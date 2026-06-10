@@ -15,12 +15,15 @@ const props = defineProps({
 
 // ── Upload form ────────────────────────────────────────────────────────────────
 
+// Must stay below upload_max_filesize in php.ini (default 2 MB).
+// .htaccess raises it to 8 MB for Apache; for nginx/artisan-serve, set upload_max_filesize=8M.
+const CHUNK_SIZE = 1.5 * 1024 * 1024; // 1.5 MB — safe under the 2 MB default
+
 const showUploadPanel = ref(false);
 const selectedFiles   = ref([]);
 const filePreviews    = ref([]);
 
 const form = useForm({
-    files:      [],
     title:      '',
     notes:      '',
     publish_at: '',
@@ -28,13 +31,22 @@ const form = useForm({
     status:     'published',
 });
 
+// Chunked upload state
+const isUploading     = ref(false);
+const uploadError     = ref(null);
+const fileProgress    = ref([]); // [{ name, progress: 0-100, done: bool }]
+const overallProgress = computed(() => {
+    if (!fileProgress.value.length) return 0;
+    return Math.round(fileProgress.value.reduce((sum, f) => sum + f.progress, 0) / fileProgress.value.length);
+});
+
 function onFilesSelected(files) {
     selectedFiles.value = files;
-    form.files = files;
 
     filePreviews.value = files.map(f => ({
         name: f.name,
-        url: f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
+        size: f.size,
+        url:  f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
         type: f.type,
     }));
 
@@ -46,19 +58,94 @@ function onFilesSelected(files) {
 function removeFile(index) {
     selectedFiles.value.splice(index, 1);
     filePreviews.value.splice(index, 1);
-    form.files = [...selectedFiles.value];
 }
 
-function submitUpload() {
-    form.post(route('admin.slides.store'), {
-        forceFormData: true,
-        onSuccess: () => {
-            form.reset();
-            selectedFiles.value = [];
-            filePreviews.value  = [];
-            showUploadPanel.value = false;
-        },
-    });
+function formatBytes(bytes) {
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function csrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
+}
+
+async function uploadChunks(file, uploadId, onProgress) {
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    let result = null;
+
+    for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE;
+        const chunk = file.slice(start, start + CHUNK_SIZE);
+
+        const fd = new FormData();
+        fd.append('upload_id',    uploadId);
+        fd.append('chunk_index',  i);
+        fd.append('total_chunks', totalChunks);
+        fd.append('filename',     file.name);
+        fd.append('mime_type',    file.type);
+        fd.append('chunk',        chunk, `chunk_${i}`);
+
+        const { data } = await window.axios.post(route('admin.uploads.chunk'), fd, {
+            headers: { 'X-CSRF-TOKEN': csrfToken() },
+        });
+
+        onProgress(Math.round(((i + 1) / totalChunks) * 100));
+
+        if (data.status === 'complete') {
+            result = data;
+        }
+    }
+
+    return result;
+}
+
+async function submitUpload() {
+    if (!selectedFiles.value.length || !form.title) return;
+
+    isUploading.value  = true;
+    uploadError.value  = null;
+    fileProgress.value = selectedFiles.value.map(f => ({ name: f.name, progress: 0, done: false }));
+
+    const completedUploads = [];
+
+    try {
+        for (let fi = 0; fi < selectedFiles.value.length; fi++) {
+            const file     = selectedFiles.value[fi];
+            const uploadId = crypto.randomUUID();
+
+            const assembled = await uploadChunks(file, uploadId, (pct) => {
+                fileProgress.value[fi].progress = pct;
+            });
+
+            fileProgress.value[fi].done = true;
+            completedUploads.push(assembled);
+        }
+
+        await window.axios.post(route('admin.uploads.finalize'), {
+            uploads:    completedUploads,
+            title:      form.title,
+            notes:      form.notes,
+            publish_at: form.publish_at,
+            expires_at: form.expires_at,
+            status:     form.status,
+        }, {
+            headers: { 'X-CSRF-TOKEN': csrfToken() },
+        });
+
+        router.visit(route('admin.slides.index'), {
+            onSuccess: () => {
+                form.reset();
+                selectedFiles.value  = [];
+                filePreviews.value   = [];
+                fileProgress.value   = [];
+                showUploadPanel.value = false;
+            },
+        });
+    } catch (err) {
+        uploadError.value = err.response?.data?.message ?? 'Upload failed. Please try again.';
+    } finally {
+        isUploading.value = false;
+    }
 }
 
 // ── Slide actions ─────────────────────────────────────────────────────────────
@@ -128,20 +215,49 @@ function statusBadge(status) {
                 <!-- File preview list -->
                 <ul v-if="filePreviews.length" class="space-y-2">
                     <li v-for="(f, i) in filePreviews" :key="i"
-                        class="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
-                        <img v-if="f.url" :src="f.url" class="h-10 w-16 rounded object-cover" />
-                        <svg v-else class="h-10 w-10 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-                                d="M15 10l4.553-2.069A1 1 0 0121 8.876V15.5a1 1 0 01-1.447.894L15 14M3 8.5A1.5 1.5 0 014.5 7h8A1.5 1.5 0 0114 8.5v7a1.5 1.5 0 01-1.5 1.5h-8A1.5 1.5 0 013 15.5v-7z" />
-                        </svg>
-                        <span class="flex-1 text-sm text-gray-700 truncate">{{ f.name }}</span>
-                        <button type="button" @click="removeFile(i)" class="text-gray-400 hover:text-red-500 transition-colors">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
+                        <div class="flex items-center gap-3">
+                            <img v-if="f.url" :src="f.url" class="h-10 w-16 rounded object-cover flex-shrink-0" />
+                            <svg v-else class="h-10 w-10 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                    d="M15 10l4.553-2.069A1 1 0 0121 8.876V15.5a1 1 0 01-1.447.894L15 14M3 8.5A1.5 1.5 0 014.5 7h8A1.5 1.5 0 0114 8.5v7a1.5 1.5 0 01-1.5 1.5h-8A1.5 1.5 0 013 15.5v-7z" />
                             </svg>
-                        </button>
+                            <div class="flex-1 min-w-0">
+                                <p class="text-sm text-gray-700 truncate">{{ f.name }}</p>
+                                <p class="text-xs text-gray-400">{{ formatBytes(f.size) }}</p>
+                            </div>
+                            <button v-if="!isUploading" type="button" @click="removeFile(i)" class="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <!-- Per-file progress bar (shown while uploading) -->
+                        <div v-if="isUploading && fileProgress[i]" class="mt-2">
+                            <div class="flex justify-between text-xs text-gray-500 mb-1">
+                                <span>{{ fileProgress[i].done ? 'Done' : 'Uploading…' }}</span>
+                                <span>{{ fileProgress[i].progress }}%</span>
+                            </div>
+                            <div class="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
+                                <div class="h-full rounded-full transition-all duration-200"
+                                    :class="fileProgress[i].done ? 'bg-green-500' : 'bg-indigo-500'"
+                                    :style="{ width: fileProgress[i].progress + '%' }" />
+                            </div>
+                        </div>
                     </li>
                 </ul>
+
+                <!-- Overall progress bar -->
+                <div v-if="isUploading && filePreviews.length > 1" class="rounded-lg bg-indigo-50 px-4 py-3">
+                    <div class="flex justify-between text-sm font-medium text-indigo-700 mb-1.5">
+                        <span>Overall progress</span>
+                        <span>{{ overallProgress }}%</span>
+                    </div>
+                    <div class="h-2 w-full rounded-full bg-indigo-100 overflow-hidden">
+                        <div class="h-full rounded-full bg-indigo-500 transition-all duration-200"
+                            :style="{ width: overallProgress + '%' }" />
+                    </div>
+                </div>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div class="sm:col-span-2">
@@ -183,15 +299,17 @@ function statusBadge(status) {
                     </div>
                 </div>
 
-                <div v-if="form.errors.files" class="text-sm text-red-600">{{ form.errors.files }}</div>
+                <div v-if="uploadError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+                    {{ uploadError }}
+                </div>
 
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" :disabled="form.processing || !selectedFiles.length"
+                    <button type="submit" :disabled="isUploading || !selectedFiles.length || !form.title"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                        {{ form.processing ? 'Uploading…' : `Upload ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}` }}
+                        {{ isUploading ? `Uploading… ${overallProgress}%` : `Upload ${selectedFiles.length} file${selectedFiles.length === 1 ? '' : 's'}` }}
                     </button>
-                    <button type="button" @click="showUploadPanel = false"
-                        class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    <button type="button" :disabled="isUploading" @click="showUploadPanel = false"
+                        class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                         Cancel
                     </button>
                 </div>
