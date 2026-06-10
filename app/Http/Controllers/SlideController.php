@@ -65,12 +65,16 @@ class SlideController extends Controller
             abort(404);
         }
 
-        $zip    = new ZipArchive();
+        $zip     = new ZipArchive();
         $tmpFile = tempnam(sys_get_temp_dir(), 'slides_');
-        $zip->open($tmpFile, ZipArchive::CREATE | ZipArchive::OVERWRITE);
+        unlink($tmpFile);
+
+        if ($zip->open($tmpFile, ZipArchive::CREATE) !== true) {
+            abort(500, 'Could not create zip archive.');
+        }
 
         foreach ($slides as $slide) {
-            $fullPath = Storage::path($slide->disk_path);
+            $fullPath = Storage::disk('public')->path($slide->disk_path);
             if (file_exists($fullPath)) {
                 $zip->addFile($fullPath, $slide->original_filename);
             }
