@@ -8,7 +8,7 @@ const props = defineProps({
     selected: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['toggle-select']);
+const emit = defineEmits(['toggle-select', 'open']);
 
 const expiresLabel = computed(() => {
     if (!props.slide.expires_at) return null;
@@ -26,20 +26,19 @@ const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_
 </script>
 
 <template>
-    <div class="group relative rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow border border-slate-200"
-        :class="{ 'ring-2 ring-indigo-500': selected }">
+    <div class="group relative rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow border border-slate-200 cursor-pointer"
+        :class="{ 'ring-2 ring-indigo-500': selected }"
+        @click="emit('open', slide)">
 
-        <!-- Selectable overlay -->
-        <div v-if="selectable" class="absolute inset-0 z-10 cursor-pointer" @click="emit('toggle-select', slide.id)">
-            <div class="absolute top-2 left-2 z-20">
-                <div class="h-5 w-5 rounded border-2 flex items-center justify-center transition-colors"
-                    :class="selected ? 'bg-indigo-600 border-indigo-600' : 'bg-white border-gray-300'">
-                    <svg v-if="selected" class="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fill-rule="evenodd"
-                            d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                            clip-rule="evenodd" />
-                    </svg>
-                </div>
+        <!-- Checkbox (selectable mode only) -->
+        <div v-if="selectable" class="absolute top-2 left-2 z-20" @click.stop="emit('toggle-select', slide.id)">
+            <div class="h-5 w-5 rounded border-2 flex items-center justify-center transition-colors"
+                :class="selected ? 'bg-indigo-600 border-indigo-600' : 'bg-white/90 border-gray-300'">
+                <svg v-if="selected" class="h-3 w-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd"
+                        d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                        clip-rule="evenodd" />
+                </svg>
             </div>
         </div>
 
@@ -69,7 +68,7 @@ const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_
         </div>
 
         <!-- Download button -->
-        <div v-if="showDownload" class="px-3 pb-3">
+        <div v-if="showDownload" class="px-3 pb-3" @click.stop>
             <a :href="route('slides.download', slide.id)"
                 class="flex items-center justify-center gap-1.5 w-full rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors">
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
