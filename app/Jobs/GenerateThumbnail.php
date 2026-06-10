@@ -15,15 +15,15 @@ class GenerateThumbnail implements ShouldQueue
 
     public function handle(): void
     {
-        $sourcePath = Storage::path($this->slide->disk_path);
+        $disk = Storage::disk('public');
+        $sourcePath = $disk->path($this->slide->disk_path);
 
         if (! file_exists($sourcePath)) {
             return;
         }
 
-        $ext = pathinfo($this->slide->filename, PATHINFO_EXTENSION);
         $thumbRelPath = 'thumbs/' . pathinfo($this->slide->filename, PATHINFO_FILENAME) . '.jpg';
-        $thumbFullPath = Storage::path($thumbRelPath);
+        $thumbFullPath = $disk->path($thumbRelPath);
 
         if ($this->slide->isImage()) {
             $this->generateImageThumbnail($sourcePath, $thumbFullPath);

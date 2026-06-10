@@ -72,12 +72,12 @@ class Slide extends Model
 
     public function getFileUrlAttribute(): string
     {
-        return Storage::url($this->disk_path);
+        return Storage::disk('public')->url($this->disk_path);
     }
 
     public function getThumbnailUrlAttribute(): ?string
     {
-        return $this->thumbnail_path ? Storage::url($this->thumbnail_path) : null;
+        return $this->thumbnail_path ? Storage::disk('public')->url($this->thumbnail_path) : null;
     }
 
     public function isImage(): bool

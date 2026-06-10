@@ -44,7 +44,7 @@ class SlideController extends Controller
             $filename   = "{$uuid}.{$ext}";
             $diskPath   = "slides/{$filename}";
 
-            $file->storeAs('slides', $filename);
+            $file->storeAs('slides', $filename, 'public');
 
             $slide = Slide::create([
                 'title'             => $request->title,
