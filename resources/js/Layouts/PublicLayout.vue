@@ -34,7 +34,7 @@ const flash = computed(() => page.props.flash);
                         </Link>
 
                         <template v-if="auth?.user">
-                            <Link v-if="auth.user.role === 'admin'" :href="route('admin.slides.index')"
+                            <Link v-if="auth.user.role === 'admin'" :href="route('admin.dashboard')"
                                 class="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-400 transition-colors">
                                 Admin
                             </Link>

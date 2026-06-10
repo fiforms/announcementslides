@@ -23,6 +23,15 @@ const user  = computed(() => page.props.auth?.user);
                 </div>
 
                 <nav class="flex-1 space-y-1 px-3 py-4">
+                    <Link :href="route('admin.dashboard')"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        :class="route().current('admin.dashboard') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                        </svg>
+                        Dashboard
+                    </Link>
                     <Link :href="route('admin.slides.index')"
                         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
                         :class="route().current('admin.slides.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">

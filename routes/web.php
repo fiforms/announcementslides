@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SlideController;
@@ -28,6 +29,7 @@ Route::middleware('auth')->group(function () {
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
     Route::get('/slides', [AdminSlideController::class, 'index'])->name('slides.index');
     Route::post('/slides', [AdminSlideController::class, 'store'])->name('slides.store');
     Route::get('/slides/{slide}/edit', [AdminSlideController::class, 'edit'])->name('slides.edit');
