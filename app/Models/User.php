@@ -40,4 +40,16 @@ class User extends Authenticatable
     {
         return $this->hasMany(Slide::class, 'uploaded_by');
     }
+
+    public function entities()
+    {
+        return $this->belongsToMany(Entity::class, 'user_entities')
+            ->withPivot('role', 'granted_by')
+            ->withTimestamps();
+    }
+
+    public function entityRole(int $entityId): ?string
+    {
+        return $this->entities()->find($entityId)?->pivot->role;
+    }
 }

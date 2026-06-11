@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ChunkedUploadController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
+use App\Http\Controllers\EntityController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SlideController;
 use App\Http\Middleware\EnsureAdmin;
@@ -25,6 +26,10 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+    Route::get('/entities/search', [EntityController::class, 'search'])->name('entities.search');
+    Route::post('/entities/{entity}/subscribe', [EntityController::class, 'subscribe'])->name('entities.subscribe');
+    Route::delete('/entities/{entity}/unsubscribe', [EntityController::class, 'unsubscribe'])->name('entities.unsubscribe');
 });
 
 // ── Admin ─────────────────────────────────────────────────────────────────────

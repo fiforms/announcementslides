@@ -18,9 +18,23 @@ class ProfileController extends Controller
      */
     public function edit(Request $request): Response
     {
+        $user = $request->user();
+
         return Inertia::render('Profile/Edit', [
-            'mustVerifyEmail' => $request->user() instanceof MustVerifyEmail,
+            'mustVerifyEmail' => $user instanceof MustVerifyEmail,
             'status' => session('status'),
+            'authMethod' => $user->google_id ? 'google' : 'password',
+            'subscriptions' => $user->entities()
+                ->orderBy('name')
+                ->get(['entities.id', 'entities.name', 'entities.city', 'entities.state', 'entities.entity_type'])
+                ->map(fn ($e) => [
+                    'id'          => $e->id,
+                    'name'        => $e->name,
+                    'city'        => $e->city,
+                    'state'       => $e->state,
+                    'entity_type' => $e->entity_type,
+                    'role'        => $e->pivot->role,
+                ]),
         ]);
     }
 
