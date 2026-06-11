@@ -1,58 +1,111 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# AnnouncementSlides
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A web-based announcement slide distribution system designed for Seventh-day Adventist churches. Administrators and authorized contributors can push slides to any church in the system; registered users can submit slides for review; and church leader users can configure slides specific to their local congregation.
 
-## About Laravel
+## Features
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- **Multi-tier role system** — admins, contributors, and church leaders each have scoped permissions
+- **Church directory integration** — loads congregations from adventistdirectory.org, organized by conference
+- **Slide submission and review workflow** — users submit slides that go through an approval process before distribution
+- **Google OAuth login** — optional single sign-on via Google accounts
+- **Multilingual support** — i18n-ready with per-language configuration
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Requirements
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8.4+
+- Composer
+- Node.js / npm
+- SQLite (default) or a supported relational database
 
-## Learning Laravel
-
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
-
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
-
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
-
-## Agentic Development
-
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+## Installation
 
 ```bash
-composer require laravel/boost --dev
+git clone <repo-url> announcementslides
+cd announcementslides
 
-php artisan boost:install
+composer install
+npm install
 ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+Copy the environment file and generate an application key:
 
-## Contributing
+```bash
+cp .env.example .env
+php artisan key:generate
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+Run database migrations:
 
-## Code of Conduct
+```bash
+php artisan migrate
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Build frontend assets:
 
-## Security Vulnerabilities
+```bash
+npm run build
+```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Create the first user
+
+```bash
+php artisan user:create
+php artisan user:setrole       # promote the user to admin
+```
+
+`user:setrole` will prompt for an email address and a role (`admin`, `contributor`, or `viewer`).
+
+### Load church data
+
+```bash
+php artisan church:load        # load entities for a conference from adventistdirectory.org
+php artisan entity:sync        # sync the local entities table
+```
+
+## Google OAuth Setup
+
+To enable Google single sign-on, create OAuth 2.0 credentials in the [Google Cloud Console](https://console.cloud.google.com/):
+
+1. Create a project and enable the **Google+ API** (or **Google Identity**).
+2. Under **Credentials**, create an **OAuth 2.0 Client ID** of type *Web application*.
+3. Add your app URL as an authorized origin and set the redirect URI to:
+   ```
+   https://your-domain.com/auth/google/callback
+   ```
+4. Copy the client ID and secret into `.env`:
+   ```ini
+   GOOGLE_CLIENT_ID=your-client-id
+   GOOGLE_CLIENT_SECRET=your-client-secret
+   GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
+   ```
+
+Users can then sign in with their Google account from the login page.
+
+## Artisan Commands
+
+| Command | Description |
+|---|---|
+| `user:create` | Create a new user account |
+| `user:list` | List all users (optionally filter by role) |
+| `user:setrole` | Set a user's role |
+| `user:setpassword` | Set a user's password |
+| `church:load` | Load Adventist entities for a conference from AdventistDirectory.org |
+| `church:list` | List all entities in the database |
+| `church:detail` | Show all stored fields for a single entity |
+| `entity:sync` | Sync the entities table |
+| `entity:assign` | Assign or remove a user role for an entity |
+| `language:add` | Add a supported language |
+| `language:list` | List all supported languages |
+
+## Development
+
+Start the development server:
+
+```bash
+php artisan serve
+npm run dev
+```
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+MIT License (see LICENSE.md)
