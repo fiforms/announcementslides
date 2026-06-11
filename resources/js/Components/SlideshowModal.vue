@@ -168,7 +168,7 @@ const handleShow = () => {
                         :key="currentIndex"
                         :src="currentSlide.file_url"
                         :alt="currentSlide.title"
-                        class="max-h-full max-w-full object-contain"
+                        class="h-full w-full object-contain"
                     />
                 </transition>
 
