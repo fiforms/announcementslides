@@ -1,6 +1,7 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import UserMenu from '@/Components/UserMenu.vue';
 
 const page = usePage();
 const auth = computed(() => page.props.auth);
@@ -21,27 +22,32 @@ const flash = computed(() => page.props.flash);
                         <span class="text-lg font-bold text-white">{{ page.props.appName }}</span>
                     </Link>
 
-                    <div class="flex items-center gap-4">
+                    <div class="flex items-center gap-6">
                         <Link :href="route('slides.index')"
                             class="text-sm text-indigo-200 hover:text-white transition-colors"
                             :class="{ 'text-white font-semibold': route().current('slides.index') }">
                             Current
                         </Link>
-                        <Link :href="route('slides.archive')"
+                        <Link v-if="auth?.user" :href="route('slides.archive')"
                             class="text-sm text-indigo-200 hover:text-white transition-colors"
                             :class="{ 'text-white font-semibold': route().current('slides.archive') }">
                             Archive
                         </Link>
 
                         <template v-if="auth?.user">
+                            <Link :href="route('my-slides.index')"
+                                class="text-sm text-indigo-200 hover:text-white transition-colors"
+                                :class="{ 'text-white font-semibold': route().current('my-slides.*') }">
+                                {{ $t('nav.my_slides') }}
+                            </Link>
+                        </template>
+
+                        <template v-if="auth?.user">
                             <Link v-if="auth.user.role === 'admin'" :href="route('admin.dashboard')"
                                 class="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-400 transition-colors">
                                 Admin
                             </Link>
-                            <Link :href="route('logout')" method="post" as="button"
-                                class="text-sm text-indigo-200 hover:text-white transition-colors">
-                                Log Out
-                            </Link>
+                            <UserMenu :user="auth.user" />
                         </template>
                         <template v-else>
                             <Link :href="route('login')"

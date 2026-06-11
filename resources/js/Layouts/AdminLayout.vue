@@ -1,6 +1,7 @@
 <script setup>
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
+import UserMenuAdmin from '@/Components/UserMenuAdmin.vue';
 
 const page = usePage();
 const flash = computed(() => page.props.flash);
@@ -69,13 +70,7 @@ const user  = computed(() => page.props.auth?.user);
                     </Link>
                 </nav>
 
-                <div class="border-t border-gray-700 px-4 py-4">
-                    <div class="text-xs text-gray-400 truncate mb-2">{{ user?.name }}</div>
-                    <Link :href="route('logout')" method="post" as="button"
-                        class="text-xs text-gray-400 hover:text-white transition-colors">
-                        {{ $t('nav.log_out') }}
-                    </Link>
-                </div>
+                <UserMenuAdmin v-if="user" :user="user" />
             </aside>
 
             <!-- Main content -->

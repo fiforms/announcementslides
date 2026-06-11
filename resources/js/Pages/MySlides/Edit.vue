@@ -25,17 +25,6 @@ function submit() {
 
 <template>
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex items-center gap-3">
-                <Link :href="route('my-slides.index')" class="text-gray-400 hover:text-gray-600 transition-colors">
-                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                </Link>
-                <h1 class="text-xl font-semibold text-gray-900">Edit Slide</h1>
-            </div>
-        </template>
-
         <div class="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
             <div class="mb-6 rounded-xl overflow-hidden bg-slate-100 aspect-video w-full max-w-sm">
                 <img v-if="slide.thumbnail_url || slide.file_url"

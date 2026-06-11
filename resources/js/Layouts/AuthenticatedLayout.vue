@@ -1,9 +1,8 @@
 <script setup>
 import { ref } from 'vue';
-import Dropdown from '@/Components/Dropdown.vue';
-import DropdownLink from '@/Components/DropdownLink.vue';
 import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
+import UserMenu from '@/Components/UserMenu.vue';
 import { Link } from '@inertiajs/vue3';
 
 const showingNavigationDropdown = ref(false);
@@ -13,7 +12,7 @@ const showingNavigationDropdown = ref(false);
     <div>
         <div class="min-h-screen bg-gray-100">
             <nav
-                class="border-b border-gray-100 bg-white"
+                class="bg-indigo-700 shadow-lg"
             >
                 <!-- Primary Navigation Menu -->
                 <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -21,95 +20,22 @@ const showingNavigationDropdown = ref(false);
                         <div class="flex">
                             <!-- App Name -->
                             <div class="flex shrink-0 items-center">
-                                <Link :href="route('dashboard')" class="text-lg font-bold text-gray-900">
+                                <Link :href="route('slides.index')" class="text-lg font-bold text-white">
                                     {{ $page.props.appName }}
                                 </Link>
                             </div>
 
-                            <!-- Navigation Links -->
-                            <div
-                                class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex"
-                            >
-                                <NavLink
-                                    :href="route('dashboard')"
-                                    :active="route().current('dashboard')"
-                                >
-                                    {{ $t('nav.dashboard') }}
-                                </NavLink>
-                                <!-- Contributor: My Slides -->
-                                <NavLink
-                                    v-if="$page.props.auth.user?.role === 'contributor' || $page.props.auth.user?.role === 'admin'"
-                                    :href="route('my-slides.index')"
-                                    :active="route().current('my-slides.*')"
-                                >
-                                    {{ $t('nav.my_slides') }}
-                                </NavLink>
-                                <!-- Entity leaders: per-entity links -->
-                                <template v-if="$page.props.auth.admin_entities?.length">
-                                    <NavLink
-                                        v-for="entity in $page.props.auth.admin_entities"
-                                        :key="entity.id"
-                                        :href="route('entity.slides.index', entity.id)"
-                                        :active="route().current('entity.slides.*')"
-                                    >
-                                        {{ entity.name }}
-                                    </NavLink>
-                                </template>
-                                <!-- Viewer: Submit a Slide (only if not a contributor or entity leader) -->
-                                <NavLink
-                                    v-if="$page.props.auth.user?.role === 'viewer' && !$page.props.auth.admin_entities?.length"
-                                    :href="route('slides.submit')"
-                                    :active="route().current('slides.submit')"
-                                >
-                                    {{ $t('nav.submit_slide') }}
-                                </NavLink>
-                            </div>
                         </div>
 
-                        <div class="hidden sm:ms-6 sm:flex sm:items-center">
-                            <!-- Settings Dropdown -->
-                            <div class="relative ms-3">
-                                <Dropdown align="right" width="48">
-                                    <template #trigger>
-                                        <span class="inline-flex rounded-md">
-                                            <button
-                                                type="button"
-                                                class="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none"
-                                            >
-                                                {{ $page.props.auth.user.name }}
-
-                                                <svg
-                                                    class="-me-0.5 ms-2 h-4 w-4"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    viewBox="0 0 20 20"
-                                                    fill="currentColor"
-                                                >
-                                                    <path
-                                                        fill-rule="evenodd"
-                                                        d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                                                        clip-rule="evenodd"
-                                                    />
-                                                </svg>
-                                            </button>
-                                        </span>
-                                    </template>
-
-                                    <template #content>
-                                        <DropdownLink
-                                            :href="route('profile.edit')"
-                                        >
-                                            {{ $t('nav.profile') }}
-                                        </DropdownLink>
-                                        <DropdownLink
-                                            :href="route('logout')"
-                                            method="post"
-                                            as="button"
-                                        >
-                                            {{ $t('nav.log_out') }}
-                                        </DropdownLink>
-                                    </template>
-                                </Dropdown>
-                            </div>
+                        <div class="hidden sm:ms-6 sm:flex sm:items-center sm:gap-6">
+                            <!-- My Slides link -->
+                            <Link
+                                :href="route('my-slides.index')"
+                                class="text-sm text-indigo-200 hover:text-white transition-colors"
+                                :class="{ 'text-white font-semibold': route().current('my-slides.*') }">
+                                {{ $t('nav.my_slides') }}
+                            </Link>
+                            <UserMenu :user="$page.props.auth.user" />
                         </div>
 
                         <!-- Hamburger -->
@@ -161,17 +87,10 @@ const showingNavigationDropdown = ref(false);
                         block: showingNavigationDropdown,
                         hidden: !showingNavigationDropdown,
                     }"
-                    class="sm:hidden"
+                    class="sm:hidden bg-indigo-600"
                 >
                     <div class="space-y-1 pb-3 pt-2">
                         <ResponsiveNavLink
-                            :href="route('dashboard')"
-                            :active="route().current('dashboard')"
-                        >
-                            {{ $t('nav.dashboard') }}
-                        </ResponsiveNavLink>
-                        <ResponsiveNavLink
-                            v-if="$page.props.auth.user?.role === 'contributor' || $page.props.auth.user?.role === 'admin'"
                             :href="route('my-slides.index')"
                             :active="route().current('my-slides.*')"
                         >
@@ -198,15 +117,15 @@ const showingNavigationDropdown = ref(false);
 
                     <!-- Responsive Settings Options -->
                     <div
-                        class="border-t border-gray-200 pb-1 pt-4"
+                        class="border-t border-indigo-500 pb-1 pt-4"
                     >
                         <div class="px-4">
                             <div
-                                class="text-base font-medium text-gray-800"
+                                class="text-base font-medium text-white"
                             >
                                 {{ $page.props.auth.user.name }}
                             </div>
-                            <div class="text-sm font-medium text-gray-500">
+                            <div class="text-sm font-medium text-indigo-200">
                                 {{ $page.props.auth.user.email }}
                             </div>
                         </div>
@@ -226,16 +145,6 @@ const showingNavigationDropdown = ref(false);
                     </div>
                 </div>
             </nav>
-
-            <!-- Page Heading -->
-            <header
-                class="bg-white shadow"
-                v-if="$slots.header"
-            >
-                <div class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-                    <slot name="header" />
-                </div>
-            </header>
 
             <!-- Page Content -->
             <main>

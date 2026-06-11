@@ -55,10 +55,6 @@ async function submit() {
 
 <template>
     <AuthenticatedLayout>
-        <template #header>
-            <h1 class="text-xl font-semibold text-gray-900">Submit a Slide</h1>
-        </template>
-
         <div class="mx-auto max-w-2xl px-4 py-8 sm:px-6 lg:px-8">
             <!-- Success state -->
             <div v-if="submitted" class="rounded-xl border border-green-200 bg-green-50 p-8 text-center">

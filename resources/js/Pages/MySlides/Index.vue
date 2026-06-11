@@ -34,9 +34,9 @@ function formatBytes(bytes) {
 
 <template>
     <AuthenticatedLayout>
-        <template #header>
-            <div class="flex items-center justify-between w-full">
-                <h1 class="text-xl font-semibold text-gray-900">My Slides</h1>
+        <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+            <!-- Upload Panel Toggle Button -->
+            <div class="flex justify-end">
                 <button @click="showUploadPanel = !showUploadPanel"
                     class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -45,9 +45,6 @@ function formatBytes(bytes) {
                     Upload Slide
                 </button>
             </div>
-        </template>
-
-        <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
             <UploadPanel
                 v-if="showUploadPanel"
                 redirect-route="my-slides.index"
