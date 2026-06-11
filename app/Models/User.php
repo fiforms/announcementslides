@@ -57,4 +57,19 @@ class User extends Authenticatable
     {
         return $this->entities()->find($entityId)?->pivot->role;
     }
+
+    public function adminEntities()
+    {
+        return $this->entities()->wherePivot('role', 'admin');
+    }
+
+    public function isEntityAdmin(int $entityId): bool
+    {
+        return $this->entityRole($entityId) === 'admin';
+    }
+
+    public function memberEntityIds(): array
+    {
+        return $this->entities()->pluck('entities.id')->toArray();
+    }
 }

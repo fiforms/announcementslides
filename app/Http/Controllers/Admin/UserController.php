@@ -45,7 +45,10 @@ class UserController extends Controller
                 'id'         => $i->id,
                 'email'      => $i->email,
                 'role'       => $i->role,
-                'created_by' => $i->creator?->only('id', 'name'),
+                'created_by' => $i->creator ? [
+                    'id'   => $i->creator->id,
+                    'name' => $i->creator->name,
+                ] : null,
                 'created_at' => $i->created_at->toDateString(),
             ]);
 

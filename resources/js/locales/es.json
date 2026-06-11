@@ -2,7 +2,13 @@
     "nav": {
         "dashboard": "Panel",
         "profile": "Perfil",
-        "log_out": "Cerrar sesión"
+        "log_out": "Cerrar sesión",
+        "my_slides": "Mis diapositivas",
+        "submit_slide": "Enviar una diapositiva",
+        "slides": "Diapositivas",
+        "users": "Usuarios",
+        "entity_slides": "Diapositivas de entidades",
+        "view_public_site": "Ver sitio público"
     },
     "auth": {
         "email": "Correo electrónico",
@@ -115,7 +121,7 @@
         "no_entity_results": "No se encontraron resultados.",
         "preregister_title": "Preinscribir un usuario",
         "email_label": "Correo electrónico",
-        "email_placeholder": "usuario@ejemplo.com",
+        "email_placeholder": "Correo electrónico",
         "role_on_login_label": "Rol al iniciar sesión",
         "role_option_viewer": "Espectador",
         "role_option_contributor": "Colaborador",
@@ -131,6 +137,76 @@
         "confirm_remove_invitation": "¿Eliminar la invitación para {email}?",
         "invite_email_subject": "Has sido invitado a {appName}",
         "invite_email_body": "Hola,\n\nSe te ha otorgado acceso de {role} a {appName}.\n\nInicia sesión con tu cuenta de Google para comenzar:\n{url}\n\nNo se requiere configuración de cuenta — solo haz clic en el enlace de arriba e inicia sesión con Google."
+    },
+    "my_slides": {
+        "page_title": "Mis diapositivas",
+        "upload_btn": "Subir diapositiva",
+        "col_slide": "Diapositiva",
+        "col_dates": "Fechas",
+        "date_from": "Desde:",
+        "date_exp": "Venc.:",
+        "always_on": "Siempre activa",
+        "archive": "Archivar",
+        "archive_confirm": "¿Archivar \"{title}\"? Ya no será visible.",
+        "no_slides": "Aún no has subido ninguna diapositiva.",
+        "upload_first_link": "Sube tu primera diapositiva"
+    },
+    "upload": {
+        "panel_title": "Subir diapositivas",
+        "title_label": "Título",
+        "notes_optional": "(opcional)",
+        "publish_hint": "No mostrar antes de esta fecha/hora",
+        "expiry_hint": "Ocultar después de esta fecha/hora",
+        "status_published": "Publicado (en vivo de inmediato)",
+        "status_draft": "Borrador (no visible)",
+        "btn_upload": "Subir {n} diapositiva | Subir {n} diapositivas",
+        "btn_uploading": "Subiendo… {pct}%"
+    },
+    "entity_slides": {
+        "page_title": "{name} — Diapositivas",
+        "upload_btn": "Subir diapositiva",
+        "entity_scoped_notice": "Las diapositivas subidas aquí son visibles solo para los miembros de {name}.",
+        "col_slide": "Diapositiva",
+        "col_dates": "Fechas",
+        "col_uploaded_by": "Subida por",
+        "date_from": "Desde:",
+        "date_exp": "Venc.:",
+        "always_on": "Siempre activa",
+        "archive": "Archivar",
+        "archive_confirm": "¿Archivar \"{title}\"? Ya no será visible.",
+        "no_slides": "Aún no hay diapositivas para {name}.",
+        "upload_first_link": "Sube la primera diapositiva",
+        "edit_title": "Editar diapositiva — {name}"
+    },
+    "submit": {
+        "page_title": "Enviar una diapositiva",
+        "review_notice": "Tu diapositiva será revisada por un administrador antes de hacerse pública.",
+        "success_title": "¡Diapositiva enviada!",
+        "success_description": "Tu diapositiva ha sido enviada a los administradores para revisión. Una vez aprobada, aparecerá en el feed público.",
+        "submit_another": "Enviar otra",
+        "title_label": "Título",
+        "title_placeholder": "Dale un título descriptivo a tu diapositiva",
+        "notes_label": "Notas para los administradores",
+        "notes_optional": "(opcional)",
+        "notes_placeholder": "Explica para qué es esta diapositiva o cuándo debería mostrarse…",
+        "btn_submit": "Enviar para revisión",
+        "btn_uploading": "Subiendo… {pct}%"
+    },
+    "admin_entities": {
+        "page_title": "Diapositivas de entidades",
+        "col_entity": "Entidad",
+        "col_type": "Tipo",
+        "col_slides": "Diapositivas",
+        "col_slide": "Diapositiva",
+        "col_dates": "Fechas",
+        "col_uploaded_by": "Subida por",
+        "date_from": "Desde:",
+        "date_exp": "Venc.:",
+        "always_on": "Siempre activa",
+        "view_slides": "Ver diapositivas",
+        "no_entities": "Aún no hay entidades con diapositivas.",
+        "entity_slides_title": "{name} — Diapositivas de entidad",
+        "no_entity_slides": "No hay diapositivas de entidad para {name}."
     },
     "admin": {
         "dashboard_title": "Panel",
@@ -173,6 +249,16 @@
         "tab_pending": "Pendiente",
         "tab_upcoming": "Próximas",
         "tab_drafts": "Borradores",
-        "tab_archived": "Archivadas recientemente"
+        "tab_archived": "Archivadas recientemente",
+        "col_slide": "Diapositiva",
+        "col_dates": "Fechas",
+        "col_uploaded_by": "Subida por",
+        "col_actions": "Acciones",
+        "no_slides_in_category": "No hay diapositivas en esta categoría.",
+        "from": "Desde:",
+        "expiration": "Venc.:",
+        "always_on": "Siempre activa",
+        "delete": "Eliminar",
+        "optional": "(opcional)"
     }
 }

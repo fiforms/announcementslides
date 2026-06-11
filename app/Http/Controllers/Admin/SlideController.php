@@ -15,11 +15,12 @@ class SlideController extends Controller
 {
     public function index(): Response
     {
-        $current  = Slide::current()->orderBy('sort_order')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
-        $pending  = Slide::pendingReview()->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
-        $upcoming = Slide::upcoming()->orderBy('publish_at')->get()->map(fn ($s) => $this->slideResource($s));
-        $archived = Slide::archived()->orderByDesc('expires_at')->limit(20)->get()->map(fn ($s) => $this->slideResource($s));
-        $drafts   = Slide::where('status', 'draft')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
+        $with     = ['uploader', 'entity'];
+        $current  = Slide::with($with)->current()->orderBy('sort_order')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
+        $pending  = Slide::with($with)->pendingReview()->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
+        $upcoming = Slide::with($with)->upcoming()->orderBy('publish_at')->get()->map(fn ($s) => $this->slideResource($s));
+        $archived = Slide::with($with)->archived()->orderByDesc('expires_at')->limit(20)->get()->map(fn ($s) => $this->slideResource($s));
+        $drafts   = Slide::with($with)->where('status', 'draft')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
 
         return Inertia::render('Admin/Slides/Index', compact('current', 'pending', 'upcoming', 'archived', 'drafts'));
     }
@@ -82,9 +83,10 @@ class SlideController extends Controller
             'expires_at' => 'nullable|date',
             'status'     => 'required|in:draft,pending,published,rejected',
             'sort_order' => 'integer|min:0',
+            'entity_id'  => 'nullable|integer|exists:entities,id',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'publish_at', 'expires_at', 'status', 'sort_order'));
+        $slide->update($request->only('title', 'notes', 'publish_at', 'expires_at', 'status', 'sort_order', 'entity_id'));
 
         return redirect()->route('admin.slides.index')
             ->with('success', 'Slide updated.');
@@ -146,6 +148,7 @@ class SlideController extends Controller
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
             'uploader'          => $slide->uploader?->only('id', 'name'),
+            'entity'            => $slide->entity ? ['id' => $slide->entity->id, 'name' => $slide->entity->name] : null,
             'created_at'        => $slide->created_at->toIso8601String(),
         ];
     }

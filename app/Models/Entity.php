@@ -39,6 +39,11 @@ class Entity extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function slides()
+    {
+        return $this->hasMany(Slide::class);
+    }
+
     public function scopeSearch($query, string $term)
     {
         return $query->where('name', 'like', '%' . $term . '%');

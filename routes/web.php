@@ -1,12 +1,16 @@
 <?php
 
-use App\Http\Controllers\Admin\ChunkedUploadController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\EntityConsoleController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\ChunkedUploadController;
 use App\Http\Controllers\EntityController;
+use App\Http\Controllers\EntitySlideController;
+use App\Http\Controllers\MySlideController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SlideController;
+use App\Http\Controllers\SubmitSlideController;
 use App\Http\Middleware\EnsureAdmin;
 use Illuminate\Support\Facades\Route;
 
@@ -21,7 +25,7 @@ Route::get('/slides/download-zip', [SlideController::class, 'downloadZip'])->nam
 
 require __DIR__.'/auth.php';
 
-// ── Profile (Breeze) ──────────────────────────────────────────────────────────
+// ── Authenticated routes ───────────────────────────────────────────────────────
 
 Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -31,14 +35,35 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::get('/entities/search', [EntityController::class, 'search'])->name('entities.search');
     Route::post('/entities/{entity}/subscribe', [EntityController::class, 'subscribe'])->name('entities.subscribe');
     Route::delete('/entities/{entity}/unsubscribe', [EntityController::class, 'unsubscribe'])->name('entities.unsubscribe');
+
+    // ── Chunked uploads (all authenticated users; role determines outcome) ──
+    Route::post('/uploads/chunk', [ChunkedUploadController::class, 'chunk'])->name('uploads.chunk');
+    Route::post('/uploads/finalize', [ChunkedUploadController::class, 'finalize'])->name('uploads.finalize');
+
+    // ── Contributor: own unscoped slide management ─────────────────────────
+    Route::prefix('my-slides')->name('my-slides.')->group(function () {
+        Route::get('/', [MySlideController::class, 'index'])->name('index');
+        Route::get('/{slide}/edit', [MySlideController::class, 'edit'])->name('edit');
+        Route::patch('/{slide}', [MySlideController::class, 'update'])->name('update');
+        Route::post('/{slide}/archive', [MySlideController::class, 'archive'])->name('archive');
+    });
+
+    // ── Entity leader: entity-scoped slide management ──────────────────────
+    Route::prefix('entity/{entity}/slides')->name('entity.slides.')->group(function () {
+        Route::get('/', [EntitySlideController::class, 'index'])->name('index');
+        Route::get('/{slide}/edit', [EntitySlideController::class, 'edit'])->name('edit');
+        Route::patch('/{slide}', [EntitySlideController::class, 'update'])->name('update');
+        Route::post('/{slide}/archive', [EntitySlideController::class, 'archive'])->name('archive');
+    });
+
+    // ── Viewer: pending slide submission ───────────────────────────────────
+    Route::get('/submit', [SubmitSlideController::class, 'index'])->name('slides.submit');
 });
 
 // ── Admin ─────────────────────────────────────────────────────────────────────
 
 Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', [AdminDashboardController::class, 'index'])->name('dashboard');
-    Route::post('/uploads/chunk', [ChunkedUploadController::class, 'chunk'])->name('uploads.chunk');
-    Route::post('/uploads/finalize', [ChunkedUploadController::class, 'finalize'])->name('uploads.finalize');
     Route::get('/slides', [AdminSlideController::class, 'index'])->name('slides.index');
     Route::post('/slides', [AdminSlideController::class, 'store'])->name('slides.store');
     Route::get('/slides/{slide}/edit', [AdminSlideController::class, 'edit'])->name('slides.edit');
@@ -56,4 +81,8 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
 
     Route::post('/invitations', [AdminUserController::class, 'storeInvitation'])->name('invitations.store');
     Route::delete('/invitations/{invitation}', [AdminUserController::class, 'destroyInvitation'])->name('invitations.destroy');
+
+    // ── Entity console (admin oversight of entity-scoped slides) ──────────
+    Route::get('/entities', [EntityConsoleController::class, 'index'])->name('entities.index');
+    Route::get('/entities/{entity}/slides', [EntityConsoleController::class, 'slides'])->name('entities.slides');
 });

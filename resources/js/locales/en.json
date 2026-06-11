@@ -2,7 +2,13 @@
     "nav": {
         "dashboard": "Dashboard",
         "profile": "Profile",
-        "log_out": "Log Out"
+        "log_out": "Log Out",
+        "my_slides": "My Slides",
+        "submit_slide": "Submit a Slide",
+        "slides": "Slides",
+        "users": "Users",
+        "entity_slides": "Entity Slides",
+        "view_public_site": "View Public Site"
     },
     "auth": {
         "email": "Email",
@@ -115,7 +121,7 @@
         "no_entity_results": "No results found.",
         "preregister_title": "Pre-register a user",
         "email_label": "Email address",
-        "email_placeholder": "user@example.com",
+        "email_placeholder": "Email address",
         "role_on_login_label": "Role on login",
         "role_option_viewer": "Viewer",
         "role_option_contributor": "Contributor",
@@ -131,6 +137,76 @@
         "confirm_remove_invitation": "Remove invitation for {email}?",
         "invite_email_subject": "You've been invited to {appName}",
         "invite_email_body": "Hi,\n\nYou've been given {role} access to {appName}.\n\nSign in with your Google account to get started:\n{url}\n\nNo account setup is required — just click the link above and sign in with Google."
+    },
+    "my_slides": {
+        "page_title": "My Slides",
+        "upload_btn": "Upload Slide",
+        "col_slide": "Slide",
+        "col_dates": "Dates",
+        "date_from": "From:",
+        "date_exp": "Exp:",
+        "always_on": "Always on",
+        "archive": "Archive",
+        "archive_confirm": "Archive \"{title}\"? It will no longer be visible.",
+        "no_slides": "You haven't uploaded any slides yet.",
+        "upload_first_link": "Upload your first slide"
+    },
+    "upload": {
+        "panel_title": "Upload Slides",
+        "title_label": "Title",
+        "notes_optional": "(optional)",
+        "publish_hint": "Don't show before this date/time",
+        "expiry_hint": "Hide after this date/time",
+        "status_published": "Published (live immediately)",
+        "status_draft": "Draft (not visible)",
+        "btn_upload": "Upload {n} slide | Upload {n} slides",
+        "btn_uploading": "Uploading… {pct}%"
+    },
+    "entity_slides": {
+        "page_title": "{name} — Slides",
+        "upload_btn": "Upload Slide",
+        "entity_scoped_notice": "Slides uploaded here are visible only to members of {name}.",
+        "col_slide": "Slide",
+        "col_dates": "Dates",
+        "col_uploaded_by": "Uploaded by",
+        "date_from": "From:",
+        "date_exp": "Exp:",
+        "always_on": "Always on",
+        "archive": "Archive",
+        "archive_confirm": "Archive \"{title}\"? It will no longer be visible.",
+        "no_slides": "No slides for {name} yet.",
+        "upload_first_link": "Upload the first slide",
+        "edit_title": "Edit Slide — {name}"
+    },
+    "submit": {
+        "page_title": "Submit a Slide",
+        "review_notice": "Your slide will be reviewed by an administrator before it becomes publicly visible.",
+        "success_title": "Slide Submitted!",
+        "success_description": "Your slide has been sent to administrators for review. Once approved, it will appear in the public slide feed.",
+        "submit_another": "Submit Another",
+        "title_label": "Title",
+        "title_placeholder": "Give your slide a descriptive title",
+        "notes_label": "Notes for administrators",
+        "notes_optional": "(optional)",
+        "notes_placeholder": "Explain what this slide is for, or when it should run…",
+        "btn_submit": "Submit for Review",
+        "btn_uploading": "Uploading… {pct}%"
+    },
+    "admin_entities": {
+        "page_title": "Entity Slides",
+        "col_entity": "Entity",
+        "col_type": "Type",
+        "col_slides": "Slides",
+        "col_slide": "Slide",
+        "col_dates": "Dates",
+        "col_uploaded_by": "Uploaded by",
+        "date_from": "From:",
+        "date_exp": "Exp:",
+        "always_on": "Always on",
+        "view_slides": "View Slides",
+        "no_entities": "No entities with slides yet.",
+        "entity_slides_title": "{name} — Entity Slides",
+        "no_entity_slides": "No entity-scoped slides for {name}."
     },
     "admin": {
         "dashboard_title": "Dashboard",
@@ -173,6 +249,16 @@
         "tab_pending": "Pending",
         "tab_upcoming": "Upcoming",
         "tab_drafts": "Drafts",
-        "tab_archived": "Recent Archived"
+        "tab_archived": "Recent Archived",
+        "col_slide": "Slide",
+        "col_dates": "Dates",
+        "col_uploaded_by": "Uploaded by",
+        "col_actions": "Actions",
+        "no_slides_in_category": "No slides in this category.",
+        "from": "From:",
+        "expiration": "Exp:",
+        "always_on": "Always on",
+        "delete": "Delete",
+        "optional": "(optional)"
     }
 }

@@ -30,7 +30,7 @@ const user  = computed(() => page.props.auth?.user);
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                         </svg>
-                        Dashboard
+                        {{ $t('nav.dashboard') }}
                     </Link>
                     <Link :href="route('admin.slides.index')"
                         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -39,7 +39,7 @@ const user  = computed(() => page.props.auth?.user);
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        Slides
+                        {{ $t('nav.slides') }}
                     </Link>
                     <Link :href="route('admin.users.index')"
                         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
@@ -48,7 +48,16 @@ const user  = computed(() => page.props.auth?.user);
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                         </svg>
-                        Users
+                        {{ $t('nav.users') }}
+                    </Link>
+                    <Link :href="route('admin.entities.index')"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        :class="route().current('admin.entities.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                        </svg>
+                        {{ $t('nav.entity_slides') }}
                     </Link>
                     <Link :href="route('slides.index')"
                         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
@@ -56,7 +65,7 @@ const user  = computed(() => page.props.auth?.user);
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                         </svg>
-                        View Public Site
+                        {{ $t('nav.view_public_site') }}
                     </Link>
                 </nav>
 
@@ -64,7 +73,7 @@ const user  = computed(() => page.props.auth?.user);
                     <div class="text-xs text-gray-400 truncate mb-2">{{ user?.name }}</div>
                     <Link :href="route('logout')" method="post" as="button"
                         class="text-xs text-gray-400 hover:text-white transition-colors">
-                        Log Out
+                        {{ $t('nav.log_out') }}
                     </Link>
                 </div>
             </aside>

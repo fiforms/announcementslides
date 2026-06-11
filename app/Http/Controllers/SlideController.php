@@ -11,9 +11,10 @@ use ZipArchive;
 
 class SlideController extends Controller
 {
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $slides = Slide::current()
+            ->visibleToUser($request->user())
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get()
@@ -24,7 +25,9 @@ class SlideController extends Controller
 
     public function archive(Request $request): Response
     {
-        $query = Slide::archived()->orderByDesc('expires_at');
+        $query = Slide::archived()
+            ->visibleToUser($request->user())
+            ->orderByDesc('expires_at');
 
         if ($search = $request->query('search')) {
             $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")
@@ -53,7 +56,7 @@ class SlideController extends Controller
     {
         $ids = $request->query('ids');
 
-        $query = Slide::current()->orderBy('sort_order');
+        $query = Slide::current()->visibleToUser($request->user())->orderBy('sort_order');
 
         if ($ids) {
             $query->whereIn('id', explode(',', $ids));

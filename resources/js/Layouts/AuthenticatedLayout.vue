@@ -36,6 +36,33 @@ const showingNavigationDropdown = ref(false);
                                 >
                                     {{ $t('nav.dashboard') }}
                                 </NavLink>
+                                <!-- Contributor: My Slides -->
+                                <NavLink
+                                    v-if="$page.props.auth.user?.role === 'contributor' || $page.props.auth.user?.role === 'admin'"
+                                    :href="route('my-slides.index')"
+                                    :active="route().current('my-slides.*')"
+                                >
+                                    {{ $t('nav.my_slides') }}
+                                </NavLink>
+                                <!-- Entity leaders: per-entity links -->
+                                <template v-if="$page.props.auth.admin_entities?.length">
+                                    <NavLink
+                                        v-for="entity in $page.props.auth.admin_entities"
+                                        :key="entity.id"
+                                        :href="route('entity.slides.index', entity.id)"
+                                        :active="route().current('entity.slides.*')"
+                                    >
+                                        {{ entity.name }}
+                                    </NavLink>
+                                </template>
+                                <!-- Viewer: Submit a Slide (only if not a contributor or entity leader) -->
+                                <NavLink
+                                    v-if="$page.props.auth.user?.role === 'viewer' && !$page.props.auth.admin_entities?.length"
+                                    :href="route('slides.submit')"
+                                    :active="route().current('slides.submit')"
+                                >
+                                    {{ $t('nav.submit_slide') }}
+                                </NavLink>
                             </div>
                         </div>
 
@@ -142,6 +169,30 @@ const showingNavigationDropdown = ref(false);
                             :active="route().current('dashboard')"
                         >
                             {{ $t('nav.dashboard') }}
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="$page.props.auth.user?.role === 'contributor' || $page.props.auth.user?.role === 'admin'"
+                            :href="route('my-slides.index')"
+                            :active="route().current('my-slides.*')"
+                        >
+                            {{ $t('nav.my_slides') }}
+                        </ResponsiveNavLink>
+                        <template v-if="$page.props.auth.admin_entities?.length">
+                            <ResponsiveNavLink
+                                v-for="entity in $page.props.auth.admin_entities"
+                                :key="entity.id"
+                                :href="route('entity.slides.index', entity.id)"
+                                :active="route().current('entity.slides.*')"
+                            >
+                                {{ entity.name }}
+                            </ResponsiveNavLink>
+                        </template>
+                        <ResponsiveNavLink
+                            v-if="$page.props.auth.user?.role === 'viewer' && !$page.props.auth.admin_entities?.length"
+                            :href="route('slides.submit')"
+                            :active="route().current('slides.submit')"
+                        >
+                            {{ $t('nav.submit_slide') }}
                         </ResponsiveNavLink>
                     </div>
 

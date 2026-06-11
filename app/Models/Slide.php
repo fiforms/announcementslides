@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
+use App\Models\Entity;
+use App\Models\User;
 
 class Slide extends Model
 {
@@ -14,7 +16,7 @@ class Slide extends Model
     protected $fillable = [
         'title', 'notes', 'filename', 'original_filename', 'disk_path',
         'file_size', 'mime_type', 'thumbnail_path', 'publish_at', 'expires_at',
-        'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at',
+        'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id',
     ];
 
     protected function casts(): array
@@ -38,6 +40,11 @@ class Slide extends Model
     public function reviewer()
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function entity()
+    {
+        return $this->belongsTo(Entity::class);
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
@@ -66,6 +73,25 @@ class Slide extends Model
         return $query->where('status', 'published')
             ->whereNotNull('publish_at')
             ->where('publish_at', '>', now());
+    }
+
+    public function scopeUnscoped(Builder $query): Builder
+    {
+        return $query->whereNull('entity_id');
+    }
+
+    public function scopeEntityScoped(Builder $query, int $entityId): Builder
+    {
+        return $query->where('entity_id', $entityId);
+    }
+
+    public function scopeVisibleToUser(Builder $query, ?User $user): Builder
+    {
+        if ($user) {
+            $entityIds = $user->memberEntityIds();
+            return $query->where(fn ($q) => $q->whereNull('entity_id')->orWhereIn('entity_id', $entityIds));
+        }
+        return $query->whereNull('entity_id');
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────

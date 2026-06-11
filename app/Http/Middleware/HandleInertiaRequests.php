@@ -34,7 +34,8 @@ class HandleInertiaRequests extends Middleware
             'appName' => config('app.name'),
             'isDev'   => app()->environment('local'),
             'auth' => [
-                'user' => $request->user(),
+                'user'             => $request->user()?->only('id', 'name', 'email', 'role', 'avatar_url'),
+                'admin_entities'   => $request->user()?->adminEntities()->get(['entities.id', 'entities.name']) ?? [],
             ],
             'flash' => [
                 'success' => session('success'),
