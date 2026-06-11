@@ -3,6 +3,9 @@ import { ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     slides: { type: Object, required: true }, // paginated
@@ -29,11 +32,11 @@ function onSearch() {
 
         <div class="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-                <h1 class="text-2xl font-bold text-gray-900">Slide Archive</h1>
-                <p class="mt-1 text-sm text-gray-500">Past slides that have expired.</p>
+                <h1 class="text-2xl font-bold text-gray-900">{{ $t('slides.archive_title') }}</h1>
+                <p class="mt-1 text-sm text-gray-500">{{ $t('slides.archive_description') }}</p>
             </div>
 
-            <input v-model="searchQuery" @input="onSearch" type="search" placeholder="Search by title or notes…"
+            <input v-model="searchQuery" @input="onSearch" type="search" :placeholder="$t('slides.search_placeholder')"
                 class="w-full sm:w-64 rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
         </div>
 
@@ -48,7 +51,7 @@ function onSearch() {
 
         <div v-else class="mt-16 text-center">
             <p class="text-lg font-medium text-gray-500">
-                {{ search ? 'No results for your search.' : 'No archived slides yet.' }}
+                {{ search ? $t('slides.no_results') : $t('slides.no_archived_slides') }}
             </p>
         </div>
 

@@ -2,6 +2,9 @@
 import { computed } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import { useI18n } from 'vue-i18n';
+
+const { t } = useI18n();
 
 const props = defineProps({
     stats:         { type: Object, required: true },
@@ -12,7 +15,7 @@ const props = defineProps({
 
 const statCards = computed(() => [
     {
-        label: 'Live Slides',
+        label: t('admin.live_slides'),
         value: props.stats.live,
         color: 'bg-green-500',
         text:  'text-green-700',
@@ -21,7 +24,7 @@ const statCards = computed(() => [
         icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
     },
     {
-        label: 'Pending Review',
+        label: t('admin.pending_review'),
         value: props.stats.pending,
         color: 'bg-yellow-500',
         text:  'text-yellow-700',
@@ -31,7 +34,7 @@ const statCards = computed(() => [
         urgent: props.stats.pending > 0,
     },
     {
-        label: 'Upcoming',
+        label: t('admin.upcoming'),
         value: props.stats.upcoming,
         color: 'bg-blue-500',
         text:  'text-blue-700',
@@ -40,7 +43,7 @@ const statCards = computed(() => [
         icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z',
     },
     {
-        label: 'Expiring Soon',
+        label: t('admin.expiring_soon'),
         value: props.stats.expiring_soon,
         color: 'bg-orange-500',
         text:  'text-orange-700',
@@ -50,7 +53,7 @@ const statCards = computed(() => [
         urgent: props.stats.expiring_soon > 0,
     },
     {
-        label: 'In Archive',
+        label: t('admin.in_archive'),
         value: props.stats.archived,
         color: 'bg-gray-400',
         text:  'text-gray-600',
@@ -78,7 +81,7 @@ function expiresClass(isoDate) {
 <template>
     <AdminLayout>
         <template #header>
-            <h1 class="text-xl font-semibold text-gray-900">Dashboard</h1>
+            <h1 class="text-xl font-semibold text-gray-900">{{ $t('admin.dashboard_title') }}</h1>
         </template>
 
         <!-- Stat cards -->
@@ -114,7 +117,7 @@ function expiresClass(isoDate) {
             <section class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                 <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                     <h2 class="text-sm font-semibold text-gray-900">
-                        Pending Review
+                        {{ $t('admin.pending_review') }}
                         <span v-if="pendingSlides.length"
                             class="ml-2 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-700">
                             {{ pendingSlides.length }}
@@ -122,7 +125,7 @@ function expiresClass(isoDate) {
                     </h2>
                     <Link :href="route('admin.slides.index', { tab: 'pending' })"
                         class="text-xs text-indigo-600 hover:text-indigo-800 transition-colors">
-                        View all →
+                        {{ $t('admin.view_all') }}
                     </Link>
                 </div>
 
@@ -143,18 +146,18 @@ function expiresClass(isoDate) {
                         <div class="flex items-center gap-2 flex-shrink-0">
                             <button @click="approve(slide.id)"
                                 class="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 transition-colors">
-                                Approve
+                                {{ $t('admin.approve') }}
                             </button>
                             <button @click="reject(slide.id)"
                                 class="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
-                                Reject
+                                {{ $t('admin.reject') }}
                             </button>
                         </div>
                     </div>
                 </div>
 
                 <div v-else class="px-5 py-10 text-center text-sm text-gray-400">
-                    No slides waiting for review.
+                    {{ $t('admin.no_pending_slides') }}
                 </div>
             </section>
 
@@ -162,7 +165,7 @@ function expiresClass(isoDate) {
             <section class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                 <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
                     <h2 class="text-sm font-semibold text-gray-900">
-                        Expiring Within 7 Days
+                        {{ $t('admin.expiring_within_7_days') }}
                         <span v-if="expiringSoon.length"
                             class="ml-2 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-semibold text-orange-700">
                             {{ expiringSoon.length }}
@@ -170,7 +173,7 @@ function expiresClass(isoDate) {
                     </h2>
                     <Link :href="route('admin.slides.index')"
                         class="text-xs text-indigo-600 hover:text-indigo-800 transition-colors">
-                        Manage →
+                        {{ $t('admin.manage') }}
                     </Link>
                 </div>
 
@@ -190,23 +193,23 @@ function expiresClass(isoDate) {
                         </div>
                         <Link :href="route('admin.slides.edit', slide.id)"
                             class="flex-shrink-0 rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-                            Edit
+                            {{ $t('admin.edit') }}
                         </Link>
                     </div>
                 </div>
 
                 <div v-else class="px-5 py-10 text-center text-sm text-gray-400">
-                    No slides expiring soon.
+                    {{ $t('admin.no_expiring_soon') }}
                 </div>
             </section>
 
             <!-- Recently Added -->
             <section class="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden lg:col-span-2">
                 <div class="flex items-center justify-between border-b border-gray-100 px-5 py-4">
-                    <h2 class="text-sm font-semibold text-gray-900">Recently Published</h2>
+                    <h2 class="text-sm font-semibold text-gray-900">{{ $t('admin.recently_published') }}</h2>
                     <Link :href="route('admin.slides.index')"
                         class="text-xs text-indigo-600 hover:text-indigo-800 transition-colors">
-                        All slides →
+                        {{ $t('admin.all_slides') }}
                     </Link>
                 </div>
 
@@ -226,15 +229,15 @@ function expiresClass(isoDate) {
                         </div>
                         <Link :href="route('admin.slides.edit', slide.id)"
                             class="flex-shrink-0 rounded-md border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
-                            Edit
+                            {{ $t('admin.edit') }}
                         </Link>
                     </div>
                 </div>
 
                 <div v-else class="px-5 py-10 text-center text-sm text-gray-400">
-                    No slides published yet.
+                    {{ $t('admin.no_published_slides') }}
                     <Link :href="route('admin.slides.index')"
-                        class="ml-1 text-indigo-600 hover:underline">Upload the first one →</Link>
+                        class="ml-1 text-indigo-600 hover:underline">{{ $t('admin.upload_first') }}</Link>
                 </div>
             </section>
 
