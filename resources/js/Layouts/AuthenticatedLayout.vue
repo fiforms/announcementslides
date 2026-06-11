@@ -20,20 +20,41 @@ const showingNavigationDropdown = ref(false);
                         <div class="flex">
                             <!-- App Name -->
                             <div class="flex shrink-0 items-center">
-                                <Link :href="route('slides.index')" class="text-lg font-bold text-white">
-                                    {{ $page.props.appName }}
+                                <Link :href="route('slides.index')" class="flex items-center gap-2">
+                                    <svg class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                    </svg>
+                                    <span class="text-lg font-bold text-white">{{ $page.props.appName }}</span>
                                 </Link>
                             </div>
 
                         </div>
 
                         <div class="hidden sm:ms-6 sm:flex sm:items-center sm:gap-6">
+                            <!-- Current link -->
+                            <Link :href="route('slides.index')"
+                                class="text-sm text-indigo-200 hover:text-white transition-colors"
+                                :class="{ 'text-white font-semibold': route().current('slides.index') }">
+                                Current
+                            </Link>
+                            <!-- Archive link -->
+                            <Link :href="route('slides.archive')"
+                                class="text-sm text-indigo-200 hover:text-white transition-colors"
+                                :class="{ 'text-white font-semibold': route().current('slides.archive') }">
+                                Archive
+                            </Link>
                             <!-- My Slides link -->
                             <Link
                                 :href="route('my-slides.index')"
                                 class="text-sm text-indigo-200 hover:text-white transition-colors"
                                 :class="{ 'text-white font-semibold': route().current('my-slides.*') }">
                                 {{ $t('nav.my_slides') }}
+                            </Link>
+                            <!-- Admin button -->
+                            <Link v-if="$page.props.auth.user?.role === 'admin'" :href="route('admin.dashboard')"
+                                class="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-400 transition-colors">
+                                Admin
                             </Link>
                             <UserMenu :user="$page.props.auth.user" />
                         </div>
