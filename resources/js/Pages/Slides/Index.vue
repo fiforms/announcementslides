@@ -3,6 +3,8 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
+import Dropdown from '@/Components/Dropdown.vue';
+import SlideshowModal from '@/Components/SlideshowModal.vue';
 import { useI18n } from 'vue-i18n';
 
 const { t, locale } = useI18n();
@@ -56,6 +58,20 @@ function downloadAll() {
     window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
+// Slideshow
+const showSlideshow = ref(false);
+const slideshowSlides = ref([]);
+
+function openSlideshowSelected() {
+    slideshowSlides.value = props.slides.filter(s => selectedIds.value.has(s.id));
+    showSlideshow.value = true;
+}
+
+function openSlideshowAll() {
+    slideshowSlides.value = props.slides;
+    showSlideshow.value = true;
+}
+
 // Lightbox
 const lightboxSlide = ref(null);
 
@@ -106,28 +122,54 @@ onUnmounted(() => {
                         class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                         {{ $t('slides.clear') }} ({{ selectedIds.size }})
                     </button>
-                    <button @click="downloadSelected"
-                        class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        {{ $t('slides.download_selected') }} ({{ selectedIds.size }})
-                    </button>
+                    <Dropdown align="left" width="48" contentClasses="py-1 bg-white">
+                        <template #trigger>
+                            <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Show/Download Selected ({{ selectedIds.size }})
+                            </button>
+                        </template>
+                        <template #content>
+                            <button @click="openSlideshowSelected"
+                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
+                                Slideshow
+                            </button>
+                            <a @click="downloadSelected"
+                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
+                                Download (.zip)
+                            </a>
+                        </template>
+                    </Dropdown>
                 </template>
                 <template v-else>
                     <button @click="selectAll"
                         class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                         {{ $t('slides.select_all') }}
                     </button>
-                    <button v-if="slides.length" @click="downloadAll"
-                        class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        {{ $t('slides.download_all') }}
-                    </button>
+                    <Dropdown v-if="slides.length" align="left" width="48" contentClasses="py-1 bg-white">
+                        <template #trigger>
+                            <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Show/Download All
+                            </button>
+                        </template>
+                        <template #content>
+                            <button @click="openSlideshowAll"
+                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
+                                Slideshow
+                            </button>
+                            <a @click="downloadAll"
+                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
+                                Download (.zip)
+                            </a>
+                        </template>
+                    </Dropdown>
                 </template>
                 </div>
             </div>
@@ -154,6 +196,9 @@ onUnmounted(() => {
             <p class="mt-4 text-lg font-medium text-gray-500">{{ $t('slides.no_slides_available') }}</p>
             <p class="text-sm text-gray-400">{{ $t('slides.check_back_soon') }}</p>
         </div>
+        <!-- Slideshow Modal -->
+        <SlideshowModal :show="showSlideshow" :slides="slideshowSlides" @close="showSlideshow = false" />
+
         <!-- Lightbox -->
         <Teleport to="body">
             <Transition
