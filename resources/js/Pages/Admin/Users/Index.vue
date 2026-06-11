@@ -1,7 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue';
-import { router, useForm } from '@inertiajs/vue3';
+import { router, useForm, usePage } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+
+const { t } = useI18n();
+const appName = computed(() => usePage().props.appName);
 
 const props = defineProps({
     users:       { type: Array, default: () => [] },
@@ -34,9 +38,7 @@ function toggleExpand(userId) {
 
 function setGlobalRole(user, role) {
     if (user.role === role) return;
-    router.patch(route('admin.users.update', user.id), { role }, {
-        preserveScroll: true,
-    });
+    router.patch(route('admin.users.update', user.id), { role }, { preserveScroll: true });
 }
 
 // ── Entity role update ─────────────────────────────────────────────────────────
@@ -49,7 +51,7 @@ function setEntityRole(user, entity, role) {
 }
 
 function detachEntity(user, entity) {
-    if (!confirm(`Remove ${user.name}'s relationship with "${entity.name}"?`)) return;
+    if (!confirm(t('admin_users.confirm_detach_entity', { user: user.name, entity: entity.name }))) return;
     router.delete(route('admin.users.entities.detach', { user: user.id, entity: entity.id }), {
         preserveScroll: true,
     });
@@ -105,7 +107,7 @@ function submitInvite() {
 }
 
 function destroyInvitation(invitation) {
-    if (!confirm(`Remove invitation for ${invitation.email}?`)) return;
+    if (!confirm(t('admin_users.confirm_remove_invitation', { email: invitation.email }))) return;
     router.delete(route('admin.invitations.destroy', invitation.id), { preserveScroll: true });
 }
 
@@ -127,12 +129,19 @@ function entityRoleBadgeClass(role) {
         ? 'bg-indigo-100 text-indigo-700'
         : 'bg-gray-100 text-gray-600';
 }
+
+function inviteMailtoLink(inv) {
+    const loginUrl = new URL(route('auth.google'), window.location.origin).href;
+    const subject  = t('admin_users.invite_email_subject', { appName: appName.value });
+    const body     = t('admin_users.invite_email_body', { role: inv.role, appName: appName.value, url: loginUrl });
+    return `mailto:${inv.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 </script>
 
 <template>
     <AdminLayout>
         <template #header>
-            <h1 class="text-xl font-semibold text-gray-900">Users</h1>
+            <h1 class="text-xl font-semibold text-gray-900">{{ $t('admin_users.page_title') }}</h1>
         </template>
 
         <!-- Tabs -->
@@ -143,7 +152,7 @@ function entityRoleBadgeClass(role) {
                     :class="activeTab === 'users'
                         ? 'border-indigo-600 text-indigo-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
-                    Users
+                    {{ $t('admin_users.tab_users') }}
                     <span class="ml-1.5 rounded-full px-2 py-0.5 text-xs font-semibold bg-gray-100 text-gray-600">
                         {{ users.length }}
                     </span>
@@ -153,7 +162,7 @@ function entityRoleBadgeClass(role) {
                     :class="activeTab === 'invitations'
                         ? 'border-indigo-600 text-indigo-600'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
-                    Pending Invitations
+                    {{ $t('admin_users.tab_invitations') }}
                     <span class="ml-1.5 rounded-full px-2 py-0.5 text-xs font-semibold"
                         :class="invitations.length > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'">
                         {{ invitations.length }}
@@ -165,7 +174,7 @@ function entityRoleBadgeClass(role) {
         <!-- ── Users tab ─────────────────────────────────────────────────────── -->
         <template v-if="activeTab === 'users'">
             <div class="mb-6 max-w-sm">
-                <input v-model="search" type="search" placeholder="Search by name or email…"
+                <input v-model="search" type="search" :placeholder="$t('admin_users.search_placeholder')"
                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
             </div>
 
@@ -173,10 +182,10 @@ function entityRoleBadgeClass(role) {
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">User</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Global Role</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Joined</th>
-                            <th class="px-4 py-3 text-right font-medium text-gray-500">Entities</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin_users.col_user') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin_users.col_global_role') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">{{ $t('admin_users.col_joined') }}</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">{{ $t('admin_users.col_entities') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -218,7 +227,7 @@ function entityRoleBadgeClass(role) {
                                 <td class="px-4 py-3 text-right">
                                     <div class="flex items-center justify-end gap-2">
                                         <span class="text-xs text-gray-500">
-                                            {{ user.entities.length }} {{ user.entities.length === 1 ? 'entity' : 'entities' }}
+                                            {{ $t('admin_users.entity_count', { n: user.entities.length }, user.entities.length) }}
                                         </span>
                                         <svg class="h-4 w-4 text-gray-400 transition-transform"
                                             :class="expandedUser === user.id ? 'rotate-180' : ''"
@@ -233,13 +242,13 @@ function entityRoleBadgeClass(role) {
                                 <td colspan="4" class="bg-gray-50 px-4 py-4">
                                     <div class="pl-11">
                                         <div class="flex items-center justify-between mb-3">
-                                            <h3 class="text-sm font-semibold text-gray-700">Entity Relationships</h3>
+                                            <h3 class="text-sm font-semibold text-gray-700">{{ $t('admin_users.entity_relationships') }}</h3>
                                             <button @click.stop="openAttachPanel(user)"
                                                 class="flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors">
                                                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                                                 </svg>
-                                                Add Entity
+                                                {{ $t('admin_users.add_entity') }}
                                             </button>
                                         </div>
 
@@ -247,10 +256,10 @@ function entityRoleBadgeClass(role) {
                                             <table class="min-w-full divide-y divide-gray-100 text-xs">
                                                 <thead class="bg-gray-50">
                                                     <tr>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Entity</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Type</th>
-                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">Role</th>
-                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">Actions</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">{{ $t('admin_users.col_entity') }}</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">{{ $t('admin_users.col_type') }}</th>
+                                                        <th class="px-3 py-2 text-left font-medium text-gray-500">{{ $t('admin_users.col_role') }}</th>
+                                                        <th class="px-3 py-2 text-right font-medium text-gray-500">{{ $t('admin_users.col_actions') }}</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody class="divide-y divide-gray-100">
@@ -267,8 +276,8 @@ function entityRoleBadgeClass(role) {
                                                                 @change="setEntityRole(user, entity, $event.target.value)"
                                                                 class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:ring-indigo-500"
                                                                 :class="entityRoleBadgeClass(entity.role)">
-                                                                <option value="viewer">viewer</option>
-                                                                <option value="admin">leader</option>
+                                                                <option value="viewer">{{ $t('admin_users.role_viewer') }}</option>
+                                                                <option value="admin">{{ $t('admin_users.role_leader') }}</option>
                                                             </select>
                                                         </td>
                                                         <td class="px-3 py-2 text-right">
@@ -284,7 +293,7 @@ function entityRoleBadgeClass(role) {
                                             </table>
                                         </div>
 
-                                        <p v-else class="text-xs text-gray-400 italic">No entity relationships yet.</p>
+                                        <p v-else class="text-xs text-gray-400 italic">{{ $t('admin_users.no_entity_relationships') }}</p>
                                     </div>
                                 </td>
                             </tr>
@@ -294,53 +303,49 @@ function entityRoleBadgeClass(role) {
             </div>
 
             <div v-if="!filteredUsers.length" class="mt-8 rounded-xl border-2 border-dashed border-gray-200 py-12 text-center">
-                <p class="text-gray-400 text-sm">No users found.</p>
+                <p class="text-gray-400 text-sm">{{ $t('admin_users.no_users') }}</p>
             </div>
         </template>
 
         <!-- ── Invitations tab ───────────────────────────────────────────────── -->
         <template v-if="activeTab === 'invitations'">
-            <!-- Add invitation form -->
             <div class="mb-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h2 class="text-sm font-semibold text-gray-900 mb-4">Pre-register a user</h2>
+                <h2 class="text-sm font-semibold text-gray-900 mb-4">{{ $t('admin_users.preregister_title') }}</h2>
                 <form @submit.prevent="submitInvite" class="flex flex-wrap items-end gap-3">
                     <div class="flex-1 min-w-48">
-                        <label class="block text-xs font-medium text-gray-700 mb-1">Email address</label>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">{{ $t('admin_users.email_label') }}</label>
                         <input v-model="inviteForm.email" type="email" required
-                            placeholder="user@example.com"
+                            :placeholder="$t('admin_users.email_placeholder')"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             :class="inviteForm.errors.email ? 'border-red-400' : ''" />
                         <p v-if="inviteForm.errors.email" class="mt-1 text-xs text-red-600">{{ inviteForm.errors.email }}</p>
                     </div>
                     <div>
-                        <label class="block text-xs font-medium text-gray-700 mb-1">Role on login</label>
+                        <label class="block text-xs font-medium text-gray-700 mb-1">{{ $t('admin_users.role_on_login_label') }}</label>
                         <select v-model="inviteForm.role"
                             class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="viewer">Viewer</option>
-                            <option value="contributor">Contributor</option>
-                            <option value="admin">Admin</option>
+                            <option value="viewer">{{ $t('admin_users.role_option_viewer') }}</option>
+                            <option value="contributor">{{ $t('admin_users.role_option_contributor') }}</option>
+                            <option value="admin">{{ $t('admin_users.role_option_admin') }}</option>
                         </select>
                     </div>
                     <button type="submit" :disabled="inviteForm.processing"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                        Save
+                        {{ $t('admin_users.save') }}
                     </button>
                 </form>
-                <p class="mt-3 text-xs text-gray-400">
-                    If the email already belongs to an existing account, their role will be updated immediately instead of queuing an invitation.
-                </p>
+                <p class="mt-3 text-xs text-gray-400">{{ $t('admin_users.preregister_hint') }}</p>
             </div>
 
-            <!-- Invitation list -->
             <div v-if="invitations.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Email</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Role</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Added by</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Date</th>
-                            <th class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin_users.col_email') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin_users.col_role') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">{{ $t('admin_users.col_added_by') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">{{ $t('admin_users.col_date') }}</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">{{ $t('admin_users.col_actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -359,10 +364,16 @@ function entityRoleBadgeClass(role) {
                                 {{ inv.created_at }}
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <button @click="destroyInvitation(inv)"
-                                    class="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
-                                    Remove
-                                </button>
+                                <div class="flex items-center justify-end gap-2">
+                                    <a :href="inviteMailtoLink(inv)"
+                                        class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                                        {{ $t('admin_users.send_email') }}
+                                    </a>
+                                    <button @click="destroyInvitation(inv)"
+                                        class="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
+                                        {{ $t('admin_users.remove') }}
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -370,7 +381,7 @@ function entityRoleBadgeClass(role) {
             </div>
 
             <div v-else class="mt-2 rounded-xl border-2 border-dashed border-gray-200 py-12 text-center">
-                <p class="text-gray-400 text-sm">No pending invitations.</p>
+                <p class="text-gray-400 text-sm">{{ $t('admin_users.no_invitations') }}</p>
             </div>
         </template>
 
@@ -379,7 +390,7 @@ function entityRoleBadgeClass(role) {
             <div class="w-full max-w-md rounded-2xl bg-white shadow-xl" @click.stop>
                 <div class="border-b border-gray-200 px-6 py-4 flex items-center justify-between">
                     <h2 class="text-base font-semibold text-gray-900">
-                        Add Entity for {{ attachingUser.name }}
+                        {{ $t('admin_users.modal_add_entity_title', { name: attachingUser.name }) }}
                     </h2>
                     <button @click="closeAttachPanel" class="text-gray-400 hover:text-gray-600 transition-colors">
                         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -390,18 +401,18 @@ function entityRoleBadgeClass(role) {
 
                 <div class="p-6 space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Search Entity</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin_users.search_entity_label') }}</label>
                         <input v-model="entitySearch" @input="searchEntities" type="search"
-                            placeholder="Type to search…"
+                            :placeholder="$t('admin_users.search_entity_placeholder')"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     </div>
 
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin_users.role_label') }}</label>
                         <select v-model="attachRole"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="viewer">Viewer (member)</option>
-                            <option value="admin">Leader (admin)</option>
+                            <option value="viewer">{{ $t('admin_users.role_viewer_member') }}</option>
+                            <option value="admin">{{ $t('admin_users.role_leader_admin') }}</option>
                         </select>
                     </div>
 
@@ -417,7 +428,7 @@ function entityRoleBadgeClass(role) {
                         </li>
                     </ul>
 
-                    <p v-else-if="entitySearch.trim()" class="text-xs text-gray-400 italic">No results found.</p>
+                    <p v-else-if="entitySearch.trim()" class="text-xs text-gray-400 italic">{{ $t('admin_users.no_entity_results') }}</p>
                 </div>
             </div>
         </div>
