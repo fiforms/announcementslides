@@ -180,12 +180,12 @@ class SlideController extends Controller
 
         $presentation = new PhpPresentation();
         $presentation->getProperties()->setTitle('Announcement Slides');
+        $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
         $presentation->removeSlideByIndex(0);
 
         // Slide dimensions (in presentation units)
-        // Using larger dimensions than before for bigger images
-        $slideWidth = 3600;
-        $slideHeight = 2025;
+        $slideWidth = 1920;
+        $slideHeight = 1080;
 
         foreach ($slides as $slide) {
             $fullPath = Storage::disk('public')->path($slide->disk_path);
@@ -206,10 +206,10 @@ class SlideController extends Controller
 
                     $shape = new DrawingFile();
                     $shape->setPath($fullPath)
-                        ->setHeight($newHeight)
-                        ->setWidth($newWidth)
-                        ->setOffsetX($offsetX)
-                        ->setOffsetY($offsetY);
+                        ->setHeight($newHeight / 2)
+                        ->setWidth($newWidth / 2)
+                        ->setOffsetX($offsetX / 2)
+                        ->setOffsetY($offsetY / 2);
                     $newSlide->addShape($shape);
                 }
             }
