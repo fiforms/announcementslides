@@ -11,6 +11,8 @@ use Inertia\Response;
 use PhpOffice\PhpPresentation\DocumentLayout;
 use PhpOffice\PhpPresentation\Shape\Drawing\File as DrawingFile;
 use PhpOffice\PhpPresentation\PhpPresentation;
+use PhpOffice\PhpPresentation\Slide\Background\Color as BackgroundColor;
+use PhpOffice\PhpPresentation\Style\Color;
 use ZipArchive;
 
 class SlideController extends Controller
@@ -191,6 +193,11 @@ class SlideController extends Controller
             $fullPath = Storage::disk('public')->path($slide->disk_path);
             if (file_exists($fullPath)) {
                 $newSlide = $presentation->createSlide();
+
+                // Set black background
+                $oBkgColor = new BackgroundColor();
+                $oBkgColor->setColor(new Color('FF000000'));
+                $newSlide->setBackground($oBkgColor);
 
                 $image = getimagesize($fullPath);
                 if ($image) {
