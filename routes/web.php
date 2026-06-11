@@ -3,6 +3,7 @@
 use App\Http\Controllers\Admin\ChunkedUploadController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\EntityController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SlideController;
@@ -22,7 +23,7 @@ require __DIR__.'/auth.php';
 
 // ── Profile (Breeze) ──────────────────────────────────────────────────────────
 
-Route::middleware('auth')->group(function () {
+Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
@@ -46,4 +47,13 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/slides/{slide}/approve', [AdminSlideController::class, 'approve'])->name('slides.approve');
     Route::post('/slides/{slide}/reject', [AdminSlideController::class, 'reject'])->name('slides.reject');
     Route::post('/slides/reorder', [AdminSlideController::class, 'reorder'])->name('slides.reorder');
+
+    Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
+    Route::patch('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
+    Route::post('/users/{user}/entities', [AdminUserController::class, 'attachEntity'])->name('users.entities.attach');
+    Route::patch('/users/{user}/entities/{entity}', [AdminUserController::class, 'updateEntityRole'])->name('users.entities.update');
+    Route::delete('/users/{user}/entities/{entity}', [AdminUserController::class, 'detachEntity'])->name('users.entities.detach');
+
+    Route::post('/invitations', [AdminUserController::class, 'storeInvitation'])->name('invitations.store');
+    Route::delete('/invitations/{invitation}', [AdminUserController::class, 'destroyInvitation'])->name('invitations.destroy');
 });

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\UserInvitation;
 use Illuminate\Support\Facades\Auth;
 use Laravel\Socialite\Facades\Socialite;
 
@@ -30,14 +31,18 @@ class GoogleController extends Controller
                     'avatar_url' => $googleUser->getAvatar(),
                 ]);
             } else {
+                $invitation = UserInvitation::where('email', $googleUser->getEmail())->first();
+
                 $user = User::create([
-                    'name' => $googleUser->getName(),
-                    'email' => $googleUser->getEmail(),
-                    'google_id' => $googleUser->getId(),
-                    'avatar_url' => $googleUser->getAvatar(),
-                    'email_verified_at' => now(),
-                    'role' => 'viewer',
+                    'name'               => $googleUser->getName(),
+                    'email'              => $googleUser->getEmail(),
+                    'google_id'          => $googleUser->getId(),
+                    'avatar_url'         => $googleUser->getAvatar(),
+                    'email_verified_at'  => now(),
+                    'role'               => $invitation?->role ?? 'viewer',
                 ]);
+
+                $invitation?->delete();
             }
         }
 

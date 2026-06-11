@@ -5,10 +5,12 @@ import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { Head, Link, useForm } from '@inertiajs/vue3';
+import { Head, Link, usePage, useForm } from '@inertiajs/vue3';
+import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
+const isDev = computed(() => usePage().props.isDev);
 
 defineProps({
     canResetPassword: {
@@ -40,7 +42,7 @@ const submit = () => {
             {{ status }}
         </div>
 
-        <form @submit.prevent="submit">
+        <form v-if="isDev" @submit.prevent="submit">
             <div>
                 <InputLabel for="email" :value="$t('auth.email')" />
 
@@ -98,8 +100,8 @@ const submit = () => {
             </div>
         </form>
 
-        <div class="mt-4">
-            <div class="relative">
+        <div :class="isDev ? 'mt-4' : ''">
+            <div v-if="isDev" class="relative">
                 <div class="absolute inset-0 flex items-center">
                     <div class="w-full border-t border-gray-300" />
                 </div>
@@ -108,7 +110,7 @@ const submit = () => {
                 </div>
             </div>
 
-            <a
+            <
                 :href="route('auth.google')"
                 class="mt-4 flex w-full items-center justify-center gap-3 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
             >

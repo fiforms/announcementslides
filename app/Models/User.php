@@ -36,6 +36,11 @@ class User extends Authenticatable
         return in_array($this->role, ['admin', 'contributor']);
     }
 
+    public function isBanned(): bool
+    {
+        return $this->role === 'banned';
+    }
+
     public function slides()
     {
         return $this->hasMany(Slide::class, 'uploaded_by');
