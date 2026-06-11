@@ -18,7 +18,7 @@ const flash = computed(() => page.props.flash);
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
-                        <span class="text-lg font-bold text-white">Announcement Slides</span>
+                        <span class="text-lg font-bold text-white">{{ page.props.appName }}</span>
                     </Link>
 
                     <div class="flex items-center gap-4">
@@ -67,7 +67,7 @@ const flash = computed(() => page.props.flash);
         </main>
 
         <footer class="mt-16 border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-400">
-            Carolinas Conference &mdash; Announcement Slides Portal
+            Carolinas Conference &mdash; {{ page.props.appName }}
         </footer>
     </div>
 </template>
