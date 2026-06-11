@@ -13,6 +13,7 @@ const emit = defineEmits(['close']);
 const page = usePage();
 const currentIndex = ref(0);
 const isPaused = ref(false);
+const showControls = ref(true);
 const slidesList = computed(() => {
     if (props.slides && props.slides.length > 0) {
         return props.slides;
@@ -21,6 +22,8 @@ const slidesList = computed(() => {
 });
 const interval = ref(null);
 const slideshowInterval = ref(10000); // Default 10 seconds
+const controlsHideTimer = ref(null);
+const containerRef = ref(null);
 
 const currentSlide = computed(() => slidesList.value[currentIndex.value]);
 
@@ -62,10 +65,42 @@ const togglePause = () => {
     isPaused.value = !isPaused.value;
 };
 
+const scheduleControlsHide = () => {
+    showControls.value = true;
+    if (controlsHideTimer.value) clearTimeout(controlsHideTimer.value);
+    controlsHideTimer.value = setTimeout(() => {
+        showControls.value = false;
+    }, 5000);
+};
+
+const handleMouseMove = () => {
+    if (props.show) {
+        scheduleControlsHide();
+    }
+};
+
+const requestFullScreen = async () => {
+    if (!containerRef.value) return;
+    try {
+        if (document.fullscreenElement) {
+            await document.exitFullscreen();
+        } else {
+            await containerRef.value.requestFullscreen();
+        }
+    } catch (err) {
+        console.error('Fullscreen request failed:', err);
+    }
+};
+
 const handleKeydown = (e) => {
     if (!props.show) return;
 
-    if (e.key === 'Escape') emit('close');
+    if (e.key === 'Escape') {
+        if (document.fullscreenElement) {
+            document.exitFullscreen();
+        }
+        emit('close');
+    }
     if (e.key === 'ArrowRight' || e.key === ' ') nextSlide();
     if (e.key === 'ArrowLeft') prevSlide();
     if (e.key === 'p' || e.key === 'P') togglePause();
@@ -77,7 +112,11 @@ onMounted(() => {
 
 onUnmounted(() => {
     document.removeEventListener('keydown', handleKeydown);
+    if (controlsHideTimer.value) clearTimeout(controlsHideTimer.value);
     stopSlideshow();
+    if (document.fullscreenElement) {
+        document.exitFullscreen();
+    }
 });
 
 const handleClose = () => {
@@ -90,8 +129,14 @@ const handleClose = () => {
 const handleShow = () => {
     if (props.show) {
         startSlideshow();
+        scheduleControlsHide();
+        // Request fullscreen after a brief delay to ensure DOM is ready
+        setTimeout(() => {
+            requestFullScreen();
+        }, 100);
     } else {
         stopSlideshow();
+        if (controlsHideTimer.value) clearTimeout(controlsHideTimer.value);
     }
 };
 </script>
@@ -107,7 +152,7 @@ const handleShow = () => {
         @enter="handleShow"
         @leave="handleShow"
     >
-        <div v-if="show" class="fixed inset-0 bg-black z-50 flex items-center justify-center">
+        <div v-if="show" ref="containerRef" class="fixed inset-0 bg-black z-50 flex items-center justify-center" :class="showControls ? 'cursor-auto' : 'cursor-none'" @mousemove="handleMouseMove">
             <!-- Slide Image -->
             <div class="relative w-full h-full flex items-center justify-center">
                 <transition
@@ -128,7 +173,7 @@ const handleShow = () => {
                 </transition>
 
                 <!-- Controls -->
-                <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/50 px-6 py-3 rounded-full backdrop-blur">
+                <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/50 px-6 py-3 rounded-full backdrop-blur transition-opacity duration-300" :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'">
                     <button
                         @click="prevSlide"
                         class="text-white hover:text-gray-300 transition p-2"
@@ -168,7 +213,8 @@ const handleShow = () => {
                 <!-- Close button -->
                 <button
                     @click="handleClose"
-                    class="absolute top-8 right-8 text-white hover:text-gray-300 transition p-2 bg-black/50 rounded-full backdrop-blur"
+                    class="absolute top-8 right-8 text-white hover:text-gray-300 transition-all duration-300 p-2 bg-black/50 rounded-full backdrop-blur"
+                    :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'"
                     title="Close (Esc)"
                 >
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
