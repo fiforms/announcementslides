@@ -20,6 +20,7 @@ Route::get('/', [SlideController::class, 'index'])->name('slides.index');
 Route::get('/archive', [SlideController::class, 'archive'])->name('slides.archive');
 Route::get('/slides/{slide}/download', [SlideController::class, 'download'])->name('slides.download');
 Route::get('/slides/download-zip', [SlideController::class, 'downloadZip'])->name('slides.download-zip');
+Route::get('/slides/download-pptx', [SlideController::class, 'downloadPowerPoint'])->name('slides.download-pptx');
 
 // ── Auth (Breeze) ─────────────────────────────────────────────────────────────
 

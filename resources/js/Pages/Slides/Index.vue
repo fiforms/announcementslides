@@ -58,6 +58,20 @@ function downloadAll() {
     window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
+function downloadPowerPointSelected() {
+    const ids = [...selectedIds.value].join(',');
+    const params = new URLSearchParams();
+    if (ids) params.append('ids', ids);
+    if (props.selectedLanguage) params.append('language', props.selectedLanguage);
+    window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
+}
+
+function downloadPowerPointAll() {
+    const params = new URLSearchParams();
+    if (props.selectedLanguage) params.append('language', props.selectedLanguage);
+    window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
+}
+
 // Slideshow
 const showSlideshow = ref(false);
 const slideshowSlides = ref([]);
@@ -141,6 +155,10 @@ onUnmounted(() => {
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
                                 Download (.zip)
                             </a>
+                            <a @click="downloadPowerPointSelected"
+                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
+                                Download (.pptx)
+                            </a>
                         </template>
                     </Dropdown>
                 </template>
@@ -167,6 +185,10 @@ onUnmounted(() => {
                             <a @click="downloadAll"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
                                 Download (.zip)
+                            </a>
+                            <a @click="downloadPowerPointAll"
+                                class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
+                                Download (.pptx)
                             </a>
                         </template>
                     </Dropdown>

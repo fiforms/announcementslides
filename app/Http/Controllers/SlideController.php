@@ -8,6 +8,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+use PhpOffice\PhpPresentation\DocumentLayout;
+use PhpOffice\PhpPresentation\Shape\Drawing\File as DrawingFile;
+use PhpOffice\PhpPresentation\PhpPresentation;
 use ZipArchive;
 
 class SlideController extends Controller
@@ -146,6 +149,78 @@ class SlideController extends Controller
 
         return response()->download($tmpFile, 'announcement-slides.zip', [
             'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
+    public function downloadPowerPoint(Request $request)
+    {
+        $ids = $request->query('ids');
+        $languageCode = $request->query('language');
+        $languageId = null;
+
+        if ($languageCode) {
+            $language = Language::where('abbreviation', $languageCode)->first();
+            $languageId = $language?->id;
+        }
+
+        $query = Slide::current()
+            ->visibleToUser($request->user())
+            ->language($languageId)
+            ->orderBy('sort_order');
+
+        if ($ids) {
+            $query->whereIn('id', explode(',', $ids));
+        }
+
+        $slides = $query->get();
+
+        if ($slides->isEmpty()) {
+            abort(404);
+        }
+
+        $presentation = new PhpPresentation();
+        $presentation->getProperties()->setTitle('Announcement Slides');
+        $presentation->removeSlideByIndex(0);
+
+        // Slide dimensions (in presentation units)
+        // Using larger dimensions than before for bigger images
+        $slideWidth = 3600;
+        $slideHeight = 2025;
+
+        foreach ($slides as $slide) {
+            $fullPath = Storage::disk('public')->path($slide->disk_path);
+            if (file_exists($fullPath)) {
+                $newSlide = $presentation->createSlide();
+
+                $image = getimagesize($fullPath);
+                if ($image) {
+                    $imgWidth = $image[0];
+                    $imgHeight = $image[1];
+
+                    // Calculate scaling to fit image in slide while maintaining aspect ratio
+                    $scale = min($slideWidth / $imgWidth, $slideHeight / $imgHeight);
+                    $newWidth = $imgWidth * $scale;
+                    $newHeight = $imgHeight * $scale;
+                    $offsetX = ($slideWidth - $newWidth) / 2;
+                    $offsetY = ($slideHeight - $newHeight) / 2;
+
+                    $shape = new DrawingFile();
+                    $shape->setPath($fullPath)
+                        ->setHeight($newHeight)
+                        ->setWidth($newWidth)
+                        ->setOffsetX($offsetX)
+                        ->setOffsetY($offsetY);
+                    $newSlide->addShape($shape);
+                }
+            }
+        }
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'slides_');
+        $oWriterPPTX = \PhpOffice\PhpPresentation\IOFactory::createWriter($presentation, 'PowerPoint2007');
+        $oWriterPPTX->save($tmpFile);
+
+        return response()->download($tmpFile, 'announcement-slides.pptx', [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         ])->deleteFileAfterSend(true);
     }
 
