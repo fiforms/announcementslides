@@ -6,6 +6,7 @@ import UploadPanel from '@/Components/UploadPanel.vue';
 
 const props = defineProps({
     slides: { type: Array, default: () => [] },
+    languages: { type: Array, default: () => [] },
 });
 
 const showUploadPanel = ref(false);
@@ -47,6 +48,7 @@ function formatBytes(bytes) {
             </div>
             <UploadPanel
                 v-if="showUploadPanel"
+                :languages="languages"
                 redirect-route="my-slides.index"
                 @success="showUploadPanel = false"
             />

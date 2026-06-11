@@ -16,7 +16,7 @@ class Slide extends Model
     protected $fillable = [
         'title', 'notes', 'filename', 'original_filename', 'disk_path',
         'file_size', 'mime_type', 'thumbnail_path', 'publish_at', 'expires_at',
-        'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id',
+        'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
     ];
 
     protected function casts(): array
@@ -45,6 +45,11 @@ class Slide extends Model
     public function entity()
     {
         return $this->belongsTo(Entity::class);
+    }
+
+    public function language()
+    {
+        return $this->belongsTo(\App\Models\Language::class);
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
@@ -92,6 +97,14 @@ class Slide extends Model
             return $query->where(fn ($q) => $q->whereNull('entity_id')->orWhereIn('entity_id', $entityIds));
         }
         return $query->whereNull('entity_id');
+    }
+
+    public function scopeLanguage(Builder $query, ?int $languageId): Builder
+    {
+        if ($languageId === null) {
+            return $query;
+        }
+        return $query->where(fn ($q) => $q->whereNull('language_id')->orWhere('language_id', $languageId));
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────

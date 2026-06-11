@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Language;
 use App\Models\Slide;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -18,14 +19,21 @@ class MySlideController extends Controller
             ->get()
             ->map(fn ($s) => $this->slideResource($s));
 
-        return Inertia::render('MySlides/Index', compact('slides'));
+        $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
+        return Inertia::render('MySlides/Index', compact('slides', 'languages'));
     }
 
     public function edit(Request $request, Slide $slide): Response
     {
         $this->authorizeOwnership($request, $slide);
 
-        return Inertia::render('MySlides/Edit', ['slide' => $this->slideResource($slide)]);
+        $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
+        return Inertia::render('MySlides/Edit', [
+            'slide' => $this->slideResource($slide),
+            'languages' => $languages,
+        ]);
     }
 
     public function update(Request $request, Slide $slide)
@@ -33,13 +41,14 @@ class MySlideController extends Controller
         $this->authorizeOwnership($request, $slide);
 
         $request->validate([
-            'title'      => 'required|string|max:255',
-            'notes'      => 'nullable|string',
-            'publish_at' => 'nullable|date',
-            'expires_at' => 'nullable|date|after_or_equal:publish_at',
+            'title'       => 'required|string|max:255',
+            'notes'       => 'nullable|string',
+            'language_id' => 'nullable|integer|exists:languages,id',
+            'publish_at'  => 'nullable|date',
+            'expires_at'  => 'nullable|date|after_or_equal:publish_at',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'publish_at', 'expires_at'));
+        $slide->update($request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at'));
 
         return redirect()->route('my-slides.index')->with('success', 'Slide updated.');
     }
@@ -67,6 +76,7 @@ class MySlideController extends Controller
             'id'                => $slide->id,
             'title'             => $slide->title,
             'notes'             => $slide->notes,
+            'language_id'       => $slide->language_id,
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
             'thumbnail_url'     => $slide->thumbnail_url,

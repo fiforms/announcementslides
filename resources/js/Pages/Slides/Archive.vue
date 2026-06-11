@@ -1,28 +1,42 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
 import { useI18n } from 'vue-i18n';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const props = defineProps({
     slides: { type: Object, required: true }, // paginated
+    languages: { type: Array, default: () => [] },
     search: { type: String, default: '' },
+    selectedLanguage: { type: String, default: null },
 });
 
 const searchQuery = ref(props.search);
+const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
 let searchTimeout = null;
 
 function onSearch() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
-        router.get(route('slides.archive'), { search: searchQuery.value || undefined }, {
+        const params = { search: searchQuery.value || undefined };
+        if (currentLanguageCode.value) params.language = currentLanguageCode.value;
+        router.get(route('slides.archive'), params, {
             preserveState: true,
             replace: true,
         });
     }, 350);
+}
+
+function changeLanguage(code) {
+    const params = { language: code };
+    if (searchQuery.value) params.search = searchQuery.value;
+    router.get(route('slides.archive'), params, {
+        preserveState: true,
+        replace: true,
+    });
 }
 </script>
 
@@ -36,8 +50,17 @@ function onSearch() {
                 <p class="mt-1 text-sm text-gray-500">{{ $t('slides.archive_description') }}</p>
             </div>
 
-            <input v-model="searchQuery" @input="onSearch" type="search" :placeholder="$t('slides.search_placeholder')"
-                class="w-full sm:w-64 rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+            <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center w-full sm:w-auto">
+                <select :value="currentLanguageCode" @change="changeLanguage($event.target.value)"
+                    class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right flex-shrink-0">
+                    <option v-for="lang in languages" :key="lang.abbreviation" :value="lang.abbreviation">
+                        {{ lang.name }} ({{ lang.native_name }})
+                    </option>
+                </select>
+
+                <input v-model="searchQuery" @input="onSearch" type="search" :placeholder="$t('slides.search_placeholder')"
+                    class="w-full sm:w-64 rounded-lg border border-gray-300 px-4 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+            </div>
         </div>
 
         <div v-if="slides.data.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

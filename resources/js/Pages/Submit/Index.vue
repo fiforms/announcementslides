@@ -11,7 +11,12 @@ const selectedFiles = ref([]);
 const filePreviews  = ref([]);
 const title         = ref('');
 const notes         = ref('');
+const languageId    = ref('');
 const submitted     = ref(false);
+
+const props = defineProps({
+    languages: { type: Array, default: () => [] },
+});
 
 function onFilesSelected(files) {
     selectedFiles.value = files;
@@ -41,6 +46,7 @@ async function submit() {
     const result = await upload(selectedFiles.value, {
         title: title.value,
         notes: notes.value,
+        language_id: languageId.value || null,
     });
 
     if (result) {
@@ -49,6 +55,7 @@ async function submit() {
         filePreviews.value  = [];
         title.value         = '';
         notes.value         = '';
+        languageId.value    = '';
     }
 }
 </script>
@@ -118,6 +125,17 @@ async function submit() {
                         <input v-model="title" type="text" required
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             placeholder="Give your slide a descriptive title" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <select v-model="languageId"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">No specific language (visible in all)</option>
+                            <option v-for="lang in languages" :key="lang.id" :value="lang.id">
+                                {{ lang.name }} ({{ lang.native_name }})
+                            </option>
+                        </select>
                     </div>
 
                     <div>

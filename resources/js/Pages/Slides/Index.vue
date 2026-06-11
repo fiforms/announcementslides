@@ -1,15 +1,24 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
 import { useI18n } from 'vue-i18n';
 
-const { t } = useI18n();
+const { t, locale } = useI18n();
 
 const props = defineProps({
     slides: { type: Array, default: () => [] },
+    languages: { type: Array, default: () => [] },
+    selectedLanguage: { type: String, default: null },
 });
+
+const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
+
+function changeLanguage(code) {
+    console.log('[Index] changeLanguage called with:', code);
+    router.get(route('slides.index'), { language: code });
+}
 
 const selectedIds = ref(new Set());
 
@@ -35,11 +44,16 @@ const hasSelection = computed(() => selectedIds.value.size > 0);
 
 function downloadSelected() {
     const ids = [...selectedIds.value].join(',');
-    window.location.href = route('slides.download-zip') + (ids ? `?ids=${ids}` : '');
+    const params = new URLSearchParams();
+    if (ids) params.append('ids', ids);
+    if (props.selectedLanguage) params.append('language', props.selectedLanguage);
+    window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
 function downloadAll() {
-    window.location.href = route('slides.download-zip');
+    const params = new URLSearchParams();
+    if (props.selectedLanguage) params.append('language', props.selectedLanguage);
+    window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
 // Lightbox
@@ -78,7 +92,15 @@ onUnmounted(() => {
                 </p>
             </div>
 
-            <div class="flex flex-wrap gap-2">
+            <div class="flex flex-col sm:flex-row flex-wrap gap-3 items-start sm:items-center">
+                <select :value="currentLanguageCode" @change="changeLanguage($event.target.value)"
+                    class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right">
+                    <option v-for="lang in languages" :key="lang.abbreviation" :value="lang.abbreviation">
+                        {{ lang.name }} ({{ lang.native_name }})
+                    </option>
+                </select>
+
+                <div class="flex flex-wrap gap-2">
                 <template v-if="hasSelection">
                     <button @click="clearSelection"
                         class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
@@ -107,6 +129,7 @@ onUnmounted(() => {
                         {{ $t('slides.download_all') }}
                     </button>
                 </template>
+                </div>
             </div>
         </div>
 

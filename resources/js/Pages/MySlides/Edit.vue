@@ -4,6 +4,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
     slide: { type: Object, required: true },
+    languages: { type: Array, default: () => [] },
 });
 
 function toLocalDatetime(iso) {
@@ -12,10 +13,11 @@ function toLocalDatetime(iso) {
 }
 
 const form = useForm({
-    title:      props.slide.title,
-    notes:      props.slide.notes ?? '',
-    publish_at: toLocalDatetime(props.slide.publish_at),
-    expires_at: toLocalDatetime(props.slide.expires_at),
+    title:       props.slide.title,
+    notes:       props.slide.notes ?? '',
+    language_id: props.slide.language_id ?? '',
+    publish_at:  toLocalDatetime(props.slide.publish_at),
+    expires_at:  toLocalDatetime(props.slide.expires_at),
 });
 
 function submit() {
@@ -45,6 +47,18 @@ function submit() {
                     <label class="block text-sm font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
                     <textarea v-model="form.notes" rows="3"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <select v-model="form.language_id"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">No specific language (visible in all)</option>
+                        <option v-for="lang in languages" :key="lang.id" :value="lang.id">
+                            {{ lang.name }} ({{ lang.native_name }})
+                        </option>
+                    </select>
+                    <p v-if="form.errors.language_id" class="mt-1 text-xs text-red-600">{{ form.errors.language_id }}</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">

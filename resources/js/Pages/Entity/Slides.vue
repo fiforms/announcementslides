@@ -7,6 +7,7 @@ import UploadPanel from '@/Components/UploadPanel.vue';
 const props = defineProps({
     entity: { type: Object, required: true },
     slides: { type: Array, default: () => [] },
+    languages: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -57,6 +58,7 @@ function statusBadge(status) {
                 :redirect-route="'entity.slides.index'"
                 :redirect-params="{ entity: entity.id }"
                 :entity-id="entity.id"
+                :languages="languages"
                 @success="showUploadPanel = false"
             />
 

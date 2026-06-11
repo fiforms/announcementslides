@@ -6,11 +6,12 @@ import SlideCard from '@/Components/SlideCard.vue';
 import DropZone from '@/Components/DropZone.vue';
 
 const props = defineProps({
-    current:  { type: Array, default: () => [] },
-    pending:  { type: Array, default: () => [] },
-    upcoming: { type: Array, default: () => [] },
-    archived: { type: Array, default: () => [] },
-    drafts:   { type: Array, default: () => [] },
+    current:   { type: Array, default: () => [] },
+    pending:   { type: Array, default: () => [] },
+    upcoming:  { type: Array, default: () => [] },
+    archived:  { type: Array, default: () => [] },
+    drafts:    { type: Array, default: () => [] },
+    languages: { type: Array, default: () => [] },
 });
 
 // ── Upload form ────────────────────────────────────────────────────────────────
@@ -24,11 +25,12 @@ const selectedFiles   = ref([]);
 const filePreviews    = ref([]);
 
 const form = useForm({
-    title:      '',
-    notes:      '',
-    publish_at: '',
-    expires_at: '',
-    status:     'published',
+    title:       '',
+    notes:       '',
+    language_id: '',
+    publish_at:  '',
+    expires_at:  '',
+    status:      'published',
 });
 
 // Chunked upload state
@@ -122,12 +124,13 @@ async function submitUpload() {
         }
 
         await window.axios.post(route('uploads.finalize'), {
-            uploads:    completedUploads,
-            title:      form.title,
-            notes:      form.notes,
-            publish_at: form.publish_at,
-            expires_at: form.expires_at,
-            status:     form.status,
+            uploads:     completedUploads,
+            title:       form.title,
+            notes:       form.notes,
+            language_id: form.language_id || null,
+            publish_at:  form.publish_at,
+            expires_at:  form.expires_at,
+            status:      form.status,
         }, {
             headers: { 'X-CSRF-TOKEN': csrfToken() },
         });
@@ -273,6 +276,18 @@ function statusBadge(status) {
                         <textarea v-model="form.notes" rows="2"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             placeholder="Optional notes for your team…" />
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <select v-model="form.language_id"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">No specific language (visible in all)</option>
+                            <option v-for="lang in languages" :key="lang.id" :value="lang.id">
+                                {{ lang.name }} ({{ lang.native_name }})
+                            </option>
+                        </select>
+                        <p v-if="form.errors.language_id" class="mt-1 text-xs text-red-600">{{ form.errors.language_id }}</p>
                     </div>
 
                     <div>

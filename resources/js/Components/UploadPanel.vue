@@ -8,6 +8,7 @@ const props = defineProps({
     redirectRoute:     { type: String, required: true },
     redirectParams:    { type: Object, default: () => ({}) },
     entityId:          { type: Number, default: null },
+    languages:         { type: Array, default: () => [] },
     pendingMessage:    { type: String, default: null },
     showStatusSelect:  { type: Boolean, default: false },
 });
@@ -20,6 +21,7 @@ const selectedFiles = ref([]);
 const filePreviews  = ref([]);
 const title         = ref('');
 const notes         = ref('');
+const languageId    = ref('');
 const publishAt     = ref('');
 const expiresAt     = ref('');
 const status        = ref('published');
@@ -53,10 +55,11 @@ async function submit() {
     if (!canSubmit.value) return;
 
     const payload = {
-        title:      title.value,
-        notes:      notes.value,
-        publish_at: publishAt.value || null,
-        expires_at: expiresAt.value || null,
+        title:       title.value,
+        notes:       notes.value,
+        language_id: languageId.value || null,
+        publish_at:  publishAt.value || null,
+        expires_at:  expiresAt.value || null,
     };
 
     if (props.showStatusSelect) {
@@ -76,6 +79,7 @@ async function submit() {
                 filePreviews.value  = [];
                 title.value         = '';
                 notes.value         = '';
+                languageId.value    = '';
                 publishAt.value     = '';
                 expiresAt.value     = '';
                 emit('success');
@@ -154,6 +158,17 @@ async function submit() {
                     <textarea v-model="notes" rows="2"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         placeholder="Optional context for administrators…" />
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <select v-model="languageId"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">No specific language (visible in all)</option>
+                        <option v-for="lang in languages" :key="lang.id" :value="lang.id">
+                            {{ lang.name }} ({{ lang.native_name }})
+                        </option>
+                    </select>
                 </div>
 
                 <div>

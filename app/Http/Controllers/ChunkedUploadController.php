@@ -85,6 +85,7 @@ class ChunkedUploadController extends Controller
             'uploads.*.mime_type'         => ['required', 'string', Rule::in(self::ALLOWED_MIME_TYPES)],
             'title'                       => 'required|string|max:255',
             'notes'                       => 'nullable|string',
+            'language_id'                 => 'nullable|integer|exists:languages,id',
             'publish_at'                  => 'nullable|date',
             'expires_at'                  => 'nullable|date|after_or_equal:publish_at',
             'status'                      => 'in:draft,published',
@@ -131,6 +132,7 @@ class ChunkedUploadController extends Controller
                 'status'            => $status,
                 'uploaded_by'       => $user->id,
                 'entity_id'         => $entityId,
+                'language_id'       => $request->language_id,
             ]);
 
             GenerateThumbnail::dispatch($slide);

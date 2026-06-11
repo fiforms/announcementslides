@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Language;
 use App\Models\Slide;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -13,20 +14,64 @@ class SlideController extends Controller
 {
     public function index(Request $request): Response
     {
+        $languageCode = $request->query('language');
+        $languageId = null;
+
+        // If no language specified, try to detect from Accept-Language header (browser default)
+        if (!$languageCode) {
+            $acceptLanguage = $request->header('Accept-Language');
+            if ($acceptLanguage) {
+                // Extract language code (e.g., 'en' from 'en-US,en;q=0.9')
+                preg_match('/^([a-z]{2})/', $acceptLanguage, $matches);
+                $languageCode = $matches[1] ?? null;
+            }
+        }
+
+        if ($languageCode) {
+            $language = Language::where('abbreviation', $languageCode)->first();
+            $languageId = $language?->id;
+        }
+
         $slides = Slide::current()
             ->visibleToUser($request->user())
+            ->language($languageId)
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($s) => $this->slideResource($s));
 
-        return Inertia::render('Slides/Index', ['slides' => $slides]);
+        $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
+        return Inertia::render('Slides/Index', [
+            'slides' => $slides,
+            'languages' => $languages,
+            'selectedLanguage' => $languageCode,
+        ]);
     }
 
     public function archive(Request $request): Response
     {
+        $languageCode = $request->query('language');
+        $languageId = null;
+
+        // If no language specified, try to detect from Accept-Language header (browser default)
+        if (!$languageCode) {
+            $acceptLanguage = $request->header('Accept-Language');
+            if ($acceptLanguage) {
+                // Extract language code (e.g., 'en' from 'en-US,en;q=0.9')
+                preg_match('/^([a-z]{2})/', $acceptLanguage, $matches);
+                $languageCode = $matches[1] ?? null;
+            }
+        }
+
+        if ($languageCode) {
+            $language = Language::where('abbreviation', $languageCode)->first();
+            $languageId = $language?->id;
+        }
+
         $query = Slide::archived()
             ->visibleToUser($request->user())
+            ->language($languageId)
             ->orderByDesc('expires_at');
 
         if ($search = $request->query('search')) {
@@ -36,9 +81,13 @@ class SlideController extends Controller
 
         $slides = $query->paginate(24)->through(fn ($s) => $this->slideResource($s));
 
+        $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
         return Inertia::render('Slides/Archive', [
             'slides' => $slides,
+            'languages' => $languages,
             'search' => $search,
+            'selectedLanguage' => $languageCode,
         ]);
     }
 
@@ -55,8 +104,18 @@ class SlideController extends Controller
     public function downloadZip(Request $request)
     {
         $ids = $request->query('ids');
+        $languageCode = $request->query('language');
+        $languageId = null;
 
-        $query = Slide::current()->visibleToUser($request->user())->orderBy('sort_order');
+        if ($languageCode) {
+            $language = Language::where('abbreviation', $languageCode)->first();
+            $languageId = $language?->id;
+        }
+
+        $query = Slide::current()
+            ->visibleToUser($request->user())
+            ->language($languageId)
+            ->orderBy('sort_order');
 
         if ($ids) {
             $query->whereIn('id', explode(',', $ids));

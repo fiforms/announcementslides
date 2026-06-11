@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateThumbnail;
+use App\Models\Language;
 use App\Models\Slide;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,7 +23,9 @@ class SlideController extends Controller
         $archived = Slide::with($with)->archived()->orderByDesc('expires_at')->limit(20)->get()->map(fn ($s) => $this->slideResource($s));
         $drafts   = Slide::with($with)->where('status', 'draft')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
 
-        return Inertia::render('Admin/Slides/Index', compact('current', 'pending', 'upcoming', 'archived', 'drafts'));
+        $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
+        return Inertia::render('Admin/Slides/Index', compact('current', 'pending', 'upcoming', 'archived', 'drafts', 'languages'));
     }
 
     public function store(Request $request)
@@ -32,6 +35,7 @@ class SlideController extends Controller
             'files.*'      => 'required|file|mimes:jpeg,jpg,png,webp,gif,mp4,mov,webm|max:204800',
             'title'        => 'required|string|max:255',
             'notes'        => 'nullable|string',
+            'language_id'  => 'nullable|integer|exists:languages,id',
             'publish_at'   => 'nullable|date',
             'expires_at'   => 'nullable|date|after_or_equal:publish_at',
             'status'       => 'in:draft,published',
@@ -55,6 +59,7 @@ class SlideController extends Controller
                 'disk_path'         => $diskPath,
                 'file_size'         => $file->getSize(),
                 'mime_type'         => $file->getMimeType(),
+                'language_id'       => $request->language_id,
                 'publish_at'        => $request->publish_at,
                 'expires_at'        => $request->expires_at,
                 'status'            => $request->status ?? 'published',
@@ -71,22 +76,28 @@ class SlideController extends Controller
 
     public function edit(Slide $slide): Response
     {
-        return Inertia::render('Admin/Slides/Edit', ['slide' => $this->slideResource($slide)]);
+        $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
+        return Inertia::render('Admin/Slides/Edit', [
+            'slide' => $this->slideResource($slide),
+            'languages' => $languages,
+        ]);
     }
 
     public function update(Request $request, Slide $slide)
     {
         $request->validate([
-            'title'      => 'required|string|max:255',
-            'notes'      => 'nullable|string',
-            'publish_at' => 'nullable|date',
-            'expires_at' => 'nullable|date',
-            'status'     => 'required|in:draft,pending,published,rejected',
-            'sort_order' => 'integer|min:0',
-            'entity_id'  => 'nullable|integer|exists:entities,id',
+            'title'       => 'required|string|max:255',
+            'notes'       => 'nullable|string',
+            'language_id' => 'nullable|integer|exists:languages,id',
+            'publish_at'  => 'nullable|date',
+            'expires_at'  => 'nullable|date',
+            'status'      => 'required|in:draft,pending,published,rejected',
+            'sort_order'  => 'integer|min:0',
+            'entity_id'   => 'nullable|integer|exists:entities,id',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'publish_at', 'expires_at', 'status', 'sort_order', 'entity_id'));
+        $slide->update($request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at', 'status', 'sort_order', 'entity_id'));
 
         return redirect()->route('admin.slides.index')
             ->with('success', 'Slide updated.');
@@ -138,6 +149,7 @@ class SlideController extends Controller
             'id'                => $slide->id,
             'title'             => $slide->title,
             'notes'             => $slide->notes,
+            'language_id'       => $slide->language_id,
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
             'thumbnail_url'     => $slide->thumbnail_url,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Entity;
+use App\Models\Language;
 use App\Models\Slide;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -22,9 +23,12 @@ class EntitySlideController extends Controller
             ->get()
             ->map(fn ($s) => $this->slideResource($s));
 
+        $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
         return Inertia::render('Entity/Slides', [
             'entity' => ['id' => $entity->id, 'name' => $entity->name],
             'slides' => $slides,
+            'languages' => $languages,
         ]);
     }
 
