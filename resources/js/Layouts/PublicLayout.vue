@@ -73,7 +73,7 @@ const flash = computed(() => page.props.flash);
         </main>
 
         <footer class="mt-16 border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-400">
-            Carolinas Conference &mdash; {{ page.props.appName }}
+            {{ page.props.appName }} &mdash; Powered by <a href="https://github.com/fiforms/announcementslides" class="text-indigo-600 hover:text-indigo-800" target="_blank">AnnouncementSlides</a>
         </footer>
     </div>
 </template>
