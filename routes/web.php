@@ -57,6 +57,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::patch('/{slide}', [LocalSlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [LocalSlideController::class, 'archive'])->name('archive');
         Route::post('/{slide}/unarchive', [LocalSlideController::class, 'unarchive'])->name('unarchive');
+        Route::post('/reorder', [LocalSlideController::class, 'reorder'])->name('reorder');
     });
 
     // ── Entity leader: entity-scoped slide management ──────────────────────

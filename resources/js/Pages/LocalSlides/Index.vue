@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
@@ -15,6 +15,21 @@ const page = usePage();
 const user = page.props.auth.user;
 
 const showUploadPanel = ref(false);
+const showArchived = ref(false);
+const draggedSlide = ref(null);
+const dragOverSlide = ref(null);
+const dropPosition = ref(null); // 'before' | 'after'
+const orderedSlides = ref([...props.slides]);
+
+const activeSlides = computed(() => {
+    return orderedSlides.value.filter(s => !isSlideArchived(s));
+});
+
+const archivedSlides = computed(() => {
+    return orderedSlides.value
+        .filter(s => isSlideArchived(s))
+        .sort((a, b) => new Date(b.expires_at) - new Date(a.expires_at));
+});
 
 function canEdit(slide) {
     return props.isAdmin && (user.role === 'admin' || slide.uploader?.id === user.id);
@@ -50,6 +65,81 @@ function statusBadge(status) {
     };
     return map[status] ?? 'bg-gray-100 text-gray-700';
 }
+
+function handleDragStart(e, slide) {
+    draggedSlide.value = slide;
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e, slide) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    // Don't show an indicator on the row being dragged.
+    if (!draggedSlide.value || draggedSlide.value.id === slide.id) {
+        dragOverSlide.value = null;
+        return;
+    }
+
+    // Decide before/after from the cursor's position within the row so the
+    // indicator edge matches exactly where the item will be inserted.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    dropPosition.value = e.clientY < midpoint ? 'before' : 'after';
+    dragOverSlide.value = slide;
+}
+
+function handleTableDragLeave(e) {
+    if (e.target.tagName === 'TBODY') {
+        dragOverSlide.value = null;
+        dropPosition.value = null;
+    }
+}
+
+function handleDrop(e, targetSlide) {
+    e.preventDefault();
+    const dragged = draggedSlide.value;
+    const position = dropPosition.value;
+    if (!dragged || dragged.id === targetSlide.id) {
+        return handleDragEnd();
+    }
+
+    const active = [...activeSlides.value];
+    const fromIndex = active.findIndex(s => s.id === dragged.id);
+    if (fromIndex === -1 || !active.some(s => s.id === targetSlide.id)) {
+        return handleDragEnd();
+    }
+
+    // Remove the dragged item first, then locate the target so the insertion
+    // index already accounts for the shift caused by removal.
+    active.splice(fromIndex, 1);
+    let insertIndex = active.findIndex(s => s.id === targetSlide.id);
+    if (position === 'after') insertIndex += 1;
+    active.splice(insertIndex, 0, dragged);
+
+    // Rebuild ordered list; archived slides keep their own (re-sorted) section.
+    orderedSlides.value = [...active, ...orderedSlides.value.filter(isSlideArchived)];
+    updateSortOrder();
+    handleDragEnd();
+}
+
+function handleDragEnd() {
+    draggedSlide.value = null;
+    dragOverSlide.value = null;
+    dropPosition.value = null;
+}
+
+function updateSortOrder() {
+    const slideIds = activeSlides.value.map(s => s.id);
+    fetch(route('local-slides.reorder', { entity_id: props.entity.id }), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
+        },
+        body: JSON.stringify({ slides: slideIds }),
+    }).catch(err => console.error('Failed to update sort order:', err));
+}
 </script>
 
 <template>
@@ -83,10 +173,12 @@ function statusBadge(status) {
                 @success="showUploadPanel = false"
             />
 
-            <div v-if="slides.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+            <!-- Active Slides -->
+            <div v-if="activeSlides.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
+                            <th v-if="isAdmin" class="px-4 py-3 text-left font-medium text-gray-500 w-8"></th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500">Slide</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">Status</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Dates</th>
@@ -94,8 +186,27 @@ function statusBadge(status) {
                             <th v-if="isAdmin" class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        <tr v-for="slide in slides" :key="slide.id" class="hover:bg-gray-50">
+                    <tbody class="divide-y divide-gray-100" @dragleave="handleTableDragLeave" @dragend="handleDragEnd">
+                        <tr v-for="slide in activeSlides" :key="slide.id"
+                            class="hover:bg-gray-50 transition-colors"
+                            :class="{
+                                'opacity-50': draggedSlide?.id === slide.id,
+                            }"
+                            :style="dragOverSlide?.id === slide.id ? {
+                                boxShadow: dropPosition === 'before'
+                                    ? 'inset 0 3px 0 0 rgb(99, 102, 241)'
+                                    : 'inset 0 -3px 0 0 rgb(99, 102, 241)',
+                                backgroundColor: 'rgb(239, 246, 255)'
+                            } : {}"
+                            draggable="true"
+                            @dragstart="handleDragStart($event, slide)"
+                            @dragover="handleDragOver($event, slide)"
+                            @drop="handleDrop($event, slide)">
+                            <td v-if="isAdmin" class="px-3 py-3 text-center cursor-grab active:cursor-grabbing">
+                                <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                    <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2z" />
+                                </svg>
+                            </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-3">
                                     <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">
@@ -122,17 +233,13 @@ function statusBadge(status) {
                             </td>
                             <td v-if="isAdmin" class="px-4 py-3 text-right">
                                 <div v-if="canEdit(slide)" class="flex items-center justify-end gap-2">
-                                    <Link v-if="!isSlideArchived(slide)" :href="route('local-slides.edit', { slide: slide.id, entity_id: entity.id })"
+                                    <Link :href="route('local-slides.edit', { slide: slide.id, entity_id: entity.id })"
                                         class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                         Edit
                                     </Link>
-                                    <button v-if="!isSlideArchived(slide)" @click="archive(slide)"
+                                    <button @click="archive(slide)"
                                         class="rounded-md border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 transition-colors">
                                         Archive
-                                    </button>
-                                    <button v-else @click="unarchive(slide)"
-                                        class="rounded-md border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors">
-                                        Restore
                                     </button>
                                 </div>
                                 <span v-else class="text-xs text-gray-300">—</span>
@@ -142,7 +249,68 @@ function statusBadge(status) {
                 </table>
             </div>
 
-            <div v-else class="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
+            <!-- Archived Slides Toggle & Section -->
+            <div v-if="archivedSlides.length" class="space-y-4">
+                <button @click="showArchived = !showArchived"
+                    class="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
+                    <svg class="h-4 w-4 transition-transform" :class="{ 'rotate-90': showArchived }" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                    Show archived slides ({{ archivedSlides.length }})
+                </button>
+
+                <div v-if="showArchived" class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Slide</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">Archived</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Dates</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Uploaded by</th>
+                                <th v-if="isAdmin" class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr v-for="slide in archivedSlides" :key="slide.id" class="hover:bg-gray-50">
+                                <td class="px-4 py-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">
+                                            <img v-if="slide.thumbnail_url || slide.file_url"
+                                                :src="slide.thumbnail_url || slide.file_url"
+                                                class="h-full w-full object-cover" />
+                                        </div>
+                                        <p class="font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
+                                    </div>
+                                </td>
+                                <td class="px-4 py-3 hidden sm:table-cell">
+                                    <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700">
+                                        archived
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell text-xs text-gray-500 space-y-0.5">
+                                    <div v-if="slide.publish_at">From: {{ new Date(slide.publish_at).toLocaleDateString() }}</div>
+                                    <div v-if="slide.expires_at">Archived: {{ new Date(slide.expires_at).toLocaleDateString() }}</div>
+                                </td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-xs text-gray-500">
+                                    {{ slide.uploader?.name ?? '—' }}
+                                </td>
+                                <td v-if="isAdmin" class="px-4 py-3 text-right">
+                                    <div v-if="canEdit(slide)">
+                                        <button @click="unarchive(slide)"
+                                            class="rounded-md border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors">
+                                            Restore
+                                        </button>
+                                    </div>
+                                    <span v-else class="text-xs text-gray-300">—</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Empty State -->
+            <div v-if="!activeSlides.length && !archivedSlides.length" class="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
                 <p class="text-gray-400">No slides for {{ entity.name }} yet.</p>
                 <button v-if="isAdmin" @click="showUploadPanel = true"
                     class="mt-4 text-sm font-medium text-indigo-600 hover:text-indigo-800">

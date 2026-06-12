@@ -125,6 +125,34 @@ class LocalSlideController extends Controller
         return back()->with('success', 'Slide restored.');
     }
 
+    public function reorder(Request $request)
+    {
+        $user = $request->user();
+        $entityId = (int) $request->query('entity_id');
+
+        abort_unless(
+            $entityId && in_array($entityId, $user->memberEntityIds()),
+            403
+        );
+        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
+
+        $request->validate([
+            'slides' => 'required|array',
+            'slides.*' => 'integer|exists:slides,id',
+        ]);
+
+        $slides = Slide::entityScoped($entityId)->whereIn('id', $request->input('slides'))->get();
+
+        foreach ($request->input('slides') as $index => $slideId) {
+            $slide = $slides->find($slideId);
+            if ($slide) {
+                $slide->update(['sort_order' => $index]);
+            }
+        }
+
+        return response()->json(['success' => true]);
+    }
+
     private function slideResource(Slide $slide): array
     {
         return [
