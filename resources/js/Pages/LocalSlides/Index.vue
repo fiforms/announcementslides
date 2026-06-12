@@ -180,7 +180,7 @@ function updateSortOrder() {
             </div>
 
             <div v-if="isAdmin" class="rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3 text-sm text-indigo-700">
-                Slides uploaded here are visible only to members of <strong>{{ entity.name }}</strong>.
+                Slides uploaded here are visible only to members of <strong>{{ entity.name }}</strong> (and nearby churches, if applicable).
             </div>
 
             <div v-else class="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-700">
