@@ -27,6 +27,8 @@ class ImageValidationService
                 $this->checkResolution($width, $height),
                 $this->checkAspectRatio($width, $height)
             );
+        } else {
+            $issues[] = 'Unreadable or corrupted image — dimensions could not be determined';
         }
 
         $issues = array_merge(

@@ -115,7 +115,15 @@ class ChunkedUploadController extends Controller
             $entityId = null;
         }
 
-        $slides = [];
+        // Contributors and viewers may not publish/submit global slides (no
+        // entity) that fail any quality check — those are hard-blocked rather
+        // than flagged. Admins and entity uploads keep the soft-warning path.
+        $enforceQuality = $entityId === null && !$user->isAdmin();
+
+        // First pass: validate every upload before creating anything, so one
+        // failing file rejects the whole batch instead of publishing partially.
+        $validated = [];
+        $blocked   = [];
 
         foreach ($request->uploads as $upload) {
             if (!Storage::disk('public')->exists($upload['disk_path'])) {
@@ -125,6 +133,29 @@ class ChunkedUploadController extends Controller
             $filePath = Storage::disk('public')->path($upload['disk_path']);
             $validation = $validationService->validate($filePath, $upload['mime_type'], $upload['file_size']);
 
+            if ($enforceQuality && $validation['status'] !== 'ok') {
+                $blocked[$upload['original_filename']] = $validation['issues'];
+            }
+
+            $validated[] = [$upload, $validation];
+        }
+
+        if (!empty($blocked)) {
+            // Remove the orphaned assembled files — there is no slide record to
+            // own them, and the user must upload an acceptable replacement.
+            foreach ($request->uploads as $upload) {
+                Storage::disk('public')->delete($upload['disk_path']);
+            }
+
+            return response()->json([
+                'message' => $this->qualityBlockMessage($blocked),
+                'blocked' => $blocked,
+            ], 422);
+        }
+
+        $slides = [];
+
+        foreach ($validated as [$upload, $validation]) {
             $slide = Slide::create([
                 'title'             => $request->title,
                 'notes'             => $request->notes,
@@ -150,5 +181,24 @@ class ChunkedUploadController extends Controller
         }
 
         return response()->json(['success' => true, 'count' => count($slides), 'status' => $status]);
+    }
+
+    /**
+     * Build a human-readable rejection message listing why each file was blocked.
+     *
+     * @param  array<string, string[]>  $blocked  filename => list of issues
+     */
+    private function qualityBlockMessage(array $blocked): string
+    {
+        $intro = count($blocked) === 1
+            ? 'This file does not meet the quality requirements and was not accepted:'
+            : 'These files do not meet the quality requirements and were not accepted:';
+
+        $lines = [];
+        foreach ($blocked as $filename => $issues) {
+            $lines[] = $filename . ' — ' . implode('; ', $issues);
+        }
+
+        return $intro . ' ' . implode(' | ', $lines);
     }
 }
