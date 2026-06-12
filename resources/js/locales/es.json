@@ -259,6 +259,8 @@
         "expiration": "Venc.:",
         "always_on": "Siempre activa",
         "delete": "Eliminar",
+        "archive": "Archivar",
+        "restore": "Restaurar",
         "optional": "(opcional)"
     }
 }

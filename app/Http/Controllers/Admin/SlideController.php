@@ -17,11 +17,13 @@ class SlideController extends Controller
     public function index(): Response
     {
         $with     = ['uploader', 'entity'];
-        $current  = Slide::with($with)->current()->orderBy('sort_order')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
-        $pending  = Slide::with($with)->pendingReview()->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
-        $upcoming = Slide::with($with)->upcoming()->orderBy('publish_at')->get()->map(fn ($s) => $this->slideResource($s));
-        $archived = Slide::with($with)->archived()->orderByDesc('expires_at')->limit(20)->get()->map(fn ($s) => $this->slideResource($s));
-        $drafts   = Slide::with($with)->where('status', 'draft')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
+        // Entity-scoped (local) slides are managed under Entity Slides; only show
+        // global slides here.
+        $current  = Slide::with($with)->unscoped()->current()->orderBy('sort_order')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
+        $pending  = Slide::with($with)->unscoped()->pendingReview()->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
+        $upcoming = Slide::with($with)->unscoped()->upcoming()->orderBy('publish_at')->get()->map(fn ($s) => $this->slideResource($s));
+        $archived = Slide::with($with)->unscoped()->archived()->orderByDesc('expires_at')->limit(20)->get()->map(fn ($s) => $this->slideResource($s));
+        $drafts   = Slide::with($with)->unscoped()->where('status', 'draft')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
@@ -134,6 +136,20 @@ class SlideController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    public function archive(Slide $slide)
+    {
+        $slide->update(['expires_at' => now()]);
+
+        return back()->with('success', 'Slide archived.');
+    }
+
+    public function unarchive(Slide $slide)
+    {
+        $slide->update(['expires_at' => null]);
+
+        return back()->with('success', 'Slide restored.');
     }
 
     public function destroy(Slide $slide)

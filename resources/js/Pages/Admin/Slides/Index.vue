@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useForm, router, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
@@ -170,6 +170,18 @@ function reject(slide) {
     }
 }
 
+function archive(slide) {
+    if (confirm(`Archive "${slide.title}"? It will move to the archived tab.`)) {
+        router.post(route('admin.slides.archive', slide.id));
+    }
+}
+
+function unarchive(slide) {
+    if (confirm(`Restore "${slide.title}"? It will be active again.`)) {
+        router.post(route('admin.slides.unarchive', slide.id));
+    }
+}
+
 function destroy(slide) {
     if (confirm(`Delete "${slide.title}"? This cannot be undone.`)) {
         router.delete(route('admin.slides.destroy', slide.id));
@@ -187,7 +199,102 @@ const tabs = computed(() => [
 ]);
 
 const activeTab = ref('current');
-const activeSlides = computed(() => props[activeTab.value]);
+
+// ── Drag-and-drop reordering (live tab only) ────────────────────────────────────
+// Only the "current" tab is ordered by sort_order; the other tabs sort by date,
+// so reordering is scoped to it.
+const orderedCurrent = ref([...props.current]);
+const draggedSlide   = ref(null);
+const dragOverSlide  = ref(null);
+const dropPosition   = ref(null); // 'before' | 'after'
+
+const isReorderable = computed(() => activeTab.value === 'current');
+const activeSlides  = computed(() =>
+    activeTab.value === 'current' ? orderedCurrent.value : props[activeTab.value]
+);
+
+// Keep the local ordered copy in sync when the server data changes.
+watch(() => props.current, (val) => { orderedCurrent.value = [...val]; });
+
+function handleDragStart(e, slide) {
+    draggedSlide.value = slide;
+    e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragOver(e, slide) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    // Don't show an indicator on the row being dragged.
+    if (!draggedSlide.value || draggedSlide.value.id === slide.id) {
+        dragOverSlide.value = null;
+        return;
+    }
+
+    // Decide before/after from the cursor's position within the row so the
+    // indicator edge matches exactly where the slide will be inserted.
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midpoint = rect.top + rect.height / 2;
+    dropPosition.value = e.clientY < midpoint ? 'before' : 'after';
+    dragOverSlide.value = slide;
+}
+
+function handleTableDragLeave(e) {
+    if (e.target.tagName === 'TBODY') {
+        dragOverSlide.value = null;
+        dropPosition.value = null;
+    }
+}
+
+function handleDrop(e, targetSlide) {
+    e.preventDefault();
+    const dragged = draggedSlide.value;
+    const position = dropPosition.value;
+    if (!dragged || dragged.id === targetSlide.id) {
+        return handleDragEnd();
+    }
+
+    const list = [...orderedCurrent.value];
+    const fromIndex = list.findIndex(s => s.id === dragged.id);
+    if (fromIndex === -1 || !list.some(s => s.id === targetSlide.id)) {
+        return handleDragEnd();
+    }
+
+    // Remove the dragged slide first, then locate the target so the insertion
+    // index already accounts for the shift caused by removal.
+    list.splice(fromIndex, 1);
+    let insertIndex = list.findIndex(s => s.id === targetSlide.id);
+    if (position === 'after') insertIndex += 1;
+    list.splice(insertIndex, 0, dragged);
+
+    orderedCurrent.value = list;
+    updateSortOrder();
+    handleDragEnd();
+}
+
+function handleDragEnd() {
+    draggedSlide.value = null;
+    dragOverSlide.value = null;
+    dropPosition.value = null;
+}
+
+function updateSortOrder() {
+    const order = orderedCurrent.value.map(s => s.id);
+    fetch(route('admin.slides.reorder'), {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': csrfToken(),
+        },
+        body: JSON.stringify({ order }),
+    }).catch(err => console.error('Failed to update sort order:', err));
+}
+
+function displayStatus(slide) {
+    // Archived slides keep their DB status (usually "published"); show the
+    // archived state explicitly while on that tab.
+    return activeTab.value === 'archived' ? 'archived' : slide.status;
+}
 
 function statusBadge(status) {
     const map = {
@@ -195,6 +302,7 @@ function statusBadge(status) {
         pending:   'bg-yellow-100 text-yellow-800',
         draft:     'bg-gray-100 text-gray-700',
         rejected:  'bg-red-100 text-red-700',
+        archived:  'bg-slate-100 text-slate-700',
     };
     return map[status] ?? 'bg-gray-100 text-gray-700';
 }
@@ -365,6 +473,7 @@ function statusBadge(status) {
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
+                        <th v-if="isReorderable" class="px-4 py-3 text-left font-medium text-gray-500 w-8"></th>
                         <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin.col_slide') }}</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">{{ $t('admin.status') }}</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">{{ $t('admin.col_dates') }}</th>
@@ -372,8 +481,25 @@ function statusBadge(status) {
                         <th class="px-4 py-3 text-right font-medium text-gray-500">{{ $t('admin.col_actions') }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100">
-                    <tr v-for="slide in activeSlides" :key="slide.id" class="hover:bg-gray-50">
+                <tbody class="divide-y divide-gray-100" @dragleave="handleTableDragLeave" @dragend="handleDragEnd">
+                    <tr v-for="slide in activeSlides" :key="slide.id"
+                        class="hover:bg-gray-50 transition-colors"
+                        :class="{ 'opacity-50': draggedSlide?.id === slide.id }"
+                        :style="isReorderable && dragOverSlide?.id === slide.id ? {
+                            boxShadow: dropPosition === 'before'
+                                ? 'inset 0 3px 0 0 rgb(99, 102, 241)'
+                                : 'inset 0 -3px 0 0 rgb(99, 102, 241)',
+                            backgroundColor: 'rgb(239, 246, 255)'
+                        } : {}"
+                        :draggable="isReorderable"
+                        @dragstart="handleDragStart($event, slide)"
+                        @dragover="handleDragOver($event, slide)"
+                        @drop="handleDrop($event, slide)">
+                        <td v-if="isReorderable" class="px-3 py-3 text-center cursor-grab active:cursor-grabbing">
+                            <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2z" />
+                            </svg>
+                        </td>
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
                                 <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">
@@ -400,8 +526,8 @@ function statusBadge(status) {
                         </td>
                         <td class="px-4 py-3 hidden sm:table-cell">
                             <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize"
-                                :class="statusBadge(slide.status)">
-                                {{ slide.status }}
+                                :class="statusBadge(displayStatus(slide))">
+                                {{ displayStatus(slide) }}
                             </span>
                         </td>
                         <td class="px-4 py-3 hidden md:table-cell text-xs text-gray-500 space-y-0.5">
@@ -428,9 +554,17 @@ function statusBadge(status) {
                                     class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                     {{ $t('admin.edit') }}
                                 </Link>
-                                <button @click="destroy(slide)"
+                                <button v-if="activeTab === 'archived'" @click="unarchive(slide)"
+                                    class="rounded-md border border-blue-200 px-2.5 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50 transition-colors">
+                                    {{ $t('admin.restore') }}
+                                </button>
+                                <button v-if="activeTab === 'archived'" @click="destroy(slide)"
                                     class="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
                                     {{ $t('admin.delete') }}
+                                </button>
+                                <button v-else @click="archive(slide)"
+                                    class="rounded-md border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 transition-colors">
+                                    {{ $t('admin.archive') }}
                                 </button>
                             </div>
                         </td>
