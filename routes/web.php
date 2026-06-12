@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\ChunkedUploadController;
 use App\Http\Controllers\EntityController;
 use App\Http\Controllers\EntitySlideController;
+use App\Http\Controllers\LocalSlideController;
 use App\Http\Controllers\MySlideController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\SlideController;
@@ -47,6 +48,15 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::get('/{slide}/edit', [MySlideController::class, 'edit'])->name('edit');
         Route::patch('/{slide}', [MySlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [MySlideController::class, 'archive'])->name('archive');
+    });
+
+    // ── Entity member: entity-scoped slide management (local slides) ────────
+    Route::prefix('local-slides')->name('local-slides.')->group(function () {
+        Route::get('/', [LocalSlideController::class, 'index'])->name('index');
+        Route::get('/{slide}/edit', [LocalSlideController::class, 'edit'])->name('edit');
+        Route::patch('/{slide}', [LocalSlideController::class, 'update'])->name('update');
+        Route::post('/{slide}/archive', [LocalSlideController::class, 'archive'])->name('archive');
+        Route::post('/{slide}/unarchive', [LocalSlideController::class, 'unarchive'])->name('unarchive');
     });
 
     // ── Entity leader: entity-scoped slide management ──────────────────────

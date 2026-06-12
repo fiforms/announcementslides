@@ -21,6 +21,7 @@ class SlideController extends Controller
     {
         $languageCode = $request->query('language');
         $languageId = null;
+        $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
 
         // If no language specified, try to detect from Accept-Language header (browser default)
         if (!$languageCode) {
@@ -37,10 +38,15 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $slides = Slide::current()
-            ->visibleToUser($request->user())
-            ->language($languageId)
-            ->orderBy('sort_order')
+        $query = Slide::current()->language($languageId);
+
+        if ($entityId) {
+            $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
+        } else {
+            $query->visibleToUser($request->user());
+        }
+
+        $slides = $query->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($s) => $this->slideResource($s));
@@ -58,6 +64,7 @@ class SlideController extends Controller
     {
         $languageCode = $request->query('language');
         $languageId = null;
+        $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
 
         // If no language specified, try to detect from Accept-Language header (browser default)
         if (!$languageCode) {
@@ -74,10 +81,15 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $query = Slide::archived()
-            ->visibleToUser($request->user())
-            ->language($languageId)
-            ->orderByDesc('expires_at');
+        $query = Slide::archived()->language($languageId);
+
+        if ($entityId) {
+            $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
+        } else {
+            $query->visibleToUser($request->user());
+        }
+
+        $query->orderByDesc('expires_at');
 
         if ($search = $request->query('search')) {
             $query->where(fn ($q) => $q->where('title', 'like', "%{$search}%")

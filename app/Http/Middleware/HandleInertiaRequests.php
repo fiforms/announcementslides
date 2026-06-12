@@ -36,6 +36,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user'             => $request->user()?->only('id', 'name', 'email', 'role', 'avatar_url'),
                 'admin_entities'   => $request->user()?->adminEntities()->get(['entities.id', 'entities.name']) ?? [],
+                'user_entities'    => $request->user()?->entities()->orderBy('name')->get(['entities.id', 'entities.name']) ?? [],
             ],
             'flash' => [
                 'success' => session('success'),

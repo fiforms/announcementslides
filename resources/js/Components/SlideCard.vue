@@ -13,7 +13,9 @@ const emit = defineEmits(['toggle-select', 'open']);
 const expiresLabel = computed(() => {
     if (!props.slide.expires_at) return null;
     const d = new Date(props.slide.expires_at);
-    return `Expires ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    const isExpired = d <= new Date();
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isExpired ? `Expired ${dateStr}` : `Expires ${dateStr}`;
 });
 
 const publishLabel = computed(() => {
