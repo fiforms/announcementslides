@@ -117,9 +117,6 @@ onUnmounted(() => {
         <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-gray-900">{{ $t('slides.announcement_slides_title') }}</h1>
-                <p class="mt-1 text-sm text-gray-500">
-                    {{ slides.length }} {{ slides.length === 1 ? $t('slides.slides_available').split('|')[0] : $t('slides.slides_available').split('|')[1] }}
-                </p>
             </div>
 
             <div class="flex flex-col sm:flex-row flex-wrap gap-3 items-start sm:items-center">
