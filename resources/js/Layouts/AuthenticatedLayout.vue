@@ -65,9 +65,9 @@ function switchEntity(entityId) {
                                 :class="{ 'text-white font-semibold': route().current('slides.archive') }">
                                 Archive
                             </Link>
-                            <!-- My Slides link (only for viewers) -->
+                            <!-- My Slides link (only for viewers and contributors) -->
                             <Link
-                                v-if="$page.props.auth.user?.role === 'viewer'"
+                                v-if="$page.props.auth.user?.role === 'viewer' || $page.props.auth.user?.role === 'contributor'"
                                 :href="route('my-slides.index')"
                                 class="text-sm text-indigo-200 hover:text-white transition-colors"
                                 :class="{ 'text-white font-semibold': route().current('my-slides.*') }">

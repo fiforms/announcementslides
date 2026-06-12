@@ -53,7 +53,7 @@ function switchEntity(entityId) {
                             Archive
                         </Link>
 
-                        <template v-if="auth?.user?.role === 'viewer'">
+                        <template v-if="auth?.user?.role === 'viewer' || auth?.user?.role === 'contributor'">
                             <Link :href="route('my-slides.index')"
                                 class="text-sm text-indigo-200 hover:text-white transition-colors"
                                 :class="{ 'text-white font-semibold': route().current('my-slides.*') }">
