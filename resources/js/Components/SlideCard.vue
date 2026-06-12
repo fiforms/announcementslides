@@ -71,7 +71,7 @@ const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_
 
         <!-- Info -->
         <div class="p-3">
-            <p class="text-sm font-semibold text-gray-900 truncate">{{ slide.title }}</p>
+            <p class="text-sm font-semibold truncate" :class="slide.entity_id ? 'text-green-600' : 'text-gray-900'">{{ slide.title }}</p>
             <div class="mt-1 flex flex-wrap gap-1">
                 <span v-if="publishLabel" class="inline-flex text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
                     {{ publishLabel }}

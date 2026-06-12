@@ -46,7 +46,8 @@ class SlideController extends Controller
             $query->visibleToUser($request->user());
         }
 
-        $slides = $query->orderBy('sort_order')
+        $slides = $query->orderByRaw('entity_id IS NOT NULL DESC')
+            ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($s) => $this->slideResource($s));
@@ -132,6 +133,7 @@ class SlideController extends Controller
         $query = Slide::current()
             ->visibleToUser($request->user())
             ->language($languageId)
+            ->orderByRaw('entity_id IS NOT NULL DESC')
             ->orderBy('sort_order');
 
         if ($ids) {
@@ -180,6 +182,7 @@ class SlideController extends Controller
         $query = Slide::current()
             ->visibleToUser($request->user())
             ->language($languageId)
+            ->orderByRaw('entity_id IS NOT NULL DESC')
             ->orderBy('sort_order');
 
         if ($ids) {
@@ -257,6 +260,7 @@ class SlideController extends Controller
             'original_filename' => $slide->original_filename,
             'validation_issues' => $slide->validation_issues,
             'validation_status' => $slide->validation_status,
+            'entity_id'         => $slide->entity_id,
         ];
     }
 }
