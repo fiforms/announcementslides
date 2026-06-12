@@ -123,6 +123,28 @@ class Slide extends Model
         return $this->thumbnail_path ? Storage::disk('public')->url($this->thumbnail_path) : null;
     }
 
+    /**
+     * The effective status for display, accounting for publish/expiry dates.
+     * A published slide whose expiry has passed reads as "archived"; one whose
+     * publish date is still in the future reads as "scheduled".
+     */
+    public function getDisplayStatusAttribute(): string
+    {
+        if ($this->status !== 'published') {
+            return $this->status;
+        }
+
+        if ($this->expires_at && $this->expires_at->isPast()) {
+            return 'archived';
+        }
+
+        if ($this->publish_at && $this->publish_at->isFuture()) {
+            return 'scheduled';
+        }
+
+        return 'published';
+    }
+
     public function isImage(): bool
     {
         return str_starts_with($this->mime_type, 'image/');

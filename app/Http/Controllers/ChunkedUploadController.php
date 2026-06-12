@@ -89,7 +89,7 @@ class ChunkedUploadController extends Controller
             'language_id'                 => 'nullable|integer|exists:languages,id',
             'publish_at'                  => 'nullable|date',
             'expires_at'                  => 'nullable|date|after_or_equal:publish_at',
-            'status'                      => 'in:draft,published',
+            'status'                      => 'in:draft,pending,published',
             'entity_id'                   => 'nullable|integer|exists:entities,id',
         ]);
 
@@ -105,7 +105,9 @@ class ChunkedUploadController extends Controller
             $status   = $request->status ?? 'published';
             $entityId = null;
         } elseif ($user->isContributor()) {
-            $status   = 'published';
+            $status   = in_array($request->status, ['draft', 'pending', 'published'], true)
+                ? $request->status
+                : 'published';
             $entityId = null;
         } else {
             // Viewer — goes to pending inbox

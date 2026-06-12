@@ -12,16 +12,35 @@ class MySlideController extends Controller
 {
     public function index(Request $request): Response
     {
+        // Group by effective status (published → draft → archived), then fall back
+        // to the global slide sort order. Archived is a derived state, so the
+        // ranking has to happen in PHP rather than a SQL ORDER BY.
+        $statusRank = [
+            'published' => 0,
+            'scheduled' => 1,
+            'pending'   => 2,
+            'draft'     => 3,
+            'rejected'  => 4,
+            'archived'  => 5,
+        ];
+
         $slides = Slide::with('entity')
             ->where('uploaded_by', $request->user()->id)
             ->whereNull('entity_id')
-            ->orderByDesc('created_at')
             ->get()
+            ->sortBy(fn ($s) => [
+                $statusRank[$s->display_status] ?? 99,
+                $s->sort_order,
+                -$s->created_at->getTimestamp(),
+            ])
+            ->values()
             ->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
-        return Inertia::render('MySlides/Index', compact('slides', 'languages'));
+        $canSetStatus = $request->user()->isContributor();
+
+        return Inertia::render('MySlides/Index', compact('slides', 'languages', 'canSetStatus'));
     }
 
     public function edit(Request $request, Slide $slide): Response
@@ -33,6 +52,7 @@ class MySlideController extends Controller
         return Inertia::render('MySlides/Edit', [
             'slide' => $this->slideResource($slide),
             'languages' => $languages,
+            'canSetStatus' => $request->user()->isContributor(),
         ]);
     }
 
@@ -46,9 +66,17 @@ class MySlideController extends Controller
             'language_id' => 'nullable|integer|exists:languages,id',
             'publish_at'  => 'nullable|date',
             'expires_at'  => 'nullable|date|after_or_equal:publish_at',
+            'status'      => 'nullable|in:draft,pending,published',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at'));
+        $fields = $request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at');
+
+        // Only contributors may change the workflow status of their slide.
+        if ($request->filled('status') && $request->user()->isContributor()) {
+            $fields['status'] = $request->status;
+        }
+
+        $slide->update($fields);
 
         return redirect()->route('my-slides.index')->with('success', 'Slide updated.');
     }
@@ -64,8 +92,13 @@ class MySlideController extends Controller
 
     private function authorizeOwnership(Request $request, Slide $slide): void
     {
+        // Ownership alone is not enough: a user demoted to "viewer" may still own
+        // global slides from when they were a contributor, but must not be able to
+        // modify them. Editing/archiving requires current contributor permissions.
         abort_unless(
-            $slide->uploaded_by === $request->user()->id && $slide->entity_id === null,
+            $request->user()->isContributor()
+                && $slide->uploaded_by === $request->user()->id
+                && $slide->entity_id === null,
             403
         );
     }
@@ -83,6 +116,7 @@ class MySlideController extends Controller
             'publish_at'        => $slide->publish_at?->toIso8601String(),
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'status'            => $slide->status,
+            'display_status'    => $slide->display_status,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
             'validation_issues' => $slide->validation_issues,

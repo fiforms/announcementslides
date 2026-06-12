@@ -7,6 +7,7 @@ import UploadPanel from '@/Components/UploadPanel.vue';
 const props = defineProps({
     slides: { type: Array, default: () => [] },
     languages: { type: Array, default: () => [] },
+    canSetStatus: { type: Boolean, default: false },
 });
 
 const showUploadPanel = ref(false);
@@ -20,6 +21,8 @@ function archive(slide) {
 function statusBadge(status) {
     const map = {
         published: 'bg-green-100 text-green-800',
+        scheduled: 'bg-blue-100 text-blue-800',
+        archived:  'bg-slate-100 text-slate-600',
         pending:   'bg-yellow-100 text-yellow-800',
         draft:     'bg-gray-100 text-gray-700',
         rejected:  'bg-red-100 text-red-700',
@@ -46,9 +49,18 @@ function formatBytes(bytes) {
                     Upload Slide
                 </button>
             </div>
+            <div v-if="canSetStatus" class="rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3 text-sm text-indigo-700">
+                You have <strong>Global Slide Contributor</strong> permissions, so any slides you upload here can be published immediately to all entities.
+            </div>
+
+            <div v-else class="rounded-lg bg-blue-50 border border-blue-100 px-4 py-3 text-sm text-blue-700">
+                You only have <strong>View</strong> permissions for global slides. You may upload a suggested slide here, but it must be reviewed and approved by an authorized reviewer before it is published.
+            </div>
+
             <UploadPanel
                 v-if="showUploadPanel"
                 :languages="languages"
+                :show-status-select="canSetStatus"
                 redirect-route="my-slides.index"
                 @success="showUploadPanel = false"
             />
@@ -80,8 +92,8 @@ function formatBytes(bytes) {
                             </td>
                             <td class="px-4 py-3 hidden sm:table-cell">
                                 <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize"
-                                    :class="statusBadge(slide.status)">
-                                    {{ slide.status }}
+                                    :class="statusBadge(slide.display_status)">
+                                    {{ slide.display_status }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 hidden md:table-cell text-xs text-gray-500 space-y-0.5">
@@ -90,7 +102,7 @@ function formatBytes(bytes) {
                                 <div v-if="!slide.publish_at && !slide.expires_at" class="text-gray-300">Always on</div>
                             </td>
                             <td class="px-4 py-3 text-right">
-                                <div class="flex items-center justify-end gap-2">
+                                <div v-if="canSetStatus" class="flex items-center justify-end gap-2">
                                     <Link :href="route('my-slides.edit', slide.id)"
                                         class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                         Edit
@@ -100,6 +112,7 @@ function formatBytes(bytes) {
                                         Archive
                                     </button>
                                 </div>
+                                <span v-else class="text-xs text-gray-300">—</span>
                             </td>
                         </tr>
                     </tbody>
