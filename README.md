@@ -2,6 +2,8 @@
 
 A web-based announcement slide distribution system designed for Seventh-day Adventist churches. Administrators and authorized contributors can push slides to any church in the system; registered users can submit slides for review; and church leader users can configure slides specific to their local congregation.
 
+> For a tour of the project layout, data model, and where the implementation lives, see [ARCHITECTURE.md](ARCHITECTURE.md).
+
 ## Features
 
 - **Multi-tier role system** — admins, contributors, and church leaders each have scoped permissions
