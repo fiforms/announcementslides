@@ -94,12 +94,13 @@ class SlideController extends Controller
             'language_id' => 'nullable|integer|exists:languages,id',
             'publish_at'  => 'nullable|date',
             'expires_at'  => 'nullable|date',
-            'status'      => 'required|in:draft,pending,published,rejected',
-            'sort_order'  => 'integer|min:0',
-            'entity_id'   => 'nullable|integer|exists:entities,id',
+            'status'       => 'required|in:draft,pending,published,rejected',
+            'sort_order'   => 'integer|min:0',
+            'entity_id'    => 'nullable|integer|exists:entities,id',
+            'share_nearby' => 'boolean',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at', 'status', 'sort_order', 'entity_id'));
+        $slide->update($request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at', 'status', 'sort_order', 'entity_id', 'share_nearby'));
 
         return redirect()->route('admin.slides.index')
             ->with('success', 'Slide updated.');
@@ -172,6 +173,7 @@ class SlideController extends Controller
             'publish_at'        => $slide->publish_at?->toIso8601String(),
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'status'            => $slide->status,
+            'share_nearby'      => $slide->share_nearby,
             'sort_order'        => $slide->sort_order,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,

@@ -13,13 +13,30 @@ const props = defineProps({
     slides: { type: Array, default: () => [] },
     languages: { type: Array, default: () => [] },
     selectedLanguage: { type: String, default: null },
+    entityId: { type: Number, default: null },
+    nearbyEnabled: { type: Boolean, default: false },
 });
 
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
 
+// Reload the dashboard preserving the current entity / language / nearby state,
+// overriding whichever value changed.
+function reloadWith(overrides = {}) {
+    const params = {
+        language: currentLanguageCode.value,
+        ...(props.entityId ? { entity_id: props.entityId } : {}),
+        ...(props.nearbyEnabled ? { nearby: 1 } : {}),
+        ...overrides,
+    };
+    router.get(route('slides.index'), params, { preserveScroll: true });
+}
+
 function changeLanguage(code) {
-    console.log('[Index] changeLanguage called with:', code);
-    router.get(route('slides.index'), { language: code });
+    reloadWith({ language: code });
+}
+
+function toggleNearby(enabled) {
+    reloadWith(enabled ? { nearby: 1 } : { nearby: undefined });
 }
 
 const selectedIds = ref(new Set());
@@ -126,6 +143,12 @@ onUnmounted(() => {
                         {{ lang.name }} ({{ lang.native_name }})
                     </option>
                 </select>
+
+                <label v-if="entityId" class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm cursor-pointer select-none">
+                    <input type="checkbox" :checked="nearbyEnabled" @change="toggleNearby($event.target.checked)"
+                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                    Include nearby
+                </label>
 
                 <div class="flex flex-wrap gap-2">
                 <template v-if="hasSelection">

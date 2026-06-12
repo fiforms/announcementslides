@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router, Link, usePage } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
@@ -20,6 +20,14 @@ const draggedSlide = ref(null);
 const dragOverSlide = ref(null);
 const dropPosition = ref(null); // 'before' | 'after'
 const orderedSlides = ref([...props.slides]);
+
+// Re-sync the local working copy whenever the server returns updated slides
+// (e.g. after archiving or toggling "share nearby"), so buttons reflect the
+// new state without a manual refresh. Drag reordering uses a fetch() call that
+// does not change props, so it won't be clobbered mid-interaction.
+watch(() => props.slides, (slides) => {
+    orderedSlides.value = [...slides];
+});
 
 const activeSlides = computed(() => {
     return orderedSlides.value.filter(s => !isSlideArchived(s));
@@ -45,6 +53,21 @@ function unarchive(slide) {
     if (confirm(`Restore "${slide.title}"? It will be visible again.`)) {
         router.post(route('local-slides.unarchive', { slide: slide.id, entity_id: props.entity.id }));
     }
+}
+
+function toggleShareNearby(slide) {
+    // Turning sharing ON requires the slide to meet quality requirements, since
+    // it will appear on nearby congregations' dashboards. The server enforces
+    // this too; this is just immediate feedback.
+    if (!slide.share_nearby && slide.validation_status && slide.validation_status !== 'ok') {
+        alert(
+            'This slide can\'t be shared with nearby churches because it doesn\'t meet the quality requirements:\n\n'
+            + (slide.validation_issues || []).join('\n')
+        );
+        return;
+    }
+    const routeName = slide.share_nearby ? 'local-slides.unshare-nearby' : 'local-slides.share-nearby';
+    router.post(route(routeName, { slide: slide.id, entity_id: props.entity.id }), {}, { preserveScroll: true });
 }
 
 function isSlideArchived(slide) {
@@ -237,6 +260,14 @@ function updateSortOrder() {
                                         class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                         Edit
                                     </Link>
+                                    <button @click="toggleShareNearby(slide)"
+                                        :title="slide.share_nearby ? 'Stop sharing with nearby churches' : 'Share with nearby churches'"
+                                        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
+                                        :class="slide.share_nearby
+                                            ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                            : 'border-gray-300 text-gray-700 hover:bg-gray-50'">
+                                        {{ slide.share_nearby ? 'Sharing nearby' : 'Share nearby' }}
+                                    </button>
                                     <button @click="archive(slide)"
                                         class="rounded-md border border-amber-200 px-2.5 py-1 text-xs font-medium text-amber-700 hover:bg-amber-50 transition-colors">
                                         Archive

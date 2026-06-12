@@ -29,6 +29,7 @@ const languageId    = ref('');
 const publishAt     = ref('');
 const expiresAt     = ref('');
 const status        = ref('published');
+const shareNearby   = ref(false);
 
 const canSubmit = computed(() => selectedFiles.value.length > 0 && title.value.trim());
 
@@ -75,6 +76,7 @@ async function submit() {
 
     if (props.entityId) {
         payload.entity_id = props.entityId;
+        payload.share_nearby = shareNearby.value;
     }
 
     const result = await upload(selectedFiles.value, payload);
@@ -89,6 +91,7 @@ async function submit() {
                 languageId.value    = '';
                 publishAt.value     = '';
                 expiresAt.value     = '';
+                shareNearby.value   = false;
                 emit('success');
             },
         });
@@ -203,6 +206,18 @@ async function submit() {
                         <option value="pending">Pending (submit for review)</option>
                         <option value="draft">Draft (not visible)</option>
                     </select>
+                </div>
+
+                <div v-if="entityId" class="sm:col-span-2">
+                    <label class="flex items-start gap-2">
+                        <input v-model="shareNearby" type="checkbox"
+                            class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                        <span class="text-sm font-medium text-gray-700">Share with nearby churches</span>
+                    </label>
+                    <div v-if="shareNearby" class="mt-2 rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-3 text-sm text-indigo-800">
+                        Local slide sharing allows you to promote events and ministries relevant to others in your local area. Ensure that your slide contains all relevant information such as the date and time, and the specific address of the event. Please share any events you would invite the public to, but don't share weekly announcements such as regular potluck, regular weekly services, other events specifically for local members. Refrain from sharing generic greetings or anything not specifically tied to an event.
+                        <p class="mt-2 text-xs text-indigo-700">Shared slides must meet the image quality requirements.</p>
+                    </div>
                 </div>
             </div>
 

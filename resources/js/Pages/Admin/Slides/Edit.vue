@@ -24,6 +24,7 @@ const form = useForm({
     expires_at:  toLocalDatetime(props.slide.expires_at),
     status:      props.slide.status,
     sort_order:  props.slide.sort_order,
+    share_nearby: props.slide.share_nearby ?? false,
 });
 
 function submit() {
@@ -113,6 +114,15 @@ function submit() {
                         <input v-model.number="form.sort_order" type="number" min="0"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     </div>
+                </div>
+
+                <div>
+                    <label class="flex items-center gap-2">
+                        <input v-model="form.share_nearby" type="checkbox"
+                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                        <span class="text-sm font-medium text-gray-700">Share with nearby churches</span>
+                    </label>
+                    <p class="mt-1 text-xs text-gray-500">When on, this slide can appear on nearby churches' dashboards if they enable "include nearby".</p>
                 </div>
 
                 <div class="flex gap-3 pt-2">

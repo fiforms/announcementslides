@@ -16,6 +16,8 @@ class Entity extends Model
         'state',
         'zip',
         'country',
+        'latitude',
+        'longitude',
         'website',
         'is_custom',
         'deactivated',
@@ -25,6 +27,8 @@ class Entity extends Model
     protected $casts = [
         'is_custom'   => 'boolean',
         'deactivated' => 'boolean',
+        'latitude'    => 'decimal:7',
+        'longitude'   => 'decimal:7',
     ];
 
     public function users()

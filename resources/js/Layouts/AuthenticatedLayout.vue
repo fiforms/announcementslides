@@ -224,6 +224,14 @@ function switchEntity(entityId) {
                 </div>
             </nav>
 
+            <!-- Flash messages -->
+            <div v-if="page.props.flash?.success" class="bg-green-50 border-b border-green-200 px-4 py-3 text-center text-sm text-green-700">
+                {{ page.props.flash.success }}
+            </div>
+            <div v-if="page.props.flash?.error" class="bg-red-50 border-b border-red-200 px-4 py-3 text-center text-sm text-red-700">
+                {{ page.props.flash.error }}
+            </div>
+
             <!-- Page Content -->
             <main>
                 <slot />

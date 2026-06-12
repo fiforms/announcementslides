@@ -17,7 +17,7 @@ class Slide extends Model
         'title', 'notes', 'filename', 'original_filename', 'disk_path',
         'file_size', 'mime_type', 'thumbnail_path', 'publish_at', 'expires_at',
         'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
-        'image_width', 'image_height', 'validation_issues', 'validation_status',
+        'image_width', 'image_height', 'validation_issues', 'validation_status', 'share_nearby',
     ];
 
     protected function casts(): array
@@ -31,6 +31,7 @@ class Slide extends Model
             'image_width' => 'integer',
             'image_height' => 'integer',
             'validation_issues' => 'array',
+            'share_nearby' => 'boolean',
         ];
     }
 
@@ -101,6 +102,11 @@ class Slide extends Model
             return $query->where(fn ($q) => $q->whereNull('entity_id')->orWhereIn('entity_id', $entityIds));
         }
         return $query->whereNull('entity_id');
+    }
+
+    public function scopeShareNearby(Builder $query): Builder
+    {
+        return $query->where('share_nearby', true);
     }
 
     public function scopeLanguage(Builder $query, ?int $languageId): Builder

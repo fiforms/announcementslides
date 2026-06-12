@@ -46,6 +46,8 @@ class EntitySync extends Command
                     'state'       => $ae->state,
                     'zip'         => $ae->zip,
                     'country'     => $ae->country,
+                    'latitude'    => $ae->latitude,
+                    'longitude'   => $ae->longitude,
                     'website'     => $ae->website,
                     'is_custom'   => false,
                     'deactivated' => false,

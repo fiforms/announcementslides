@@ -125,6 +125,53 @@ class LocalSlideController extends Controller
         return back()->with('success', 'Slide restored.');
     }
 
+    public function shareNearby(Request $request, Slide $slide)
+    {
+        $this->authorizeSlideAction($request, $slide);
+
+        // Shared slides appear on other congregations' dashboards, so they must
+        // clear the same quality bar enforced at upload time.
+        if ($slide->validation_status !== 'ok') {
+            return back()->with('error',
+                'This slide can\'t be shared with nearby churches because it doesn\'t meet the quality requirements: '
+                . implode('; ', $slide->validation_issues ?? []));
+        }
+
+        $slide->update(['share_nearby' => true]);
+
+        return back()->with('success', 'Slide is now shared with nearby churches.');
+    }
+
+    public function unshareNearby(Request $request, Slide $slide)
+    {
+        $this->authorizeSlideAction($request, $slide);
+
+        $slide->update(['share_nearby' => false]);
+
+        return back()->with('success', 'Slide is no longer shared with nearby churches.');
+    }
+
+    /**
+     * Shared permission gate for entity-admin slide actions: the user must be a
+     * member of the entity, an admin of it (or site admin), and own the slide
+     * (unless site admin), and the slide must belong to that entity.
+     */
+    private function authorizeSlideAction(Request $request, Slide $slide): int
+    {
+        $user = $request->user();
+        $entityId = (int) $request->query('entity_id');
+
+        abort_unless(
+            $entityId && in_array($entityId, $user->memberEntityIds()),
+            403
+        );
+        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
+        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
+        abort_unless($slide->entity_id === $entityId, 404);
+
+        return $entityId;
+    }
+
     public function reorder(Request $request)
     {
         $user = $request->user();
@@ -165,6 +212,7 @@ class LocalSlideController extends Controller
             'publish_at'        => $slide->publish_at?->toIso8601String(),
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'status'            => $slide->status,
+            'share_nearby'      => $slide->share_nearby,
             'sort_order'        => $slide->sort_order,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,

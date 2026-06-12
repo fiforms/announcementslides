@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Entity;
 use App\Models\Language;
 use App\Models\Slide;
+use App\Support\NearbyEntities;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -38,10 +40,27 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
+        $nearby = $request->boolean('nearby');
+        $nearbyIds = [];
+
+        if ($entityId && $nearby) {
+            $radius = (float) ($request->user()?->setting('nearby_radius_miles')
+                ?? config('slides.nearby_radius_miles'));
+            $home = Entity::find($entityId);
+            $nearbyIds = $home ? NearbyEntities::within($home, $radius) : [];
+        }
+
         $query = Slide::current()->language($languageId);
 
         if ($entityId) {
-            $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
+            // Home entity's slides + global slides, plus opt-in shared slides from
+            // nearby entities (the share_nearby flag only gates the borrowed bucket).
+            $query->where(function ($q) use ($entityId, $nearbyIds) {
+                $q->whereNull('entity_id')->orWhere('entity_id', $entityId);
+                if (! empty($nearbyIds)) {
+                    $q->orWhere(fn ($n) => $n->whereIn('entity_id', $nearbyIds)->shareNearby());
+                }
+            });
         } else {
             $query->visibleToUser($request->user());
         }
@@ -58,6 +77,8 @@ class SlideController extends Controller
             'slides' => $slides,
             'languages' => $languages,
             'selectedLanguage' => $languageCode,
+            'entityId' => $entityId,
+            'nearbyEnabled' => $entityId ? $nearby : false,
         ]);
     }
 

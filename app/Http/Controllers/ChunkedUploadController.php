@@ -91,6 +91,7 @@ class ChunkedUploadController extends Controller
             'expires_at'                  => 'nullable|date|after_or_equal:publish_at',
             'status'                      => 'in:draft,pending,published',
             'entity_id'                   => 'nullable|integer|exists:entities,id',
+            'share_nearby'                => 'boolean',
         ]);
 
         $user     = $request->user();
@@ -115,10 +116,16 @@ class ChunkedUploadController extends Controller
             $entityId = null;
         }
 
+        // Nearby sharing only applies to entity-scoped (local) slides.
+        $shareNearby = $entityId !== null && $request->boolean('share_nearby');
+
         // Contributors and viewers may not publish/submit global slides (no
         // entity) that fail any quality check — those are hard-blocked rather
-        // than flagged. Admins and entity uploads keep the soft-warning path.
-        $enforceQuality = $entityId === null && !$user->isAdmin();
+        // than flagged. Admins and (non-shared) entity uploads keep the
+        // soft-warning path. Local slides marked to share with nearby churches
+        // are held to the same hard quality bar, since they appear on other
+        // congregations' dashboards.
+        $enforceQuality = ($entityId === null && !$user->isAdmin()) || $shareNearby;
 
         // First pass: validate every upload before creating anything, so one
         // failing file rejects the whole batch instead of publishing partially.
@@ -174,6 +181,7 @@ class ChunkedUploadController extends Controller
                 'uploaded_by'       => $user->id,
                 'entity_id'         => $entityId,
                 'language_id'       => $request->language_id,
+                'share_nearby'      => $shareNearby,
             ]);
 
             GenerateThumbnail::dispatch($slide);

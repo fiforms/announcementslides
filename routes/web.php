@@ -32,6 +32,7 @@ require __DIR__.'/auth.php';
 Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::patch('/profile/settings', [ProfileController::class, 'updateSettings'])->name('profile.settings.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     Route::get('/entities/search', [EntityController::class, 'search'])->name('entities.search');
@@ -57,6 +58,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::patch('/{slide}', [LocalSlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [LocalSlideController::class, 'archive'])->name('archive');
         Route::post('/{slide}/unarchive', [LocalSlideController::class, 'unarchive'])->name('unarchive');
+        Route::post('/{slide}/share-nearby', [LocalSlideController::class, 'shareNearby'])->name('share-nearby');
+        Route::post('/{slide}/unshare-nearby', [LocalSlideController::class, 'unshareNearby'])->name('unshare-nearby');
         Route::post('/reorder', [LocalSlideController::class, 'reorder'])->name('reorder');
     });
 

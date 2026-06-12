@@ -72,4 +72,28 @@ class User extends Authenticatable
     {
         return $this->entities()->pluck('entities.id')->toArray();
     }
+
+    public function settings()
+    {
+        return $this->hasMany(UserSetting::class);
+    }
+
+    /**
+     * Read a single per-user setting value, falling back to $default when unset.
+     */
+    public function setting(string $tag, $default = null)
+    {
+        return $this->settings()->where('setting_tag', $tag)->value('setting_value') ?? $default;
+    }
+
+    /**
+     * Create or update a single per-user setting.
+     */
+    public function putSetting(string $tag, $value): void
+    {
+        $this->settings()->updateOrCreate(
+            ['setting_tag' => $tag],
+            ['setting_value' => $value],
+        );
+    }
 }
