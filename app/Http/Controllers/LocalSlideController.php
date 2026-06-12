@@ -140,6 +140,8 @@ class LocalSlideController extends Controller
             'sort_order'        => $slide->sort_order,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
+            'validation_issues' => $slide->validation_issues,
+            'validation_status' => $slide->validation_status,
             'uploader'          => $slide->uploader?->only('id', 'name'),
             'created_at'        => $slide->created_at->toIso8601String(),
         ];

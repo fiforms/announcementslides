@@ -4,6 +4,8 @@ import { useForm, router, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
 import DropZone from '@/Components/DropZone.vue';
+import ValidationWarnings from '@/Components/ValidationWarnings.vue';
+import { useImageValidation } from '@/Composables/useImageValidation.js';
 
 const props = defineProps({
     current:   { type: Array, default: () => [] },
@@ -20,9 +22,12 @@ const props = defineProps({
 // .htaccess raises it to 8 MB for Apache; for nginx/artisan-serve, set upload_max_filesize=8M.
 const CHUNK_SIZE = 1.5 * 1024 * 1024; // 1.5 MB — safe under the 2 MB default
 
+const { validate: validateImage } = useImageValidation();
+
 const showUploadPanel = ref(false);
 const selectedFiles   = ref([]);
 const filePreviews    = ref([]);
+const fileValidations = ref([]);
 
 const form = useForm({
     title:       '',
@@ -42,7 +47,7 @@ const overallProgress = computed(() => {
     return Math.round(fileProgress.value.reduce((sum, f) => sum + f.progress, 0) / fileProgress.value.length);
 });
 
-function onFilesSelected(files) {
+async function onFilesSelected(files) {
     selectedFiles.value = files;
 
     filePreviews.value = files.map(f => ({
@@ -51,6 +56,8 @@ function onFilesSelected(files) {
         url:  f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
         type: f.type,
     }));
+
+    fileValidations.value = await Promise.all(files.map(f => validateImage(f)));
 
     if (!form.title && files.length === 1) {
         form.title = files[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -235,6 +242,10 @@ function statusBadge(status) {
                                 </svg>
                             </button>
                         </div>
+                        <!-- Validation warnings -->
+                        <div v-if="fileValidations[i]" class="mt-2">
+                            <ValidationWarnings :issues="fileValidations[i].issues" />
+                        </div>
                         <!-- Per-file progress bar (shown while uploading) -->
                         <div v-if="isUploading && fileProgress[i]" class="mt-2">
                             <div class="flex justify-between text-xs text-gray-500 mb-1">
@@ -370,9 +381,19 @@ function statusBadge(status) {
                                         :src="slide.thumbnail_url || slide.file_url"
                                         class="h-full w-full object-cover" />
                                 </div>
-                                <div>
-                                    <p class="font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <p class="font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
+                                        <svg v-if="slide.validation_issues?.length" class="h-4 w-4 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20" title="Image quality warnings detected">
+                                            <path fill-rule="evenodd"
+                                                d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                                                clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
                                     <p v-if="slide.entity" class="text-xs text-indigo-600 font-medium mt-0.5">{{ slide.entity.name }}</p>
+                                    <p v-if="slide.validation_issues?.length" class="text-xs text-yellow-700 mt-0.5">
+                                        <span v-for="(issue, idx) in slide.validation_issues" :key="idx" class="block">• {{ issue }}</span>
+                                    </p>
                                     <p v-if="slide.notes" class="text-xs text-gray-400 line-clamp-1 mt-0.5">{{ slide.notes }}</p>
                                 </div>
                             </div>

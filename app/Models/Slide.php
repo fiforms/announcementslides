@@ -17,6 +17,7 @@ class Slide extends Model
         'title', 'notes', 'filename', 'original_filename', 'disk_path',
         'file_size', 'mime_type', 'thumbnail_path', 'publish_at', 'expires_at',
         'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
+        'image_width', 'image_height', 'validation_issues', 'validation_status',
     ];
 
     protected function casts(): array
@@ -27,6 +28,9 @@ class Slide extends Model
             'reviewed_at' => 'datetime',
             'file_size'   => 'integer',
             'sort_order'  => 'integer',
+            'image_width' => 'integer',
+            'image_height' => 'integer',
+            'validation_issues' => 'array',
         ];
     }
 

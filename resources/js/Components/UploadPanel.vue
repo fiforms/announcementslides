@@ -2,7 +2,9 @@
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import DropZone from '@/Components/DropZone.vue';
+import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
+import { useImageValidation } from '@/Composables/useImageValidation.js';
 
 const props = defineProps({
     redirectRoute:     { type: String, required: true },
@@ -16,9 +18,11 @@ const props = defineProps({
 const emit = defineEmits(['success']);
 
 const { isUploading, uploadError, fileProgress, overallProgress, upload } = useChunkedUpload();
+const { validate: validateImage } = useImageValidation();
 
 const selectedFiles = ref([]);
 const filePreviews  = ref([]);
+const fileValidations = ref([]);
 const title         = ref('');
 const notes         = ref('');
 const languageId    = ref('');
@@ -28,7 +32,7 @@ const status        = ref('published');
 
 const canSubmit = computed(() => selectedFiles.value.length > 0 && title.value.trim());
 
-function onFilesSelected(files) {
+async function onFilesSelected(files) {
     selectedFiles.value = files;
     filePreviews.value  = files.map(f => ({
         name: f.name,
@@ -36,6 +40,9 @@ function onFilesSelected(files) {
         url:  f.type.startsWith('image/') ? URL.createObjectURL(f) : null,
         type: f.type,
     }));
+
+    fileValidations.value = await Promise.all(files.map(f => validateImage(f)));
+
     if (!title.value && files.length === 1) {
         title.value = files[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
     }
@@ -100,7 +107,7 @@ async function submit() {
         <form @submit.prevent="submit" class="space-y-5">
             <DropZone @files-selected="onFilesSelected" />
 
-            <ul v-if="filePreviews.length" class="space-y-2">
+            <ul v-if="filePreviews.length" class="space-y-3">
                 <li v-for="(f, i) in filePreviews" :key="i"
                     class="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2">
                     <div class="flex items-center gap-3">
@@ -119,6 +126,9 @@ async function submit() {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
+                    </div>
+                    <div v-if="fileValidations[i]" class="mt-2">
+                        <ValidationWarnings :issues="fileValidations[i].issues" />
                     </div>
                     <div v-if="isUploading && fileProgress[i]" class="mt-2">
                         <div class="flex justify-between text-xs text-gray-500 mb-1">

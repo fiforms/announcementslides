@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Jobs\GenerateThumbnail;
 use App\Models\Slide;
+use App\Services\ImageValidationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -74,7 +75,7 @@ class ChunkedUploadController extends Controller
         ]);
     }
 
-    public function finalize(Request $request)
+    public function finalize(Request $request, ImageValidationService $validationService)
     {
         $request->validate([
             'uploads'                     => 'required|array|min:1',
@@ -119,6 +120,9 @@ class ChunkedUploadController extends Controller
                 return response()->json(['message' => 'Assembled file not found: ' . $upload['original_filename']], 422);
             }
 
+            $filePath = Storage::disk('public')->path($upload['disk_path']);
+            $validation = $validationService->validate($filePath, $upload['mime_type'], $upload['file_size']);
+
             $slide = Slide::create([
                 'title'             => $request->title,
                 'notes'             => $request->notes,
@@ -127,6 +131,10 @@ class ChunkedUploadController extends Controller
                 'disk_path'         => $upload['disk_path'],
                 'file_size'         => $upload['file_size'],
                 'mime_type'         => $upload['mime_type'],
+                'image_width'       => $validation['width'],
+                'image_height'      => $validation['height'],
+                'validation_issues' => $validation['issues'],
+                'validation_status' => $validation['status'],
                 'publish_at'        => $request->publish_at,
                 'expires_at'        => $request->expires_at,
                 'status'            => $status,

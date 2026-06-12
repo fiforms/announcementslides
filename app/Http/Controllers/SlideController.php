@@ -246,15 +246,17 @@ class SlideController extends Controller
     private function slideResource(Slide $slide): array
     {
         return [
-            'id'               => $slide->id,
-            'title'            => $slide->title,
-            'notes'            => $slide->notes,
-            'mime_type'        => $slide->mime_type,
-            'file_url'         => $slide->file_url,
-            'thumbnail_url'    => $slide->thumbnail_url,
-            'publish_at'       => $slide->publish_at?->toIso8601String(),
-            'expires_at'       => $slide->expires_at?->toIso8601String(),
-            'original_filename'=> $slide->original_filename,
+            'id'                => $slide->id,
+            'title'             => $slide->title,
+            'notes'             => $slide->notes,
+            'mime_type'         => $slide->mime_type,
+            'file_url'          => $slide->file_url,
+            'thumbnail_url'     => $slide->thumbnail_url,
+            'publish_at'        => $slide->publish_at?->toIso8601String(),
+            'expires_at'        => $slide->expires_at?->toIso8601String(),
+            'original_filename' => $slide->original_filename,
+            'validation_issues' => $slide->validation_issues,
+            'validation_status' => $slide->validation_status,
         ];
     }
 }

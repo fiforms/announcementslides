@@ -1,6 +1,7 @@
 <script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -50,6 +51,11 @@ function submit() {
                     :src="slide.thumbnail_url || slide.file_url"
                     :alt="slide.title"
                     class="w-full h-full object-contain" />
+            </div>
+
+            <!-- Validation warnings -->
+            <div v-if="slide.validation_issues?.length" class="mb-6">
+                <ValidationWarnings :issues="slide.validation_issues" />
             </div>
 
             <form @submit.prevent="submit" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">

@@ -1,5 +1,6 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
+import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 
 const props = defineProps({
     slide: { type: Object, required: true },
@@ -9,6 +10,7 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['toggle-select', 'open']);
+const showValidationDetails = ref(false);
 
 const expiresLabel = computed(() => {
     if (!props.slide.expires_at) return null;
@@ -45,7 +47,7 @@ const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_
         </div>
 
         <!-- Thumbnail -->
-        <div class="aspect-video bg-slate-100 overflow-hidden">
+        <div class="aspect-video bg-slate-100 overflow-hidden relative">
             <img v-if="previewSrc" :src="previewSrc" :alt="slide.title"
                 class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
             <div v-else class="w-full h-full flex items-center justify-center text-slate-300">
@@ -53,6 +55,17 @@ const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                         d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01" />
                 </svg>
+            </div>
+            <!-- Validation warning badge -->
+            <div v-if="slide.validation_issues?.length" class="absolute top-2 right-2">
+                <button @click.stop="showValidationDetails = !showValidationDetails"
+                    class="relative group">
+                    <svg class="h-6 w-6 text-yellow-400 drop-shadow-md" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd"
+                            d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                            clip-rule="evenodd" />
+                    </svg>
+                </button>
             </div>
         </div>
 
@@ -67,6 +80,11 @@ const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_
                     {{ expiresLabel }}
                 </span>
             </div>
+        </div>
+
+        <!-- Validation warnings expanded view -->
+        <div v-if="showValidationDetails && slide.validation_issues?.length" class="px-3 py-2 bg-amber-50 border-t border-amber-200" @click.stop>
+            <ValidationWarnings :issues="slide.validation_issues" />
         </div>
 
         <!-- Download button -->

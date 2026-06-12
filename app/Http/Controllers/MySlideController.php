@@ -85,6 +85,8 @@ class MySlideController extends Controller
             'status'            => $slide->status,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
+            'validation_issues' => $slide->validation_issues,
+            'validation_status' => $slide->validation_status,
             'created_at'        => $slide->created_at->toIso8601String(),
         ];
     }

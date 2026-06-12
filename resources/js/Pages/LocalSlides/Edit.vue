@@ -1,6 +1,7 @@
 <script setup>
 import { useForm, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 
 const props = defineProps({
     entity: { type: Object, required: true },
@@ -32,6 +33,10 @@ function submit() {
                     :src="slide.thumbnail_url || slide.file_url"
                     :alt="slide.title"
                     class="w-full h-full object-contain" />
+            </div>
+
+            <div v-if="slide.validation_issues?.length" class="mb-6">
+                <ValidationWarnings :issues="slide.validation_issues" />
             </div>
 
             <form @submit.prevent="submit" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
