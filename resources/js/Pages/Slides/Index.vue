@@ -139,10 +139,6 @@ onUnmounted(() => {
                     <Dropdown align="left" width="48" contentClasses="py-1 bg-white">
                         <template #trigger>
                             <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15 19l-7-7 7-7" />
-                                </svg>
                                 Show/Download Selected ({{ selectedIds.size }})
                             </button>
                         </template>
@@ -153,11 +149,11 @@ onUnmounted(() => {
                             </button>
                             <a @click="downloadSelected"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                Download (.zip)
+                                Image Download (.zip)
                             </a>
                             <a @click="downloadPowerPointSelected"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                Download (.pptx)
+                                PowerPoint Download (.pptx)
                             </a>
                         </template>
                     </Dropdown>
@@ -170,10 +166,6 @@ onUnmounted(() => {
                     <Dropdown v-if="slides.length" align="left" width="48" contentClasses="py-1 bg-white">
                         <template #trigger>
                             <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                        d="M15 19l-7-7 7-7" />
-                                </svg>
                                 Show/Download All
                             </button>
                         </template>
@@ -184,11 +176,11 @@ onUnmounted(() => {
                             </button>
                             <a @click="downloadAll"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                Download (.zip)
+                                Image Download (.zip)
                             </a>
                             <a @click="downloadPowerPointAll"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                Download (.pptx)
+                                PowerPoint Download (.pptx)
                             </a>
                         </template>
                     </Dropdown>
