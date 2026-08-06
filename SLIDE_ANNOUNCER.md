@@ -398,10 +398,18 @@ server, not this repo).
   automatically — the same auto-rollback property Mender would have given,
   achieved through RAUC's native mechanism instead.
 - **Persistent state discipline**: anything that must survive an OS update
-  (WiFi credentials, device pairing token, local-app releases, synced
-  slides, sync-status file) lives on the persistent `/data` slot, never on
-  rootfs — rootfs is replaced wholesale on each RAUC install. Systemd units
-  reference `/data`-relative paths so they're unaffected by OS upgrades.
+  and needs Unix semantics (symlinks for atomic app-release swaps, `chmod
+  600` on the pairing token and the identity secret, synced slide media,
+  sync-status file) lives on the persistent ext4 `/data` slot, never on
+  rootfs — rootfs is replaced wholesale on each RAUC install. The one
+  exception is `slideannouncer.yaml` (WiFi credentials + declared device
+  identity), which deliberately lives on the separate FAT32 boot/firmware
+  partition instead — see "First-boot / WiFi setup flow" and "Device
+  identity & anti-clone protection" under Tier 2 for why (human-editable
+  from a PC/Mac; that partition is untouched by RAUC updates too, so it's
+  just as persistent as `/data` for this purpose). Systemd units reference
+  `/data`- and `/boot/firmware`-relative paths so both are unaffected by OS
+  upgrades.
 - **Update safety (no Sunday-morning surprises, without a scheduling
   server)**: since there's no Mender-Server-style deployment scheduler, the
   "don't reboot mid-service" safeguard moves entirely to the device, using
@@ -445,41 +453,72 @@ server, not this repo).
   path* to that page are independent choices, not two different UIs to
   build.
 
-**Primary path — on-device setup via an attached HID input (e.g. an RF
-remote presenting as a keyboard/mouse combo).** Assumption: the remote is a
-plug-and-play 2.4GHz RF dongle, not Bluetooth — it needs to work *before*
-WiFi exists and ideally before any pairing has happened, so it can't depend
-on a Bluetooth pairing step of its own. (Flag if the actual hardware is
-Bluetooth-based — that reintroduces a chicken-and-egg problem this design
-assumes away.)
-- On boot, before deciding how to present setup, the backend checks for a
-  usable HID input device (`/dev/input/event*` exposing keyboard + relative-
-  pointer capabilities, e.g. via `evtest`/`libinput` introspection rather
-  than assuming a specific device path).
-- If found: **skip AP-mode/hotspot entirely.** `slide-announcer-kiosk.service`
-  points Chromium straight at `http://localhost/setup` on the device's own
-  display. The admin uses the remote to pick a network from a list
-  (`nmcli device wifi list`) and type the password directly into the
-  on-screen form — real key events into a real page, no on-screen keyboard
-  needed. Once connected, the same display flips to the **pairing screen**
-  to accept the numeric code, then to `kiosk` — identical state machine to
-  before, just reached without ever involving a second device. No captive
-  portal question exists on this path at all, since there was never a
-  second network/device in the loop to trigger one.
+Three setup modalities exist, tried in order at boot:
 
-**Fallback path — headless (no HID input detected).** Falls back to the
-already-designed AP-mode flow: NetworkManager's built-in hotspot
-(`nmcli device wifi hotspot`, avoids needing hostapd/dnsmasq) with a fixed
-SSID → admin connects with a phone, browses to a printed IP → enters WiFi
-credentials → backend connects via `nmcli`, tears down the hotspot →
+**0. Pre-provisioned config file (`/boot/firmware/slideannouncer.yaml`) —
+true headless, and doubles as the human-editable identity file.** This is a
+plain-text YAML file at the root of the Pi's existing FAT32 boot/firmware
+partition — the same well-established mechanism Raspberry Pi OS itself uses
+for headless WiFi setup (dropping `wpa_supplicant.conf`/an empty `ssh` file
+onto that partition before first boot). It's the right home for this rather
+than a new dedicated partition: FAT32 needs no driver on any OS (Mac,
+Windows, Linux) to read/write, a tiny config file never approaches its 4GB
+file-size limit, and it's a partition that already exists in the image
+rather than an addition to an already-nontrivial A/B + `/data` layout.
+Because it's plain FAT32 (no symlinks, no Unix permissions), it only ever
+holds things that are safe to be world-readable and don't need atomic
+symlink swaps — WiFi credentials and the *declared* device identity, not
+the local-app releases or the pairing token (those still need `/data`,
+ext4, exactly as designed before).
+
+Contents:
+```yaml
+wifi:
+  ssid: "Church Wifi"
+  password: "..."
+device_uuid: "3f29b6d2-....-....-...."
+device_uuid_check: "a1b2c3...(hex)"
+```
+On boot, if this file is present with WiFi credentials, the backend
+connects directly via `nmcli` — no AP-mode hotspot, no keyboard needed at
+all. This is genuinely zero-touch: a technician can hand-edit this file (or
+a provisioning script can generate it) before a card is ever put in a
+device or shipped anywhere, closing the "true headless" gap flagged
+earlier. Pairing itself still needs a fresh code from the website (codes
+are short-lived by design), so this path removes the WiFi step from
+zero-touch provisioning, not the pairing step.
+
+**1. On-device setup via an attached HID input** (e.g. an RF remote
+presenting as a keyboard/mouse combo), if no usable config file was found.
+Assumption: the remote is a plug-and-play 2.4GHz RF dongle, not Bluetooth —
+it needs to work *before* WiFi exists and ideally before any pairing has
+happened, so it can't depend on a Bluetooth pairing step of its own. (Flag
+if the actual hardware is Bluetooth-based — that reintroduces a
+chicken-and-egg problem this design assumes away.)
+- The backend checks for a usable HID input device (`/dev/input/event*`
+  exposing keyboard + relative-pointer capabilities, e.g. via
+  `evtest`/`libinput` introspection rather than assuming a specific device
+  path).
+- If found: `slide-announcer-kiosk.service` points Chromium straight at
+  `http://localhost/setup` on the device's own display. The admin uses the
+  remote to pick a network from a list (`nmcli device wifi list`) and type
+  the password directly into the on-screen form — real key events into a
+  real page, no on-screen keyboard needed. Once connected, the same display
+  flips to the **pairing screen** to accept the numeric code, then to
+  `kiosk`. No captive portal question exists on this path at all, since
+  there was never a second network/device in the loop to trigger one.
+
+**2. Fallback — headless AP-mode (no config file, no HID input).** Falls
+back to the already-designed AP-mode flow: NetworkManager's built-in
+hotspot (`nmcli device wifi hotspot`, avoids needing hostapd/dnsmasq) with a
+fixed SSID → admin connects with a phone, browses to a printed IP → enters
+WiFi credentials → backend connects via `nmcli`, tears down the hotspot →
 pairing screen → `POST /api/slide-announcers/pair` → `kiosk` mode. True
-captive-portal auto-popup on this path is still explicitly deferred (see
-above in this doc's history) — the printed-IP flow is accepted as good
-enough for now. **This path needs a dedicated design pass of its own** for
-genuinely headless deployment (e.g. pre-configuring/mailing a device to a
-site with no on-hand admin, or provisioning at scale before shipping) —
-today it only covers "no keyboard, but someone's standing there with a
-phone," not true zero-touch provisioning.
+captive-portal auto-popup on this path is still explicitly deferred — the
+printed-IP flow is accepted as good enough for now.
+
+All three paths converge on the same pairing screen and the same
+`POST /api/slide-announcers/pair` call once WiFi is up.
 - Common to both paths: once WiFi credentials are stored, revisiting either
   path later requires an explicit admin action (see the local settings
   menu's "reset network"/unpair actions) — the device does **not**
@@ -488,30 +527,58 @@ phone," not true zero-touch provisioning.
   instead just shows the stale-cache indicator.
 
 ### Device identity & anti-clone protection
-A device generates its own `device_uuid` (a random UUID) on first boot and
-persists it — alongside the network interface's `mac_address` at that
-moment — in `/data/identity.json`. `mac_address` is recorded because it's
-useful for hardware inventory (matching a database row back to a physical
-unit), but it is **not** the thing that makes a device unique from the
-server's perspective — `device_uuid` (sent at pairing, stored on
-`SlideAnnouncer`) is.
+`device_uuid` is deliberately **visible and human-editable** — it lives in
+`slideannouncer.yaml` on the FAT32 boot partition (see First-boot flow,
+above), so a technician can read or hand-set it off-device. That visibility
+is exactly why the identity check can't just trust whatever UUID is written
+there: the actual tamper-resistant half of a device's identity is a secret
+that never leaves the ext4 `/data` partition.
 
-On every boot, the identity check compares the currently-detected MAC
-against the one stored in `/data/identity.json`:
-- **Match** (or first boot, nothing stored yet) → proceed normally.
-- **Mismatch** → treat this as evidence the `/data` partition (or the whole
-  SD card) was cloned onto different hardware, or moved from one Pi to
-  another. Response: regenerate `device_uuid`, delete the stored pairing
-  token and cached slides/settings, and boot into the pairing screen — the
-  same wipe-and-reboot path revocation uses (see Heartbeat, above).
+**Two files, two roles:**
+- `/boot/firmware/slideannouncer.yaml` (FAT32, world-readable/editable):
+  `device_uuid` and `device_uuid_check` — a value anyone can *read*, but
+  can't *forge* without the secret below.
+- `/data/identity.key` (ext4, `chmod 600`, owned by the backend service
+  user): a random secret `identity_key`, generated once and never written
+  anywhere else — not to the boot partition, not sent to the server, not
+  reconstructable from anything visible outside `/data`.
 
-This is deliberate protection against SD-card cloning, not just device
-identification: if a provisioned card is cloned onto a second Pi, the clone
-detects a MAC mismatch on first boot and wipes/re-pairs itself independently
-— so the two physical devices can never end up sharing one `device_uuid` (or
-one still-valid pairing token) even though they briefly shared a disk image.
-A full factory wipe/reset (see Kiosk display, below) triggers the same
-identity regeneration deliberately, for the same reason.
+**The check:** `device_uuid_check = HMAC-SHA256(identity_key, device_uuid + mac_address)`,
+computed and written to the boot config whenever a device's identity is
+(re)established — first boot, a successful re-pair, or a wipe/regenerate.
+On every subsequent boot: read `device_uuid`/`device_uuid_check` from the
+boot partition, read `identity_key` from `/data`, recompute the HMAC using
+the *currently detected* MAC address, and compare:
+- **Match** → the declared UUID, the secret key, and the current hardware
+  are all consistent with each other → proceed normally.
+- **Mismatch** → wipe and re-pair, unconditionally (regenerate a fresh
+  `device_uuid` *and* a fresh `identity_key`, delete the pairing token and
+  cached slides/settings, write a new consistent UUID/check pair back to the
+  boot config, boot into the pairing screen) — the same wipe-and-reboot path
+  revocation and explicit unpair use (see Heartbeat and Kiosk display,
+  above).
+
+This one check now covers every way the identity could go wrong, without
+needing separate cases for each:
+- **Hardware actually changed** (dead Pi board, same SD card moved to a
+  replacement unit, or a genuine SD-card clone onto second hardware) — the
+  MAC used to compute the stored check no longer matches, so the HMAC
+  recomputation fails regardless of what UUID is on record. Per your
+  decision above, this always wipes and re-pairs rather than trying to
+  distinguish "legitimate swap" from "clone" — a site admin re-entering a
+  pairing code after a hardware swap is an acceptable, infrequent cost for
+  never having a manual bypass that could be misused the other way.
+- **Someone edits `device_uuid` by hand** on the boot partition (whether
+  out of curiosity, to relabel a device, or to try to impersonate another
+  device's identity) — without `identity_key` (which never leaves the
+  original `/data`), they cannot compute a `device_uuid_check` that matches
+  their edited UUID, so the very next boot fails the check and wipes back to
+  a fresh, unpaired identity. The edit doesn't grant a forged identity; it
+  just forces a re-pair.
+- **A full clone of both partitions** onto a second physical unit — the
+  clone carries a valid, matching UUID/check/key triple, but its MAC
+  differs from the one baked into the check, so it still fails and
+  wipes/regenerates independently on first boot, exactly as before.
 
 ### Slide sync daemon
 - 60s baseline poll of `GET /api/slide-announcers/slides`. Local manifest
@@ -582,14 +649,20 @@ window on one device, to keep failure attribution simple.
    can't cleanly roll back.
 3. Exact archive format for local-app releases (`.tar.gz` proposed) — to be
    finalized next.
-4. True headless configuration (no attached keyboard/remote *and* no admin
-   physically present with a phone) is not designed yet — the current
-   fallback path assumes someone is on-site with a phone, even without a
-   keyboard. Needs its own design pass if zero-touch/pre-shipped
-   provisioning becomes a real requirement.
+4. ~~True headless configuration~~ — resolved: the pre-provisioned
+   `slideannouncer.yaml` on the boot partition covers zero-touch WiFi setup
+   (see First-boot flow, above). Pairing itself still needs a fresh code
+   generated on-demand from the website, since codes are intentionally
+   short-lived — fully zero-touch *pairing* (no human action at all once a
+   device is powered on at its site) is still an open question if that ever
+   becomes a requirement.
 5. Confirm the RF remote hardware is a plug-and-play HID dongle, not
    Bluetooth — the on-device setup path assumes input works before any
    pairing (WiFi or Bluetooth) has happened.
+6. `device_uuid_check` uses HMAC-SHA256 in this design — HMAC (not a bare
+   hash of the concatenation) is the part that matters, since it's what
+   makes the check unforgeable without `identity_key`; SHA-256 itself is
+   just a reasonable, unremarkable choice of underlying hash.
 
 ---
 
