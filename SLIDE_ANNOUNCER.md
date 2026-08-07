@@ -665,7 +665,14 @@ window on one device, to keep failure attribution simple.
    outcome, just needs to happen before relying on this across a fleet you
    can't physically reach): Wayland/labwc on the actual target Pi model, and
    RAUC's tryboot integration (flash, install a bundle, force a bad health
-   check, confirm fallback).
+   check, confirm fallback). A first implementation attempt now exists
+   (`slideannouncer/system/rauc/rpi-tryboot-backend.sh` and
+   `rpi-tryboot-commit.sh`, kernel/initramfs shipped as a RAUC custom slot
+   alongside rootfs) — but it's reconstructed from general RAUC/Raspberry
+   Pi tryboot documentation, not confirmed against this project's actual
+   RAUC version or hardware, and the post-update health check is still
+   just a placeholder ("did we reach this systemd unit"). This is the
+   concrete thing the hardware pass above needs to exercise.
 2. Symlink-swap (no A/B) for the local-app tier — revisit only if future
    local-app releases start needing local-state migrations a plain swap
    can't cleanly roll back.
