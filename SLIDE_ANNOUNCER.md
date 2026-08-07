@@ -397,6 +397,28 @@ server, not this repo).
   own fallback returns the device to the previous slot on the next boot
   automatically — the same auto-rollback property Mender would have given,
   achieved through RAUC's native mechanism instead.
+- **Read-only rootfs**: `rootA`/`rootB` are mounted `ro` (kernel cmdline +
+  `/etc/fstab`) — a device that loses power mid-write to an ext4 rootfs it
+  isn't otherwise touching has nothing to gain from that risk, and RAUC
+  already replaces rootfs wholesale on update rather than patching it in
+  place. `/tmp` and `/var/tmp` are plain volatile tmpfs. `/etc` and `/var`
+  each get a CoW overlay (`lowerdir=` the real, read-only directory,
+  mounted back over itself) so services can still write to the paths they
+  expect: `/var`'s upper layer is tmpfs (logs, nginx/NetworkManager runtime
+  state, caches — nothing there needs to survive a reboot), while `/etc`'s
+  upper layer lives on `/data` — SSH host keys, `machine-id` (both
+  regenerated once by `provisioning/firstboot.py`), and any future
+  NetworkManager connection profiles under
+  `/etc/NetworkManager/system-connections/` need to, and this way they just
+  do, as plain file writes, no extra persistence code required. Tradeoff:
+  an OTA that changes a stock `/etc` file already shadowed by something in
+  the upper layer won't show through until that shadow is cleared —
+  acceptable since nothing here expects a rootfs update to silently rewrite
+  live `/etc` config out from under a running device. See
+  `image-builder/stage-slide-announcer/01-system-files/00-run.sh` (fstab/
+  cmdline wiring) and `image-builder/repartition.sh` (pre-creates `/etc`'s
+  upper/work dirs on `/data`, since they must exist before the very first
+  boot's overlay mount).
 - **Persistent state discipline**: anything that must survive an OS update
   and needs Unix semantics (symlinks for atomic app-release swaps, `chmod
   600` on the pairing token and the identity secret, synced slide media,
