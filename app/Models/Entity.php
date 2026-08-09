@@ -48,6 +48,11 @@ class Entity extends Model
         return $this->hasMany(Slide::class);
     }
 
+    public function slideAnnouncers()
+    {
+        return $this->hasMany(SlideAnnouncer::class);
+    }
+
     public function scopeSearch($query, string $term)
     {
         return $query->where('name', 'like', '%' . $term . '%');

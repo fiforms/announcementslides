@@ -13,9 +13,25 @@ repository (OS image, local kiosk app, update tooling). "Slide Announcer" is
 used as the consistent name for the feature across both repos — the device
 model/table/routes on the server side, and the device repo itself.
 
-**Status: architecture only. No application code has been written yet** —
-the Sanctum wiring, migrations, controllers described in Part 1, and the
-device firmware described in Part 2 are planned here but not implemented.
+**Status (2026-08-09): Part 1's pairing + heartbeat + fleet-inventory core is
+implemented** — Sanctum wiring, the `slide_announcers` /
+`slide_announcer_pairing_codes` / `slide_announcer_heartbeats` /
+`slide_announcer_os_releases` migrations, the pairing/heartbeat/sync API
+controllers, and the entity-leader pairing UI (`Entity/SlideAnnouncers.vue`)
+all exist and are described below as built, not planned. Two things called
+out in Part 1 as deliberately out of scope for this pass:
+- **No `Admin/SlideAnnouncerReleasesController` upload UI** — publishing an
+  OS release is done via `php artisan slide-announcer:publish-os-release`
+  instead (uploads the bundle to `Storage`, computes `sha256`, optionally
+  `--activate`s it). The cross-site `Admin/*` fleet view is also not built
+  yet. Revisit once there's an actual fleet to look at.
+- **Heartbeat retention is a manual command, not a query scope** —
+  `php artisan slide-announcer:prune-heartbeats` deletes rows older than
+  `slide_announcer.heartbeat_retention_days` (default 30). Run it from
+  outside the app (cron/systemd timer on the server host) — this repo has
+  no in-app scheduler today.
+
+Device-side pairing (Part 2) is still open — see that section's status note.
 
 ## Repo strategy
 
@@ -122,18 +138,36 @@ Admin/entity-leader visibility, below).
 entity_id (FK), created_by (FK users), expires_at, used_at,
 slide_announcer_id (nullable FK, set on consumption), timestamps`.
 
-**`slide_announcer_os_releases`** (new, for the RAUC rollout — see Tier 1):
+**`slide_announcer_os_releases`** (for the RAUC rollout — see Tier 1):
 `id, version (string), channel (enum: stable/testing/developer),
 bundle_disk_path, sha256, is_active (bool), notes, released_at, created_by
-(FK users), timestamps`, with `is_active` scoped **per channel** (unique
-constraint on `channel` where `is_active = true`) rather than one global
-switch — a device only ever compares against the active release on its own
-`update_channel`. This is what makes "developer"/"testing"/"stable" tiers
-work: publish a build to `developer` first, promote the same or a newer
-build to `testing`, then to `stable`, each a separate row activation. The
-bundle file itself lives on the same `Storage` disk (S3/R2 in prod) as
-everything else, so publishing a release is "upload a file + flip a flag,"
-no separate hosting.
+(FK users), timestamps`, with `is_active` scoped **per channel** — enforced
+in `SlideAnnouncerOsRelease::activate()` (deactivates every other row on the
+same channel, then activates this one), not a DB partial-unique-index, so it
+stays portable between SQLite (dev) and MySQL (prod), the same tradeoff
+`NearbyEntities::within()` already makes elsewhere in this codebase — rather
+than one global switch, a device only ever compares against the active
+release on its own `update_channel`. This is what makes
+"developer"/"testing"/"stable" tiers work: publish a build to `developer`
+first, promote the same or a newer build to `testing`, then to `stable`,
+each a separate row activation (`php artisan
+slide-announcer:publish-os-release <path> <version> <channel> [--activate]`
+— no admin upload UI exists yet, see the status note above). The bundle file
+itself lives on the same `Storage` disk (S3/R2 in prod) as everything else,
+so publishing a release is "upload a file + flip a flag," no separate
+hosting.
+
+**`slide_announcer_heartbeats`** (new — the rolling per-device log the
+master `slide_announcers` row doesn't have room for): `id,
+slide_announcer_id (FK, cascade), app_version, os_version, ip_address,
+cpu_temp_c, created_at` (no `updated_at` — a log row is never edited).
+`slide_announcers` itself keeps only the *latest* snapshot of these fields
+(`last_ip`, `last_cpu_temp_c`, plus `app_version`/`os_version`) for the
+fleet-list view; this table is the history behind it, one row per heartbeat
+(default every 5 minutes, device-side — see Part 2's sync/heartbeat client).
+Pruned by age (`slide_announcer.heartbeat_retention_days`, default 30) via
+`php artisan slide-announcer:prune-heartbeats`, not a query scope — this is
+an operational log, not user-facing content like `Slide`'s expiry scopes.
 
 Revocation is `revoked_at` + deleting the device's Sanctum tokens, not a hard
 delete — keeps history for the "needs attention" UI, matching how `Slide`
@@ -144,12 +178,12 @@ already soft-deletes.
   `EntitySlideAnnouncerController` alongside the existing
   [EntitySlideController](app/Http/Controllers/EntitySlideController.php),
   same `isAdmin() || isEntityAdmin($entity->id)` guard):
-  - `GET /entities/{entity}/slide-announcers` — Inertia page listing paired
+  - `GET /entity/{entity}/slide-announcers` — Inertia page listing paired
     devices.
-  - `POST /entities/{entity}/slide-announcers/pairing-codes` — generates a
+  - `POST /entity/{entity}/slide-announcers/pairing-codes` — generates a
     6-digit code, 10-minute expiry, shown on-screen for the leader to key
     into the device.
-  - `DELETE /entities/{entity}/slide-announcers/{slideAnnouncer}` —
+  - `DELETE /entity/{entity}/slide-announcers/{slideAnnouncer}` —
     revoke/unpair.
 - **Device side** (public, unauthenticated, `routes/api.php`):
   - `POST /api/slide-announcers/pair {code, device_name, mac_address?, device_uuid?}`
@@ -158,10 +192,13 @@ already soft-deletes.
     (`abilities: ['slide-announcer']`), returns it once. Generic error on
     bad/expired code (don't leak which). Rate-limited (`throttle:10,1` per
     IP, consistent with `routes/auth.php`'s existing pattern) plus a
-    backoff-style `RateLimiter` hit counter, since this is the one endpoint
-    on the whole API with no auth at all — decided this is good enough for
-    v1 and tunable later without a design change if abuse patterns show
-    otherwise.
+    backoff-style `Cache`-backed hit counter (>20 attempts per IP in 10
+    minutes → 429) on top of the route throttle, since this is the one
+    endpoint on the whole API with no auth at all — decided this is good
+    enough for v1 and tunable later without a design change if abuse
+    patterns show otherwise. Also handles **re-pairing an existing
+    `device_uuid`** (see below) by updating that row and revoking its old
+    tokens, rather than always creating a fresh `SlideAnnouncer`.
   - **Re-pairing** (a device that already has a token, moving to a
     different site, or an explicit local "unpair" action) always goes
     through this same endpoint with a fresh code — there's no separate
@@ -219,9 +256,17 @@ available even when offline.
 
 ### Heartbeat + version checks (app *and* OS)
 `POST /api/slide-announcers/heartbeat` (`auth:sanctum` +
-`slide-announcer.auth`), body `{app_version?, os_version?}`. Updates
-`last_seen_at`, `last_ip`, and both version fields. "Offline/needs attention"
-in the admin UI is computed, not stored: `last_seen_at < now()->subMinutes(3)`.
+`slide-announcer.auth`), body `{app_version?, os_version?, cpu_temp_c?}`.
+`last_ip` is read from the request itself, not the body. Updates
+`slide_announcers`' snapshot fields (`last_seen_at`, `last_ip`,
+`last_cpu_temp_c`, `app_version`, `os_version`) **and** appends a row to
+`slide_announcer_heartbeats` (see "New data model," above) so the same call
+both refreshes the fleet-list view and extends its history. Expected to be
+called on a 5-minute interval by the device (systemd timer, Part 2).
+"Offline/needs attention" in the admin UI is computed, not stored:
+`last_seen_at < now()->subMinutes(config('slide_announcer.online_threshold_minutes'))`
+(default 12 — a little over two missed 5-minute beats — so one dropped
+heartbeat from a transient network blip doesn't flip the badge).
 
 Fold both the local-app update check and the RAUC OS update check into the
 one heartbeat response (saves round trips, and the device already has to
@@ -306,9 +351,9 @@ against it:
 ### New routes summary
 ```
 web.php:
-  GET    /entities/{entity}/slide-announcers
-  POST   /entities/{entity}/slide-announcers/pairing-codes
-  DELETE /entities/{entity}/slide-announcers/{slideAnnouncer}
+  GET    /entity/{entity}/slide-announcers
+  POST   /entity/{entity}/slide-announcers/pairing-codes
+  DELETE /entity/{entity}/slide-announcers/{slideAnnouncer}
 
   admin/slide-announcers                       (cross-site fleet view)
   admin/slide-announcer-releases                (publish/activate RAUC bundles)
@@ -332,6 +377,44 @@ api.php (new file, registered in bootstrap/app.php):
    the only fix is publishing a new release. Current call: acceptable until
    real-world usage shows otherwise; revisit once there's field experience
    to design against instead of guessing.
+
+### Future idea: multiple slideshows per site (not implemented)
+
+Flagged as a direction worth documenting now, while the pairing/sync
+contract is still young, even though nothing below is built:
+
+Today a site (`Entity`) has exactly one slide deck, and every
+`SlideAnnouncer` paired to that entity shows the same thing —
+`SlideAnnouncerSyncController::index()` has no notion of "which show." A
+church that wants, say, a lobby TV running general announcements and a
+sanctuary-overflow TV running a different rotation (or the same slides in a
+different order/duration) can't do that with one device-per-entity slide
+scoping.
+
+Sketch of what would need to change, if this gets built:
+- A new `slideshows` table (`id, entity_id, name, is_default, ...`) that
+  `Slide` gains an optional `slideshow_id` on (nullable — untagged slides
+  fall back to the entity's default show, so existing single-slideshow
+  sites need no data migration).
+- `SlideAnnouncer` gains a `slideshow_id` FK (nullable — defaults to the
+  entity's default slideshow, same fallback rule) so pairing a device
+  optionally targets a specific show instead of "the entity's slides."
+- `SlideAnnouncerSyncController::index()`'s query would scope by
+  `slideshow_id` instead of (or in addition to) `entity_id` directly.
+- The entity-leader UI (`Entity/Slides.vue` today, one flat list) would need
+  a slideshow picker/tab, and per-device slideshow assignment would move
+  into `Entity/SlideAnnouncers.vue`'s device settings alongside
+  `update_channel`/`auto_update_enabled`.
+- `settings` (per-device display options) already lives on `SlideAnnouncer`
+  rather than a shared table, so per-device duration/transition overrides
+  already compose fine with per-device slideshow assignment — no conflict
+  there.
+
+Deliberately not started: it's a real schema change (new table + FK on two
+existing models) that only pays off once a site actually asks for more than
+one show, and the current single-slideshow-per-entity model is simpler to
+reason about everywhere it touches (sync query, admin UI, `Slide` scopes)
+until that need is real.
 
 ---
 

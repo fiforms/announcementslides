@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\ChunkedUploadController;
 use App\Http\Controllers\EntityController;
+use App\Http\Controllers\EntitySlideAnnouncerController;
 use App\Http\Controllers\EntitySlideController;
 use App\Http\Controllers\LocalSlideController;
 use App\Http\Controllers\MySlideController;
@@ -69,6 +70,14 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::get('/{slide}/edit', [EntitySlideController::class, 'edit'])->name('edit');
         Route::patch('/{slide}', [EntitySlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [EntitySlideController::class, 'archive'])->name('archive');
+    });
+
+    // ── Entity leader: paired Slide Announcer devices ───────────────────────
+    Route::prefix('entity/{entity}/slide-announcers')->name('entity.slide-announcers.')->group(function () {
+        Route::get('/', [EntitySlideAnnouncerController::class, 'index'])->name('index');
+        Route::post('/pairing-codes', [EntitySlideAnnouncerController::class, 'storePairingCode'])->name('pairing-codes.store');
+        Route::patch('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'update'])->name('update');
+        Route::delete('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'destroy'])->name('destroy');
     });
 
     // ── Viewer: pending slide submission ───────────────────────────────────

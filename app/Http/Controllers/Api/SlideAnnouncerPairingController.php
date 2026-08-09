@@ -1,0 +1,96 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\SlideAnnouncer;
+use App\Models\SlideAnnouncerPairingCode;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+
+class SlideAnnouncerPairingController extends Controller
+{
+    /**
+     * Public, unauthenticated (throttled at the route). Handles both the
+     * initial pairing of a fresh device and re-pairing an already-paired
+     * one — there's no separate "transfer" endpoint, see SLIDE_ANNOUNCER.md
+     * "Pairing flow." A generic error is returned for any bad/expired code
+     * so we don't leak which codes exist.
+     */
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'code' => 'required|string|size:6',
+            'device_name' => 'required|string|max:255',
+            'mac_address' => 'nullable|string|max:255',
+            'device_uuid' => 'nullable|string|max:255',
+        ]);
+
+        // Backoff-style hit counter on top of the route's throttle:10,1 —
+        // a bare rate limit alone doesn't slow down a slow, patient guesser.
+        $backoffKey = 'slide-announcer-pair-backoff:'.$request->ip();
+        $hits = Cache::get($backoffKey, 0);
+        if ($hits > 20) {
+            abort(429);
+        }
+        Cache::put($backoffKey, $hits + 1, now()->addMinutes(10));
+
+        $pairingCode = SlideAnnouncerPairingCode::unused()->unexpired()
+            ->where('code', $data['code'])
+            ->first();
+
+        if (! $pairingCode) {
+            abort(422, 'Invalid or expired pairing code.');
+        }
+
+        [$device, $token] = DB::transaction(function () use ($pairingCode, $data) {
+            // Re-pairing: a device_uuid already on file means this is the
+            // same physical device moving sites (or re-pairing after an
+            // unpair/revoke), not a new fleet entry — see SLIDE_ANNOUNCER.md
+            // "Pairing flow." Old tokens are revoked so a stale one from a
+            // previous site can't keep working.
+            $device = ! empty($data['device_uuid'])
+                ? SlideAnnouncer::where('device_uuid', $data['device_uuid'])->first()
+                : null;
+
+            if ($device) {
+                $device->tokens()->delete();
+                $device->update([
+                    'entity_id' => $pairingCode->entity_id,
+                    'name' => $data['device_name'],
+                    'mac_address' => $data['mac_address'] ?? $device->mac_address,
+                    'last_ip' => request()->ip(),
+                    'paired_at' => now(),
+                    'paired_by' => $pairingCode->created_by,
+                    'revoked_at' => null,
+                ]);
+            } else {
+                $device = SlideAnnouncer::create([
+                    'entity_id' => $pairingCode->entity_id,
+                    'name' => $data['device_name'],
+                    'mac_address' => $data['mac_address'] ?? null,
+                    'device_uuid' => $data['device_uuid'] ?? null,
+                    'last_ip' => request()->ip(),
+                    'paired_at' => now(),
+                    'paired_by' => $pairingCode->created_by,
+                ]);
+            }
+
+            $pairingCode->update([
+                'used_at' => now(),
+                'slide_announcer_id' => $device->id,
+            ]);
+
+            $token = $device->createToken('slide-announcer', ['slide-announcer']);
+
+            return [$device, $token];
+        });
+
+        return response()->json([
+            'slide_announcer_id' => $device->id,
+            'entity_id' => $device->entity_id,
+            'token' => $token->plainTextToken,
+        ], 201);
+    }
+}
