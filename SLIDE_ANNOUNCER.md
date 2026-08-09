@@ -535,11 +535,10 @@ zero-touch provisioning, not the pairing step.
 
 **1. On-device setup via an attached HID input** (e.g. an RF remote
 presenting as a keyboard/mouse combo), if no usable config file was found.
-Assumption: the remote is a plug-and-play 2.4GHz RF dongle, not Bluetooth —
-it needs to work *before* WiFi exists and ideally before any pairing has
-happened, so it can't depend on a Bluetooth pairing step of its own. (Flag
-if the actual hardware is Bluetooth-based — that reintroduces a
-chicken-and-egg problem this design assumes away.)
+Confirmed on real hardware: the remote presents to the OS as a plug-and-play
+USB HID keyboard/mouse combo, not Bluetooth — it works *before* WiFi exists
+and before any pairing has happened, with no Bluetooth pairing step of its
+own required.
 - The backend checks for a usable HID input device (`/dev/input/event*`
   exposing keyboard + relative-pointer capabilities, e.g. via
   `evtest`/`libinput` introspection rather than assuming a specific device
@@ -694,18 +693,19 @@ scheduling an OS update and a local-app update in the same maintenance
 window on one device, to keep failure attribution simple.
 
 ### Open questions / tradeoffs flagged
-1. Hardware validation still pending (no design change riding on the
-   outcome, just needs to happen before relying on this across a fleet you
-   can't physically reach): Wayland/labwc on the actual target Pi model, and
-   RAUC's tryboot integration (flash, install a bundle, force a bad health
-   check, confirm fallback). A first implementation attempt now exists
+1. Hardware validation still pending for RAUC's tryboot integration (flash,
+   install a bundle, force a bad health check, confirm fallback) — no
+   design change riding on the outcome, just needs to happen before relying
+   on this across a fleet you can't physically reach. Wayland/labwc on the
+   actual target Pi model is confirmed working on real hardware. A first
+   tryboot implementation attempt now exists
    (`slideannouncer/system/rauc/rpi-tryboot-backend.sh` and
    `rpi-tryboot-commit.sh`, kernel/initramfs shipped as a RAUC custom slot
    alongside rootfs) — but it's reconstructed from general RAUC/Raspberry
    Pi tryboot documentation, not confirmed against this project's actual
    RAUC version or hardware, and the post-update health check is still
    just a placeholder ("did we reach this systemd unit"). This is the
-   concrete thing the hardware pass above needs to exercise.
+   concrete thing still needing a hardware pass.
 2. Symlink-swap (no A/B) for the local-app tier — revisit only if future
    local-app releases start needing local-state migrations a plain swap
    can't cleanly roll back.
@@ -718,9 +718,10 @@ window on one device, to keep failure attribution simple.
    short-lived — fully zero-touch *pairing* (no human action at all once a
    device is powered on at its site) is still an open question if that ever
    becomes a requirement.
-5. Confirm the RF remote hardware is a plug-and-play HID dongle, not
-   Bluetooth — the on-device setup path assumes input works before any
-   pairing (WiFi or Bluetooth) has happened.
+5. ~~Confirm the RF remote hardware is a plug-and-play HID dongle, not
+   Bluetooth~~ — resolved: confirmed on real hardware, the remote presents
+   as a USB HID keyboard/mouse combo, so input works before any pairing
+   (WiFi or Bluetooth) has happened.
 6. `device_uuid_check` uses HMAC-SHA256 in this design — HMAC (not a bare
    hash of the concatenation) is the part that matters, since it's what
    makes the check unforgeable without `identity_key`; SHA-256 itself is
