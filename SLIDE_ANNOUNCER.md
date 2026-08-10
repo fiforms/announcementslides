@@ -186,18 +186,20 @@ not a code change; see Part 2's `heartbeat.py`, which reports
 `platform.machine()` verbatim as this value.
 
 **`release_type` covers four real artifact shapes across two `kind`
-values**: `(os, full)` is a RAUC OTA bundle, `(os, hotfix)` is a RAUC
-bundle that only applies cleanly on top of one specific prior version
-(recorded in `required_base_version`), `(os, disk_image)` is a flashable
-`.tar.gz` for re-imaging an SD card by hand (never an OTA candidate —
-`SlideAnnouncerRelease::resolveForDevice()` never returns one), and
-`(app, full)` is the local-app archive, unchanged. `SlideAnnouncerRelease::parseFilename()`
-recognizes `slideannouncer-X.X.X.raucb` (full) and
-`slideannouncer-X.X.X.hotfix.from.Y.Y.Y.raucb` (hotfix) to auto-fill the
-admin upload form's version/type/base-version fields — it can't tell an
-`(app, full)` `.tar.gz` from an `(os, disk_image)` one (both are just
-`slideannouncer-X.X.X.tar.gz`), so `kind`/`release_type` stay explicit
-admin selections either way. `tagChannel()`'s per-slot eviction (below)
+values**: `(os, full)` is a `.raucb` RAUC OTA bundle, `(os, hotfix)` is a
+`.raucb` RAUC bundle that only applies cleanly on top of one specific
+prior version (recorded in `required_base_version`), `(os, disk_image)`
+is a flashable `.img.xz` disk image for re-imaging an SD card by hand
+(never an OTA candidate — `SlideAnnouncerRelease::resolveForDevice()`
+never returns one), and `(app, full)` is the local-app `.tar.gz` archive,
+unchanged. `SlideAnnouncerRelease::parseFilename()` recognizes
+`slideannouncer-X.X.X.raucb` (full) and
+`slideannouncer-X.X.X.hotfix.from.Y.Y.Y.raucb` (hotfix) — for any of the
+three extensions — to auto-fill the admin upload form's
+version/type/base-version fields; `kind`/`release_type` stay explicit
+admin selections regardless, since the filename alone doesn't say which
+of the two `kind`s a given upload belongs to. `tagChannel()`'s per-slot
+eviction (below)
 and `resolveForDevice()`'s hotfix-exact-match resolution (used by the
 heartbeat controller in place of a plain `currentOnChannel()->first()`)
 are what let a full release and one or more hotfixes — each targeting a
