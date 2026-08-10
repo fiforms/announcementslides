@@ -921,8 +921,12 @@ window on one device, to keep failure attribution simple.
    install a bundle, force a bad health check, confirm fallback) — no
    design change riding on the outcome, just needs to happen before relying
    on this across a fleet you can't physically reach. Wayland/labwc on the
-   actual target Pi model is confirmed working on real hardware. A first
-   tryboot implementation attempt now exists
+   actual target Pi model is confirmed working on real hardware. The
+   hotfix path (`slideannouncer/image-builder/make-hotfix-bundle.sh`,
+   no A/B involved) is also confirmed working end-to-end on real
+   hardware (2026-08-10) — `rauc install` over HTTP, version-gate check,
+   live-rootfs write-through, and the on-device VERSION bump all
+   verified. A first tryboot implementation attempt now exists
    (`slideannouncer/system/rauc/rpi-tryboot-backend.sh` and
    `rpi-tryboot-commit.sh`, kernel/initramfs shipped as a RAUC custom slot
    alongside rootfs) — but it's reconstructed from general RAUC/Raspberry
