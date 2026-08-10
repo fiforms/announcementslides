@@ -16,14 +16,51 @@ const { isUploading, uploadError, overallProgress, upload } = useChunkedUpload({
     finalizeRoute: 'admin.slide-announcer-releases.finalize',
 });
 
+const RELEASE_TYPES_BY_KIND = {
+    os: [
+        { value: 'full', label: 'OTA image (RAUC .raucb)' },
+        { value: 'hotfix', label: 'Hotfix (RAUC .raucb)' },
+        { value: 'disk_image', label: 'Full disk image (.tar.gz)' },
+    ],
+    app: [
+        { value: 'full', label: 'App archive (.tar.gz)' },
+    ],
+};
+
+// Mirrors SlideAnnouncerRelease::parseFilename() — a client-side
+// convenience to auto-fill the form; the server re-validates everything
+// on finalize() regardless.
+function parseReleaseFilename(filename) {
+    const match = /^slideannouncer-(\d+\.\d+\.\d+)(?:\.hotfix\.from\.(\d+\.\d+\.\d+))?\.(?:raucb|tar\.gz)$/i.exec(filename);
+    if (!match) return null;
+    const [, version, base] = match;
+    return {
+        version,
+        release_type: base ? 'hotfix' : 'full',
+        required_base_version: base ?? null,
+    };
+}
+
 const selectedFile = ref(null);
 const kind = ref('os');
+const releaseType = ref('full');
 const version = ref('');
+const requiredBaseVersion = ref('');
 const architecture = ref('');
 const initialChannel = ref('');
 const notes = ref('');
 const finalizeError = ref(null);
 const releases = ref([...props.releases]);
+
+const releaseTypeOptions = computed(() => RELEASE_TYPES_BY_KIND[kind.value]);
+
+// App only supports 'full' today — if the kind switches away from os,
+// drop back to full rather than leaving an os-only type selected.
+watch(kind, () => {
+    if (!releaseTypeOptions.value.some(o => o.value === releaseType.value)) {
+        releaseType.value = 'full';
+    }
+});
 
 // Inertia re-renders this page with fresh props after any router.post/delete
 // (tag/untag/destroy below), but releases was only ever seeded from props
@@ -35,11 +72,23 @@ watch(() => props.releases, (updated) => {
 const currentReleases = computed(() => releases.value.filter(r => r.channels.length > 0));
 const archivedReleases = computed(() => releases.value.filter(r => r.channels.length === 0));
 
-const acceptedExtension = computed(() => (kind.value === 'os' ? '.raucb' : '.tar.gz'));
-const canSubmit = computed(() => selectedFile.value && version.value.trim() && architecture.value.trim());
+const acceptedExtension = computed(() => (
+    kind.value === 'os' && releaseType.value === 'disk_image' ? '.tar.gz' :
+    kind.value === 'os' ? '.raucb' : '.tar.gz'
+));
+const canSubmit = computed(() => selectedFile.value && version.value.trim() && architecture.value.trim()
+    && (releaseType.value !== 'hotfix' || requiredBaseVersion.value.trim()));
 
 function onFileSelected(event) {
     selectedFile.value = event.target.files[0] ?? null;
+    const parsed = selectedFile.value ? parseReleaseFilename(selectedFile.value.name) : null;
+    if (parsed) {
+        version.value = parsed.version;
+        if (releaseTypeOptions.value.some(o => o.value === parsed.release_type)) {
+            releaseType.value = parsed.release_type;
+        }
+        requiredBaseVersion.value = parsed.required_base_version ?? '';
+    }
 }
 
 function formatBytes(bytes) {
@@ -62,7 +111,9 @@ async function submit() {
 
     const result = await upload([selectedFile.value], {
         kind: kind.value,
+        release_type: releaseType.value,
         version: version.value.trim(),
+        required_base_version: releaseType.value === 'hotfix' ? requiredBaseVersion.value.trim() : null,
         architecture: architecture.value.trim(),
         channel: initialChannel.value || null,
         notes: notes.value || null,
@@ -79,14 +130,24 @@ async function submit() {
 
     releases.value.unshift(result.release);
     selectedFile.value = null;
+    releaseType.value = 'full';
     version.value = '';
+    requiredBaseVersion.value = '';
     architecture.value = '';
     initialChannel.value = '';
     notes.value = '';
 }
 
 function tagChannel(release, channel) {
-    const holder = releases.value.find(r => r.channels.some(c => c.channel === channel) && r.kind === release.kind && r.architecture === release.architecture);
+    // Mirrors the server's per-slot eviction rule in tagChannel(): same
+    // kind+architecture+release_type, and for hotfixes also the same
+    // required_base_version — a full release or a differently-targeted
+    // hotfix isn't evicted, so this warning shouldn't claim it will be.
+    const holder = releases.value.find(r => r.channels.some(c => c.channel === channel)
+        && r.kind === release.kind
+        && r.architecture === release.architecture
+        && r.release_type === release.release_type
+        && (release.release_type !== 'hotfix' || r.required_base_version === release.required_base_version));
     const warning = holder && holder.id !== release.id
         ? ` This removes it from ${holder.kind} ${holder.version} (${holder.architecture}), which currently holds that tag.`
         : '';
@@ -172,11 +233,27 @@ async function copyToClipboard(text, which) {
                         </label>
                     </div>
 
-                    <label class="block">
-                        <span class="text-sm font-medium text-gray-700">Version</span>
-                        <input type="text" v-model="version" :disabled="isUploading" placeholder="e.g. 2026.08.1 or 0.2.0"
+                    <label class="block" v-if="releaseTypeOptions.length > 1">
+                        <span class="text-sm font-medium text-gray-700">Type</span>
+                        <select v-model="releaseType" :disabled="isUploading"
                             class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                            <option v-for="opt in releaseTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                        </select>
                     </label>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="block">
+                            <span class="text-sm font-medium text-gray-700">Version</span>
+                            <input type="text" v-model="version" :disabled="isUploading" placeholder="e.g. 2026.08.1 or 0.2.0"
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                        </label>
+                        <label class="block" v-if="releaseType === 'hotfix'">
+                            <span class="text-sm font-medium text-gray-700">Required base version</span>
+                            <input type="text" v-model="requiredBaseVersion" :disabled="isUploading" placeholder="e.g. 1.2.0"
+                                class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                            <span class="text-xs text-gray-500">Only applies on top of a device already at this exact version.</span>
+                        </label>
+                    </div>
 
                     <label class="block">
                         <span class="text-sm font-medium text-gray-700">File ({{ acceptedExtension }})</span>
@@ -233,6 +310,7 @@ async function copyToClipboard(text, which) {
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500">Kind</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Type</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500">Version</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500">Architecture</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500">Channels</th>
@@ -244,6 +322,10 @@ async function copyToClipboard(text, which) {
                             <tr v-for="release in currentReleases" :key="release.id" class="hover:bg-gray-50 cursor-pointer"
                                 @click="openDetails(release)">
                                 <td class="px-4 py-3">{{ release.kind }}</td>
+                                <td class="px-4 py-3">
+                                    {{ release.release_type }}
+                                    <span v-if="release.release_type === 'hotfix'" class="text-gray-500">(from {{ release.required_base_version }})</span>
+                                </td>
                                 <td class="px-4 py-3 font-mono">{{ release.version }}</td>
                                 <td class="px-4 py-3">{{ release.architecture }}</td>
                                 <td class="px-4 py-3">
@@ -258,7 +340,7 @@ async function copyToClipboard(text, which) {
                                 </td>
                             </tr>
                             <tr v-if="!currentReleases.length">
-                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">No releases currently tagged on any channel.</td>
+                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">No releases currently tagged on any channel.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -273,6 +355,7 @@ async function copyToClipboard(text, which) {
                         <thead class="bg-gray-50">
                             <tr>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500">Kind</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Type</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500">Version</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500">Architecture</th>
                                 <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Size</th>
@@ -284,6 +367,10 @@ async function copyToClipboard(text, which) {
                             <tr v-for="release in archivedReleases" :key="release.id" class="hover:bg-gray-50 cursor-pointer"
                                 @click="openDetails(release)">
                                 <td class="px-4 py-3">{{ release.kind }}</td>
+                                <td class="px-4 py-3">
+                                    {{ release.release_type }}
+                                    <span v-if="release.release_type === 'hotfix'" class="text-gray-500">(from {{ release.required_base_version }})</span>
+                                </td>
                                 <td class="px-4 py-3 font-mono">{{ release.version }}</td>
                                 <td class="px-4 py-3">{{ release.architecture }}</td>
                                 <td class="px-4 py-3 hidden md:table-cell text-gray-600">{{ formatBytes(release.file_size) }}</td>
@@ -297,7 +384,7 @@ async function copyToClipboard(text, which) {
                                 </td>
                             </tr>
                             <tr v-if="!archivedReleases.length">
-                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">Nothing archived.</td>
+                                <td colspan="7" class="px-4 py-8 text-center text-gray-500">Nothing archived.</td>
                             </tr>
                         </tbody>
                     </table>
@@ -312,7 +399,10 @@ async function copyToClipboard(text, which) {
                         <h3 class="text-lg font-semibold text-gray-900">
                             {{ detailsRelease.kind }} {{ detailsRelease.version }}
                         </h3>
-                        <p class="text-sm text-gray-500">{{ detailsRelease.architecture }}</p>
+                        <p class="text-sm text-gray-500">
+                            {{ detailsRelease.architecture }} &middot; {{ detailsRelease.release_type }}
+                            <span v-if="detailsRelease.release_type === 'hotfix'">(from {{ detailsRelease.required_base_version }})</span>
+                        </p>
                     </div>
                 </div>
 

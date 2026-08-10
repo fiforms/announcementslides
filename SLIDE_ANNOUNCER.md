@@ -169,32 +169,57 @@ slide_announcer_id (nullable FK, set on consumption), timestamps`.
 
 **`slide_announcer_releases`** (covers both RAUC OS bundles and local-app
 archives — see Tier 1 and Tier 2): `id, kind (string: os|app), version
-(string), architecture (string, e.g. arm64/armhf/x64), disk_path, sha256,
-notes, created_by (FK users), timestamps`. A row is an **immutable
-uploaded build** — one file, one URL, forever. There is deliberately no
-`channel` or `is_active` column here (there was, briefly, on 2026-08-10,
-before this section was rewritten the same day — see the status note
-above): which channel(s) a build is current on is a fact about a *tag*,
-not the build, because the same file can be current on more than one
-channel at once (promoted to `testing` without losing its `developer`
-tag) — a single `is_active` boolean per row can't represent that.
-`architecture` is a plain string with no fixed list (unlike `kind`, which
-validates against `SlideAnnouncerRelease::KINDS`) — a new architecture
-needs a new value, not a code change; see Part 2's `heartbeat.py`, which
-reports `platform.machine()` verbatim as this value.
+(string), architecture (string, e.g. arm64/armhf/x64), release_type
+(string: full|hotfix|disk_image, added 2026-08-10 later still),
+required_base_version (string, nullable), disk_path, sha256, notes,
+created_by (FK users), timestamps`. A row is an **immutable uploaded
+build** — one file, one URL, forever. There is deliberately no `channel`
+or `is_active` column here (there was, briefly, on 2026-08-10, before this
+section was rewritten the same day — see the status note above): which
+channel(s) a build is current on is a fact about a *tag*, not the build,
+because the same file can be current on more than one channel at once
+(promoted to `testing` without losing its `developer` tag) — a single
+`is_active` boolean per row can't represent that. `architecture` is a
+plain string with no fixed list (unlike `kind`, which validates against
+`SlideAnnouncerRelease::KINDS`) — a new architecture needs a new value,
+not a code change; see Part 2's `heartbeat.py`, which reports
+`platform.machine()` verbatim as this value.
+
+**`release_type` covers four real artifact shapes across two `kind`
+values**: `(os, full)` is a RAUC OTA bundle, `(os, hotfix)` is a RAUC
+bundle that only applies cleanly on top of one specific prior version
+(recorded in `required_base_version`), `(os, disk_image)` is a flashable
+`.tar.gz` for re-imaging an SD card by hand (never an OTA candidate —
+`SlideAnnouncerRelease::resolveForDevice()` never returns one), and
+`(app, full)` is the local-app archive, unchanged. `SlideAnnouncerRelease::parseFilename()`
+recognizes `slideannouncer-X.X.X.raucb` (full) and
+`slideannouncer-X.X.X.hotfix.from.Y.Y.Y.raucb` (hotfix) to auto-fill the
+admin upload form's version/type/base-version fields — it can't tell an
+`(app, full)` `.tar.gz` from an `(os, disk_image)` one (both are just
+`slideannouncer-X.X.X.tar.gz`), so `kind`/`release_type` stay explicit
+admin selections either way. `tagChannel()`'s per-slot eviction (below)
+and `resolveForDevice()`'s hotfix-exact-match resolution (used by the
+heartbeat controller in place of a plain `currentOnChannel()->first()`)
+are what let a full release and one or more hotfixes — each targeting a
+different `required_base_version` — stay tagged on the same channel at
+once.
 
 **`slide_announcer_release_channels`** (the tag table): `id,
 slide_announcer_release_id (FK, cascade), channel (string: stable/
 testing/developer), tagged_by (FK users, nullable), created_at` (no
-`updated_at` — a tag is created or deleted, never edited). At most one
-release can hold a given `(kind, architecture, channel)` tag at a time —
-enforced in `SlideAnnouncerRelease::tagChannel()` (deletes any other
-release's tag row for that same triple, then creates this one; a "move,"
-not a toggle), not a DB constraint, the same portability tradeoff
-`NearbyEntities::within()` and the old `is_active`-per-channel logic
-already made elsewhere in this codebase. `untagChannel()` just deletes
-this release's own row for that channel — a channel can end up pointing
-at nothing for some architecture, that's fine, no replacement is forced.
+`updated_at` — a tag is created or deleted, never edited). Releases
+occupy independent **slots** per `(kind, architecture, channel)`: one slot
+for the full release, one for the disk image, and one per distinct
+`required_base_version` among hotfixes — enforced in
+`SlideAnnouncerRelease::tagChannel()` (deletes any other release
+occupying that same slot, then creates this one; a "move," not a toggle),
+not a DB constraint, the same portability tradeoff `NearbyEntities::within()`
+and the old `is_active`-per-channel logic already made elsewhere in this
+codebase. This is what lets a full OS release and two hotfixes (targeting
+different base versions) all be tagged `stable` at once. `untagChannel()`
+just deletes this release's own row for that channel — a channel can end
+up pointing at nothing for some architecture, that's fine, no replacement
+is forced.
 
 **"Archived" is a derived state, not a column**: `SlideAnnouncerRelease::isArchived()`
 is simply "this release has zero rows in `channels()`." Untagging a
@@ -359,13 +384,18 @@ call this endpoint regularly for liveness):
 }
 ```
 Both the app-update and OS-update fields are read from the same
-`slide_announcer_releases::currentOnChannel(kind, $slideAnnouncer->architecture, $slideAnnouncer->update_channel)`
-query, differing only in `kind` (`'app'` vs `'os'`) — which release a
-device is even offered, of either kind, depends on **both** its
-`update_channel` (stable/testing/developer, set from the website) and its
-self-reported `architecture` (set by the device itself, via this same
-heartbeat) — a device that hasn't sent an architecture yet simply matches
-nothing, same as any other no-current-release case. `app_sha256` mirrors
+`SlideAnnouncerRelease::resolveForDevice(kind, $slideAnnouncer->architecture, $slideAnnouncer->update_channel, $currentVersion)`
+call, differing only in `kind` (`'app'` vs `'os'`) and which version
+column feeds `$currentVersion` — which release a device is even offered,
+of either kind, depends on its `update_channel` (stable/testing/developer,
+set from the website), its self-reported `architecture`, and now also its
+self-reported current version (a device that hasn't sent an architecture
+yet simply matches nothing, same as any other no-current-release case).
+`resolveForDevice()` first looks for a tagged hotfix whose
+`required_base_version` exactly equals the device's current version, and
+falls back to the tagged full release otherwise — a device several
+versions behind picks up one hotfix hop per heartbeat rather than being
+offered a multi-version jump in one response. `app_sha256` mirrors
 `os_bundle_sha256` (added for the same integrity-check purpose the
 `updater/`'s eventual smoke-check would want, once that's built).
 `os_auto_update_enabled`

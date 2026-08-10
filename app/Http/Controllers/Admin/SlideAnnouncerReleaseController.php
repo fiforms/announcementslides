@@ -104,7 +104,9 @@ class SlideAnnouncerReleaseController extends Controller
             'uploads' => 'required|array|size:1',
             'uploads.0.disk_path' => ['required', 'string', 'regex:#^slide-announcer/uploads/[0-9a-f\-]{36}\.(raucb|tar\.gz)$#'],
             'kind' => ['required', 'string', Rule::in(SlideAnnouncerRelease::KINDS)],
-            'version' => 'required|string|max:255',
+            'release_type' => ['required', 'string', Rule::in(SlideAnnouncerRelease::RELEASE_TYPES)],
+            'version' => ['required', 'string', 'regex:/^\d+\.\d+\.\d+$/'],
+            'required_base_version' => ['required_if:release_type,hotfix', 'nullable', 'string', 'regex:/^\d+\.\d+\.\d+$/'],
             'architecture' => 'required|string|max:64',
             // Optional initial tag — a release can be published untagged
             // (archived from the moment it lands) or tagged immediately,
@@ -113,6 +115,15 @@ class SlideAnnouncerReleaseController extends Controller
             'notes' => 'nullable|string',
         ]);
 
+        // disk_image is an os-only flashable archive, never an app variant;
+        // hotfix requires a base version, full/disk_image must not have one.
+        if ($data['release_type'] === 'disk_image' && $data['kind'] !== 'os') {
+            return response()->json(['message' => 'Disk images are only valid for the os kind.'], 422);
+        }
+        if ($data['release_type'] !== 'hotfix' && ! empty($data['required_base_version'])) {
+            return response()->json(['message' => 'Only a hotfix may specify a required base version.'], 422);
+        }
+
         $diskPath = $data['uploads'][0]['disk_path'];
 
         if (! Storage::disk('public')->exists($diskPath)) {
@@ -120,7 +131,22 @@ class SlideAnnouncerReleaseController extends Controller
         }
 
         $extension = str_ends_with($diskPath, '.tar.gz') ? 'tar.gz' : 'raucb';
-        $finalPath = "slide-announcer/releases/{$data['kind']}/{$data['architecture']}/{$data['version']}.{$extension}";
+        $expectedExtension = $this->expectedExtension($data['kind'], $data['release_type']);
+        if ($extension !== $expectedExtension) {
+            return response()->json([
+                'message' => "A {$data['kind']} {$data['release_type']} release must be a .{$expectedExtension} file.",
+            ], 422);
+        }
+
+        // Suffix keeps the path collision-free now that a hotfix's target
+        // version can coincide with a full release's version number, or
+        // with a disk image built for the same version.
+        $suffix = match ($data['release_type']) {
+            'hotfix' => "-hotfix-from-{$data['required_base_version']}",
+            'disk_image' => '-disk-image',
+            default => '',
+        };
+        $finalPath = "slide-announcer/releases/{$data['kind']}/{$data['architecture']}/{$data['version']}{$suffix}.{$extension}";
 
         $sha256 = hash_file('sha256', Storage::disk('public')->path($diskPath));
 
@@ -133,6 +159,8 @@ class SlideAnnouncerReleaseController extends Controller
             'kind' => $data['kind'],
             'version' => $data['version'],
             'architecture' => $data['architecture'],
+            'release_type' => $data['release_type'],
+            'required_base_version' => $data['release_type'] === 'hotfix' ? $data['required_base_version'] : null,
             'disk_path' => $finalPath,
             'sha256' => $sha256,
             'notes' => $data['notes'] ?? null,
@@ -181,6 +209,17 @@ class SlideAnnouncerReleaseController extends Controller
      * the multi-part '.tar.gz' case first since pathinfo()-style
      * single-extension logic would only see '.gz'.
      */
+    /**
+     * (os,full) and (os,hotfix) are RAUC bundles; (os,disk_image) is a
+     * flashable archive; (app,full) is the local-app archive. Only these
+     * four combinations are valid — enforced by finalize()'s disk_image
+     * kind check above.
+     */
+    private function expectedExtension(string $kind, string $releaseType): string
+    {
+        return $kind === 'os' && $releaseType === 'disk_image' ? 'tar.gz' : ($kind === 'os' ? 'raucb' : 'tar.gz');
+    }
+
     private function matchedExtension(string $filename): ?string
     {
         $lower = strtolower($filename);
@@ -199,6 +238,8 @@ class SlideAnnouncerReleaseController extends Controller
             'kind' => $release->kind,
             'version' => $release->version,
             'architecture' => $release->architecture,
+            'release_type' => $release->release_type,
+            'required_base_version' => $release->required_base_version,
             'sha256' => $release->sha256,
             'disk_path' => $release->disk_path,
             'url' => $release->url(),

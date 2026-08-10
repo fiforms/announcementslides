@@ -48,10 +48,10 @@ class SlideAnnouncerHeartbeatController extends Controller
             'cpu_temp_c' => $data['cpu_temp_c'] ?? null,
         ]);
 
-        $activeAppRelease = SlideAnnouncerRelease::currentOnChannel('app', $device->architecture, $device->update_channel)->first();
+        $activeAppRelease = SlideAnnouncerRelease::resolveForDevice('app', $device->architecture, $device->update_channel, $device->app_version);
         $appUpdateAvailable = $activeAppRelease && $activeAppRelease->version !== $device->app_version;
 
-        $activeOsRelease = SlideAnnouncerRelease::currentOnChannel('os', $device->architecture, $device->update_channel)->first();
+        $activeOsRelease = SlideAnnouncerRelease::resolveForDevice('os', $device->architecture, $device->update_channel, $device->os_version);
         $osUpdateAvailable = $activeOsRelease && $activeOsRelease->version !== $device->os_version;
 
         return response()->json([
