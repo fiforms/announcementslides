@@ -185,6 +185,8 @@ class SlideAnnouncerReleaseController extends Controller
             'channel' => $release->channel,
             'is_active' => $release->is_active,
             'sha256' => $release->sha256,
+            'disk_path' => $release->disk_path,
+            'url' => $release->url(),
             'notes' => $release->notes,
             'file_size' => Storage::disk('public')->exists($release->disk_path)
                 ? Storage::disk('public')->size($release->disk_path)
