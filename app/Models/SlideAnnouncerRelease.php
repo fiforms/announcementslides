@@ -10,10 +10,11 @@ class SlideAnnouncerRelease extends Model
     const KINDS = ['os', 'app'];
     const CHANNELS = ['stable', 'testing', 'developer'];
 
-    // 'full' is a complete OTA image (os) or app archive (app); 'hotfix'
-    // (os only) requires required_base_version and only applies on top of
-    // that exact version; 'disk_image' (os only) is a flashable .tar.gz
-    // for re-imaging an SD card, never an OTA candidate.
+    // 'full' is a complete OTA image (os, .raucb) or app archive (app,
+    // .tar.gz); 'hotfix' (os only, .raucb) requires required_base_version
+    // and only applies on top of that exact version; 'disk_image' (os
+    // only, .img.xz) is a flashable disk image for re-imaging an SD card,
+    // never an OTA candidate.
     const RELEASE_TYPES = ['full', 'hotfix', 'disk_image'];
 
     protected $fillable = [
@@ -80,15 +81,15 @@ class SlideAnnouncerRelease extends Model
      * "slideannouncer-1.2.1.hotfix.from.1.2.0.raucb" into version/
      * release_type/required_base_version. Returns null for anything else
      * — the admin GUI falls back to manual entry when this doesn't match,
-     * it never blocks the upload. Can't distinguish an app full image
-     * from an os disk image (both are "slideannouncer-X.X.X.tar.gz") —
-     * kind/release_type stay explicit admin selections either way.
+     * it never blocks the upload. kind/release_type still stay explicit
+     * admin selections either way — this only automates version/hotfix
+     * detection, not which of the three extensions is expected.
      */
     public static function parseFilename(string $filename): ?array
     {
         $pattern = '/^slideannouncer-(?<version>\d+\.\d+\.\d+)'
             . '(?:\.hotfix\.from\.(?<base>\d+\.\d+\.\d+))?'
-            . '\.(?:raucb|tar\.gz)$/i';
+            . '\.(?:raucb|tar\.gz|img\.xz)$/i';
 
         if (! preg_match($pattern, $filename, $matches)) {
             return null;

@@ -20,7 +20,7 @@ const RELEASE_TYPES_BY_KIND = {
     os: [
         { value: 'full', label: 'OTA image (RAUC .raucb)' },
         { value: 'hotfix', label: 'Hotfix (RAUC .raucb)' },
-        { value: 'disk_image', label: 'Full disk image (.tar.gz)' },
+        { value: 'disk_image', label: 'Full disk image (.img.xz)' },
     ],
     app: [
         { value: 'full', label: 'App archive (.tar.gz)' },
@@ -31,7 +31,7 @@ const RELEASE_TYPES_BY_KIND = {
 // convenience to auto-fill the form; the server re-validates everything
 // on finalize() regardless.
 function parseReleaseFilename(filename) {
-    const match = /^slideannouncer-(\d+\.\d+\.\d+)(?:\.hotfix\.from\.(\d+\.\d+\.\d+))?\.(?:raucb|tar\.gz)$/i.exec(filename);
+    const match = /^slideannouncer-(\d+\.\d+\.\d+)(?:\.hotfix\.from\.(\d+\.\d+\.\d+))?\.(?:raucb|tar\.gz|img\.xz)$/i.exec(filename);
     if (!match) return null;
     const [, version, base] = match;
     return {
@@ -73,7 +73,7 @@ const currentReleases = computed(() => releases.value.filter(r => r.channels.len
 const archivedReleases = computed(() => releases.value.filter(r => r.channels.length === 0));
 
 const acceptedExtension = computed(() => (
-    kind.value === 'os' && releaseType.value === 'disk_image' ? '.tar.gz' :
+    kind.value === 'os' && releaseType.value === 'disk_image' ? '.img.xz' :
     kind.value === 'os' ? '.raucb' : '.tar.gz'
 ));
 const canSubmit = computed(() => selectedFile.value && version.value.trim() && architecture.value.trim()

@@ -13,11 +13,11 @@ use Inertia\Response;
 
 class SlideAnnouncerReleaseController extends Controller
 {
-    // No real browser-recognized MIME type exists for .raucb, and .tar.gz
-    // varies by browser/OS (application/gzip, application/x-gzip, or none
-    // at all) — extension is the only reliable signal here, unlike the
-    // image/video allowlists ChunkedUploadController checks by MIME.
-    private const ALLOWED_EXTENSIONS = ['raucb', 'tar.gz'];
+    // No real browser-recognized MIME type exists for .raucb, and .tar.gz/
+    // .img.xz vary by browser/OS (application/gzip, application/x-gzip, or
+    // none at all) — extension is the only reliable signal here, unlike
+    // the image/video allowlists ChunkedUploadController checks by MIME.
+    private const ALLOWED_EXTENSIONS = ['raucb', 'tar.gz', 'img.xz'];
 
     public function index(): Response
     {
@@ -44,7 +44,7 @@ class SlideAnnouncerReleaseController extends Controller
         $extension = $this->matchedExtension($request->filename);
         if (! $extension) {
             return response()->json([
-                'message' => 'Only .raucb and .tar.gz files are accepted.',
+                'message' => 'Only .raucb, .tar.gz, and .img.xz files are accepted.',
             ], 422);
         }
 
@@ -102,7 +102,7 @@ class SlideAnnouncerReleaseController extends Controller
             // with ChunkedUploadController, even though a release is always
             // exactly one file.
             'uploads' => 'required|array|size:1',
-            'uploads.0.disk_path' => ['required', 'string', 'regex:#^slide-announcer/uploads/[0-9a-f\-]{36}\.(raucb|tar\.gz)$#'],
+            'uploads.0.disk_path' => ['required', 'string', 'regex:#^slide-announcer/uploads/[0-9a-f\-]{36}\.(raucb|tar\.gz|img\.xz)$#'],
             'kind' => ['required', 'string', Rule::in(SlideAnnouncerRelease::KINDS)],
             'release_type' => ['required', 'string', Rule::in(SlideAnnouncerRelease::RELEASE_TYPES)],
             'version' => ['required', 'string', 'regex:/^\d+\.\d+\.\d+$/'],
@@ -130,7 +130,7 @@ class SlideAnnouncerReleaseController extends Controller
             return response()->json(['message' => 'Assembled file not found — please re-upload.'], 422);
         }
 
-        $extension = str_ends_with($diskPath, '.tar.gz') ? 'tar.gz' : 'raucb';
+        $extension = $this->matchedExtension($diskPath);
         $expectedExtension = $this->expectedExtension($data['kind'], $data['release_type']);
         if ($extension !== $expectedExtension) {
             return response()->json([
@@ -205,20 +205,21 @@ class SlideAnnouncerReleaseController extends Controller
     }
 
     /**
-     * Returns the matched extension ('raucb' or 'tar.gz') or null — checks
-     * the multi-part '.tar.gz' case first since pathinfo()-style
-     * single-extension logic would only see '.gz'.
-     */
-    /**
      * (os,full) and (os,hotfix) are RAUC bundles; (os,disk_image) is a
-     * flashable archive; (app,full) is the local-app archive. Only these
-     * four combinations are valid — enforced by finalize()'s disk_image
-     * kind check above.
+     * flashable .img.xz disk image; (app,full) is the local-app .tar.gz
+     * archive. Only these four combinations are valid — enforced by
+     * finalize()'s disk_image kind check above.
      */
     private function expectedExtension(string $kind, string $releaseType): string
     {
-        return $kind === 'os' && $releaseType === 'disk_image' ? 'tar.gz' : ($kind === 'os' ? 'raucb' : 'tar.gz');
+        return $kind === 'os' && $releaseType === 'disk_image' ? 'img.xz' : ($kind === 'os' ? 'raucb' : 'tar.gz');
     }
+
+    /**
+     * Returns the matched extension ('raucb', 'tar.gz', or 'img.xz') or
+     * null — checks the multi-part extensions first since pathinfo()-style
+     * single-extension logic would only see '.gz'/'.xz'.
+     */
 
     private function matchedExtension(string $filename): ?string
     {
