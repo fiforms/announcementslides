@@ -21,6 +21,12 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Both drops (not just the first) so this migration self-heals if
+        // it's ever re-run after a partial failure — see the FK name fix
+        // below, which is exactly why that happened the first time
+        // (MySQL's 64-char identifier limit; SQLite has no such limit,
+        // so this only surfaced against the real production DB).
+        Schema::dropIfExists('slide_announcer_release_channels');
         Schema::dropIfExists('slide_announcer_releases');
 
         Schema::create('slide_announcer_releases', function (Blueprint $table) {
@@ -41,7 +47,13 @@ return new class extends Migration
 
         Schema::create('slide_announcer_release_channels', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('slide_announcer_release_id')->constrained('slide_announcer_releases')->cascadeOnDelete();
+            // Explicit short FK name (constrained()'s 3rd arg) — Laravel's
+            // auto-generated name
+            // ("slide_announcer_release_channels_slide_announcer_release_id_foreign")
+            // is 67 characters, over MySQL's 64-char identifier limit.
+            $table->foreignId('slide_announcer_release_id')
+                ->constrained('slide_announcer_releases', 'id', 'sarc_release_id_foreign')
+                ->cascadeOnDelete();
             $table->string('channel'); // stable | testing | developer
             $table->foreignId('tagged_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('created_at')->useCurrent();
