@@ -60,6 +60,15 @@ const user  = computed(() => page.props.auth?.user);
                         </svg>
                         {{ $t('nav.entity_slides') }}
                     </Link>
+                    <Link :href="route('admin.slide-announcer-releases.index')"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        :class="route().current('admin.slide-announcer-releases.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M12 12v9m0-9l-3 3m3-3l3 3" />
+                        </svg>
+                        {{ $t('nav.slide_announcer_releases') }}
+                    </Link>
                     <Link :href="route('slides.index')"
                         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-300 hover:bg-gray-800 hover:text-white transition-colors">
                         <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

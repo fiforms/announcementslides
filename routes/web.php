@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\EntityConsoleController;
+use App\Http\Controllers\Admin\SlideAnnouncerReleaseController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\ChunkedUploadController;
@@ -111,4 +112,13 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     // ── Entity console (admin oversight of entity-scoped slides) ──────────
     Route::get('/entities', [EntityConsoleController::class, 'index'])->name('entities.index');
     Route::get('/entities/{entity}/slides', [EntityConsoleController::class, 'slides'])->name('entities.slides');
+
+    // ── Slide Announcer releases (OS bundles + local-app archives) ────────
+    Route::prefix('slide-announcer-releases')->name('slide-announcer-releases.')->group(function () {
+        Route::get('/', [SlideAnnouncerReleaseController::class, 'index'])->name('index');
+        Route::post('/chunk', [SlideAnnouncerReleaseController::class, 'chunk'])->name('chunk');
+        Route::post('/finalize', [SlideAnnouncerReleaseController::class, 'finalize'])->name('finalize');
+        Route::post('/{slideAnnouncerRelease}/activate', [SlideAnnouncerReleaseController::class, 'activate'])->name('activate');
+        Route::delete('/{slideAnnouncerRelease}', [SlideAnnouncerReleaseController::class, 'destroy'])->name('destroy');
+    });
 });

@@ -15,14 +15,14 @@ model/table/routes on the server side, and the device repo itself.
 
 **Status (2026-08-09): Part 1's pairing + heartbeat + fleet-inventory core is
 implemented** — Sanctum wiring, the `slide_announcers` /
-`slide_announcer_pairing_codes` / `slide_announcer_heartbeats` /
-`slide_announcer_os_releases` migrations, the pairing/heartbeat/sync API
-controllers, and the entity-leader pairing UI (`Entity/SlideAnnouncers.vue`)
-all exist and are described below as built, not planned. Two things called
-out in Part 1 as deliberately out of scope for this pass:
-- **No `Admin/SlideAnnouncerReleasesController` upload UI** — publishing an
-  OS release is done via `php artisan slide-announcer:publish-os-release`
-  instead (uploads the bundle to `Storage`, computes `sha256`, optionally
+`slide_announcer_pairing_codes` / `slide_announcer_heartbeats` migrations,
+the pairing/heartbeat/sync API controllers, and the entity-leader pairing UI
+(`Entity/SlideAnnouncers.vue`) all exist and are described below as built,
+not planned. Two things called out in Part 1 as deliberately out of scope
+for this pass:
+- **No `Admin/SlideAnnouncerReleasesController` upload UI** — publishing a
+  release is done via `php artisan slide-announcer:publish-release`
+  instead (uploads the file to `Storage`, computes `sha256`, optionally
   `--activate`s it). The cross-site `Admin/*` fleet view is also not built
   yet. Revisit once there's an actual fleet to look at.
 - **Heartbeat retention is a manual command, not a query scope** —
@@ -30,6 +30,17 @@ out in Part 1 as deliberately out of scope for this pass:
   `slide_announcer.heartbeat_retention_days` (default 30). Run it from
   outside the app (cron/systemd timer on the server host) — this repo has
   no in-app scheduler today.
+
+**Update 2026-08-10: releases are unified across OS and local-app.** What
+was `slide_announcer_os_releases` (OS bundles only) is now
+`slide_announcer_releases`, with a `kind` column (`os`|`app`) — the same
+channel-staged (stable/testing/developer) rollout mechanism now covers
+local-app archives too, not just RAUC bundles. This replaced the app-update
+side's old two-value `config('slide_announcer.app_version'/'app_download_url')`
+source of truth entirely (see "Heartbeat + version checks," below, for the
+current contract). The migration is additive (`Schema::rename` + add
+column), not a drop-and-recreate, since the OS-only table was already
+running outside local dev by the time this landed.
 
 Device-side pairing (Part 2) is still open — see that section's status note.
 
@@ -127,9 +138,9 @@ Admin/entity-leader visibility, below).
   device keeps them consistent.
 - `update_channel` + `auto_update_enabled` are per-device controls an entity
   leader or admin sets from the website — they drive which
-  `slide_announcer_os_releases` row a given device is offered (by channel)
-  and whether its own update-check unit is allowed to actually install it
-  or just report availability (see Heartbeat, below).
+  `slide_announcer_releases` row (`kind = 'os'`) a given device is offered
+  (by channel) and whether its own update-check unit is allowed to
+  actually install it or just report availability (see Heartbeat, below).
 - `settings` is a free-form JSON blob (display duration, transition style,
   and future per-device display options) — see "Presenter/display
   settings," below.
@@ -138,24 +149,44 @@ Admin/entity-leader visibility, below).
 entity_id (FK), created_by (FK users), expires_at, used_at,
 slide_announcer_id (nullable FK, set on consumption), timestamps`.
 
-**`slide_announcer_os_releases`** (for the RAUC rollout — see Tier 1):
-`id, version (string), channel (enum: stable/testing/developer),
-bundle_disk_path, sha256, is_active (bool), notes, released_at, created_by
-(FK users), timestamps`, with `is_active` scoped **per channel** — enforced
-in `SlideAnnouncerOsRelease::activate()` (deactivates every other row on the
-same channel, then activates this one), not a DB partial-unique-index, so it
-stays portable between SQLite (dev) and MySQL (prod), the same tradeoff
-`NearbyEntities::within()` already makes elsewhere in this codebase — rather
-than one global switch, a device only ever compares against the active
-release on its own `update_channel`. This is what makes
-"developer"/"testing"/"stable" tiers work: publish a build to `developer`
-first, promote the same or a newer build to `testing`, then to `stable`,
-each a separate row activation (`php artisan
-slide-announcer:publish-os-release <path> <version> <channel> [--activate]`
-— no admin upload UI exists yet, see the status note above). The bundle file
-itself lives on the same `Storage` disk (S3/R2 in prod) as everything else,
-so publishing a release is "upload a file + flip a flag," no separate
-hosting.
+**`slide_announcer_releases`** (covers both RAUC OS bundles and local-app
+archives — see Tier 1 and Tier 2): `id, kind (string: os|app), version
+(string), channel (enum: stable/testing/developer), disk_path, sha256,
+is_active (bool), notes, released_at, created_by (FK users), timestamps`,
+with `is_active` scoped **per (kind, channel)** — enforced in
+`SlideAnnouncerRelease::activate()` (deactivates every other row of the
+same kind+channel, then activates this one), not a DB partial-unique-index,
+so it stays portable between SQLite (dev) and MySQL (prod), the same
+tradeoff `NearbyEntities::within()` already makes elsewhere in this
+codebase — rather than one global switch, a device only ever compares
+against the active release of a given kind on its own `update_channel`.
+`kind` is a plain string, not a DB enum, for the same portability reason
+`channel`'s uniqueness isn't a DB constraint — validated at the app layer
+(`SlideAnnouncerRelease::KINDS`) instead.
+
+This is what makes "developer"/"testing"/"stable" tiers work for *either*
+kind: publish a build to `developer` first, promote the same or a newer
+build to `testing`, then to `stable`, each a separate row activation —
+```
+php artisan slide-announcer:publish-release os  <path.raucb>   <version> <channel> [--activate]
+php artisan slide-announcer:publish-release app <path.tar.gz>  <version> <channel> [--activate]
+```
+(no admin upload UI exists yet, see the status note above). Files live on
+the same `Storage` disk (`public` — S3/R2 in prod, local in dev) as
+everything else — slides, thumbnails, and now release artifacts — under
+`slide-announcer/releases/{kind}/{channel}/{version}{original-extension}`
+(e.g. `slide-announcer/releases/os/stable/2026.08.1.raucb`,
+`slide-announcer/releases/app/testing/0.2.0.tar.gz`), so publishing a
+release is "upload a file + flip a flag," no separate hosting. The
+`publish-release` command computes `sha256` itself and preserves whatever
+extension the source file had (handling multi-dot extensions like
+`.tar.gz` correctly, not just the last segment).
+
+One table instead of two near-identical ones (`..._os_releases` +
+`..._app_releases`) because the shape is identical and the only thing that
+differs is which heartbeat field consumes the row — see
+`SlideAnnouncerHeartbeatController` querying `activeOnChannel('os', ...)`
+and `activeOnChannel('app', ...)` against the same table.
 
 **`slide_announcer_heartbeats`** (new — the rolling per-device log the
 master `slide_announcers` row doesn't have room for): `id,
@@ -277,6 +308,7 @@ call this endpoint regularly for liveness):
   "latest_app_version": "1.4.0",
   "app_update_available": true,
   "app_download_url": "https://.../slide-announcer-1.4.0.tar.gz",
+  "app_sha256": "…",
   "latest_os_version": "2026.08.1",
   "os_update_available": false,
   "os_bundle_url": "https://.../slide-announcer-2026.08.1.raucb",
@@ -284,11 +316,14 @@ call this endpoint regularly for liveness):
   "os_auto_update_enabled": true
 }
 ```
-App-update fields keep the simple two-value `config`/env source of truth
-from before. OS-update fields are read from
-`slide_announcer_os_releases::where('channel', $slideAnnouncer->update_channel)->where('is_active', true)`
-— which release a device is even offered depends on its `update_channel`
-(stable/testing/developer), set from the website. `os_auto_update_enabled`
+Both the app-update and OS-update fields are read from the same
+`slide_announcer_releases::activeOnChannel(kind, $slideAnnouncer->update_channel)`
+query, differing only in `kind` (`'app'` vs `'os'`) — which release a
+device is even offered, of either kind, depends on its `update_channel`
+(stable/testing/developer), set from the website. `app_sha256` mirrors
+`os_bundle_sha256` (added for the same integrity-check purpose the
+`updater/`'s eventual smoke-check would want, once that's built).
+`os_auto_update_enabled`
 mirrors the device's own `auto_update_enabled` column: the server is the
 source of truth for this switch (an entity leader/admin flips it from the
 website, not on the device itself), and the device's update-check unit only
@@ -365,13 +400,13 @@ api.php (new file, registered in bootstrap/app.php):
 ```
 
 ### Open questions to resolve before implementation
-1. Exact archive format for local-app releases (`.tar.gz` proposed) — to be
-   finalized alongside Tier 2's updater design.
-2. `slide_announcer_os_releases` is scoped by `channel`, not by individual
-   entity — fine for now; if the fleet grows enough that per-site/cohort
-   rollout (beyond three fixed channels) becomes worth the complexity, this
-   table already has the right shape to grow an `entity_id` targeting
-   column later.
+1. ~~Exact archive format for local-app releases~~ — resolved: `.tar.gz`,
+   as originally proposed (see `slide-announcer:publish-release`, above).
+2. `slide_announcer_releases` is scoped by `(kind, channel)`, not by
+   individual entity — fine for now; if the fleet grows enough that
+   per-site/cohort rollout (beyond three fixed channels) becomes worth the
+   complexity, this table already has the right shape to grow an
+   `entity_id` targeting column later.
 3. No rollback story yet for an OS release that boots fine (passes the
    health check, gets `mark-good`) but has a bug discovered later — today
    the only fix is publishing a new release. Current call: acceptable until
@@ -452,9 +487,9 @@ server, not this repo).
   <url>`," which is exactly the same shape as the Tier 2 app-update check
   already needs. Rather than standing up (or paying for) a second product —
   Mender Server, or RAUC's own HawkBit-based alternative — the "server" here
-  is just the `slide_announcer_os_releases` table and the heartbeat
-  response fields described in Part 1, backed by the same S3/R2 storage the
-  slide files already use. This is the right tradeoff given the explicit
+  is just the `slide_announcer_releases` table (`kind = 'os'`) and the
+  heartbeat response fields described in Part 1, backed by the same S3/R2
+  storage the slide files already use. This is the right tradeoff given the explicit
   goal of hosting everything from the existing site, and it scales fine
   across a multi-state fleet since there's still exactly one place
   (`Admin/SlideAnnouncerReleasesController`) to publish a release from —

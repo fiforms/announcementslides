@@ -8,6 +8,7 @@
         "slides": "Slides",
         "users": "Users",
         "entity_slides": "Entity Slides",
+        "slide_announcer_releases": "Announcer Releases",
         "view_public_site": "View Public Site"
     },
     "auth": {

@@ -5,12 +5,15 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
 
-class SlideAnnouncerOsRelease extends Model
+class SlideAnnouncerRelease extends Model
 {
+    const KINDS = ['os', 'app'];
+
     protected $fillable = [
+        'kind',
         'version',
         'channel',
-        'bundle_disk_path',
+        'disk_path',
         'sha256',
         'is_active',
         'notes',
@@ -28,24 +31,26 @@ class SlideAnnouncerOsRelease extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function scopeActiveOnChannel($query, string $channel)
+    public function scopeActiveOnChannel($query, string $kind, string $channel)
     {
-        return $query->where('channel', $channel)->where('is_active', true);
+        return $query->where('kind', $kind)->where('channel', $channel)->where('is_active', true);
     }
 
-    public function bundleUrl(): string
+    public function url(): string
     {
-        return Storage::disk('public')->url($this->bundle_disk_path);
+        return Storage::disk('public')->url($this->disk_path);
     }
 
     /**
-     * Deactivates any other release on this release's channel, then
-     * activates this one. This is the entire "rollout" mechanism — see
-     * SLIDE_ANNOUNCER.md, "New data model."
+     * Deactivates any other release of the same kind+channel, then
+     * activates this one — the entire "rollout" mechanism for both OS
+     * bundles and local-app archives. See SLIDE_ANNOUNCER.md, "New data
+     * model."
      */
     public function activate(): void
     {
-        static::where('channel', $this->channel)
+        static::where('kind', $this->kind)
+            ->where('channel', $this->channel)
             ->where('id', '!=', $this->id)
             ->update(['is_active' => false]);
 

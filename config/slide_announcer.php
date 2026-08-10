@@ -3,20 +3,6 @@
 return [
     /*
     |--------------------------------------------------------------------------
-    | Local-app (Tier 2) update source of truth
-    |--------------------------------------------------------------------------
-    |
-    | Simple two-value config, not a releases table — app updates ship far
-    | more often than OS images and are applied via an atomic symlink swap on
-    | the device (see SLIDE_ANNOUNCER.md, Tier 2), so there's no rollout-tier
-    | tracking to model here, unlike slide_announcer_os_releases below.
-    |
-    */
-    'app_version' => env('SLIDE_ANNOUNCER_APP_VERSION'),
-    'app_download_url' => env('SLIDE_ANNOUNCER_APP_DOWNLOAD_URL'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Heartbeat / online threshold
     |--------------------------------------------------------------------------
     */

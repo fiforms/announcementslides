@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SlideAnnouncerHeartbeat;
-use App\Models\SlideAnnouncerOsRelease;
+use App\Models\SlideAnnouncerRelease;
 use Illuminate\Http\Request;
 
 class SlideAnnouncerHeartbeatController extends Controller
@@ -13,7 +13,10 @@ class SlideAnnouncerHeartbeatController extends Controller
      * Updates the device's fleet-inventory snapshot (slide_announcers) and
      * appends a row to the rolling log (slide_announcer_heartbeats), then
      * folds both the local-app and OS update checks into the one response
-     * — see SLIDE_ANNOUNCER.md, "Heartbeat + version checks."
+     * — see SLIDE_ANNOUNCER.md, "Heartbeat + version checks." Both checks
+     * go through the same channel-staged slide_announcer_releases table
+     * (kind 'os'/'app') — a device's update_channel governs which release
+     * of *either* kind it's offered, not just OS bundles.
      */
     public function store(Request $request)
     {
@@ -42,20 +45,21 @@ class SlideAnnouncerHeartbeatController extends Controller
             'cpu_temp_c' => $data['cpu_temp_c'] ?? null,
         ]);
 
-        $latestAppVersion = config('slide_announcer.app_version');
-        $appUpdateAvailable = $latestAppVersion && $latestAppVersion !== $device->app_version;
+        $activeAppRelease = SlideAnnouncerRelease::activeOnChannel('app', $device->update_channel)->first();
+        $appUpdateAvailable = $activeAppRelease && $activeAppRelease->version !== $device->app_version;
 
-        $activeOsRelease = SlideAnnouncerOsRelease::activeOnChannel($device->update_channel)->first();
+        $activeOsRelease = SlideAnnouncerRelease::activeOnChannel('os', $device->update_channel)->first();
         $osUpdateAvailable = $activeOsRelease && $activeOsRelease->version !== $device->os_version;
 
         return response()->json([
             'ok' => true,
-            'latest_app_version' => $latestAppVersion,
+            'latest_app_version' => $activeAppRelease?->version,
             'app_update_available' => $appUpdateAvailable,
-            'app_download_url' => $appUpdateAvailable ? config('slide_announcer.app_download_url') : null,
+            'app_download_url' => $appUpdateAvailable ? $activeAppRelease->url() : null,
+            'app_sha256' => $appUpdateAvailable ? $activeAppRelease->sha256 : null,
             'latest_os_version' => $activeOsRelease?->version,
             'os_update_available' => $osUpdateAvailable,
-            'os_bundle_url' => $osUpdateAvailable ? $activeOsRelease->bundleUrl() : null,
+            'os_bundle_url' => $osUpdateAvailable ? $activeOsRelease->url() : null,
             'os_bundle_sha256' => $osUpdateAvailable ? $activeOsRelease->sha256 : null,
             'os_auto_update_enabled' => $device->auto_update_enabled,
         ]);

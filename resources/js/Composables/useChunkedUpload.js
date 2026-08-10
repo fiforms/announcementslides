@@ -6,7 +6,10 @@ function csrfToken() {
     return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 }
 
-export function useChunkedUpload() {
+export function useChunkedUpload(options = {}) {
+    const chunkRoute    = options.chunkRoute ?? 'uploads.chunk';
+    const finalizeRoute = options.finalizeRoute ?? 'uploads.finalize';
+
     const isUploading     = ref(false);
     const uploadError     = ref(null);
     const fileProgress    = ref([]);
@@ -31,7 +34,7 @@ export function useChunkedUpload() {
             fd.append('mime_type',    file.type);
             fd.append('chunk',        chunk, `chunk_${i}`);
 
-            const { data } = await window.axios.post(route('uploads.chunk'), fd, {
+            const { data } = await window.axios.post(route(chunkRoute), fd, {
                 headers: { 'X-CSRF-TOKEN': csrfToken() },
             });
 
@@ -65,7 +68,7 @@ export function useChunkedUpload() {
                 completedUploads.push(assembled);
             }
 
-            const { data } = await window.axios.post(route('uploads.finalize'), {
+            const { data } = await window.axios.post(route(finalizeRoute), {
                 uploads: completedUploads,
                 ...payload,
             }, {
