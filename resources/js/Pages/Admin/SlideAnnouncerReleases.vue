@@ -239,7 +239,7 @@ async function copyToClipboard(text, which) {
                         </label>
                         <label class="block">
                             <span class="text-sm font-medium text-gray-700">Architecture</span>
-                            <input type="text" v-model="architecture" :disabled="isUploading" placeholder="e.g. arm64"
+                            <input type="text" v-model="architecture" :disabled="isUploading" placeholder="e.g. aarch64"
                                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
                         </label>
                     </div>
