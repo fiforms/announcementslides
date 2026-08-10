@@ -233,8 +233,8 @@ async function copyToClipboard(text, which) {
                             <span class="text-sm font-medium text-gray-700">Kind</span>
                             <select v-model="kind" :disabled="isUploading"
                                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
-                                <option value="os">OS bundle (RAUC .raucb)</option>
-                                <option value="app">Local-app archive (.tar.gz)</option>
+                                <option value="os">OS Image or Update</option>
+                                <option value="app">Local App</option>
                             </select>
                         </label>
                         <label class="block">
