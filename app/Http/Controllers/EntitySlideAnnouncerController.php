@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Entity;
 use App\Models\SlideAnnouncer;
 use App\Models\SlideAnnouncerPairingCode;
+use App\Models\SlideAnnouncerRelease;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,7 +36,56 @@ class EntitySlideAnnouncerController extends Controller
                 'code' => $pairingCode->code,
                 'expires_at' => $pairingCode->expires_at->toIso8601String(),
             ] : null,
+            'diskImages' => $this->diskImages(),
         ]);
+    }
+
+    /**
+     * Current os/disk_image releases tagged stable or testing, grouped by
+     * architecture, so an entity leader can grab an SD-card image to
+     * provision a new device without needing admin access — the same
+     * releases platform admins publish from Admin/SlideAnnouncerReleases,
+     * just filtered to the two channels an entity actually points devices
+     * at (developer is admin/tester-only, so it's excluded here).
+     */
+    private function diskImages(): array
+    {
+        return SlideAnnouncerRelease::query()
+            ->where('kind', 'os')
+            ->where('release_type', 'disk_image')
+            ->with('channels')
+            ->get()
+            ->filter(fn (SlideAnnouncerRelease $release) => $release->channels
+                ->whereIn('channel', ['stable', 'testing'])
+                ->isNotEmpty())
+            ->groupBy('architecture')
+            ->sortKeys()
+            ->map(function ($releases, string $architecture) {
+                $taggedOn = fn (string $channel) => $releases->first(
+                    fn (SlideAnnouncerRelease $r) => $r->channels->contains('channel', $channel)
+                );
+
+                return [
+                    'architecture' => $architecture,
+                    'stable' => optional($taggedOn('stable'), fn ($r) => $this->diskImageResource($r)),
+                    'testing' => optional($taggedOn('testing'), fn ($r) => $this->diskImageResource($r)),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function diskImageResource(SlideAnnouncerRelease $release): array
+    {
+        return [
+            'version' => $release->version,
+            'url' => $release->url(),
+            'sha256' => $release->sha256,
+            'file_size' => Storage::disk('public')->exists($release->disk_path)
+                ? Storage::disk('public')->size($release->disk_path)
+                : null,
+            'created_at' => $release->created_at->toIso8601String(),
+        ];
     }
 
     public function storePairingCode(Request $request, Entity $entity)

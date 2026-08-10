@@ -630,6 +630,21 @@ server, not this repo).
   time — since they must exist before the very first boot's overlay mount
   *and* after a factory reset reformats `/data` at runtime, one boot-time
   mechanism covers both instead of a build-time seed a reset would bypass).
+- **Future idea: `/data`-backed swap file as a low-priority zram backstop
+  (not implemented)** — on low-memory devices, Chromium's disk cache has
+  nowhere to live but RAM (home dir is read-only, `/tmp` is tmpfs), and
+  zram swap is the only relief valve today. tmpfs pages are themselves
+  swappable, so a small (256-512MB) swap file on `/data`, added at
+  `swapon -p 0` (below zram's default priority) so the kernel drains zram
+  first, would let that tmpfs-backed cache spill to the SD card under
+  genuine memory pressure instead of getting reclaimed or triggering an
+  OOM kill — a possible reliability win on constrained hardware. Tradeoffs
+  to weigh before building it: SD card write endurance and much slower
+  random I/O than zram mean heavy reliance on it could cause thrashing
+  that's arguably worse for a kiosk than an OOM-killed Chromium the kiosk
+  service just restarts; would need the same idempotent boot-time
+  creation pattern as `slide-announcer-data-dirs.service` above, since
+  `/data` doesn't exist yet on first boot and is wiped on factory reset.
 - **Persistent state discipline**: anything that must survive an OS update
   and needs Unix semantics (symlinks for atomic app-release swaps, `chmod
   600` on the pairing token and the identity secret, synced slide media,
