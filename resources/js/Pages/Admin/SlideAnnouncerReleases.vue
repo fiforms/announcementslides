@@ -46,7 +46,7 @@ const kind = ref('os');
 const releaseType = ref('full');
 const version = ref('');
 const requiredBaseVersion = ref('');
-const architecture = ref('');
+const architecture = ref('aarch64');
 const initialChannel = ref('');
 const notes = ref('');
 const finalizeError = ref(null);
@@ -96,6 +96,17 @@ function formatBytes(bytes) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
     if (bytes < 1024 * 1024 * 1024) return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
+}
+
+// Seeded with what's actually been tested/documented for disk images —
+// an architecture with no entry here just doesn't get a compatibility
+// note rather than a guessed one.
+const DISK_IMAGE_COMPATIBILITY = {
+    aarch64: 'This image is compatible with Raspberry Pi 3 or newer (suggested 2GB or more RAM).',
+};
+
+function diskImageCompatibility(architecture) {
+    return DISK_IMAGE_COMPATIBILITY[architecture] ?? null;
 }
 
 function channelBadgeClass(channel) {
@@ -490,6 +501,18 @@ async function copyToClipboard(text, which) {
                             class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700 flex-shrink-0">
                             Download
                         </a>
+                    </div>
+                    <div v-if="detailsRelease.release_type === 'disk_image'" class="mt-2 text-xs text-gray-500 space-y-1">
+                        <p>
+                            You can write this image directly to an SD card to provision Slide Announcer on a new
+                            device. Use
+                            <a href="https://etcher.balena.io/" target="_blank" rel="noopener noreferrer"
+                                class="text-indigo-600 hover:text-indigo-800 underline">balenaEtcher</a>
+                            or similar software to write this image.
+                        </p>
+                        <p v-if="diskImageCompatibility(detailsRelease.architecture)">
+                            {{ diskImageCompatibility(detailsRelease.architecture) }}
+                        </p>
                     </div>
                 </div>
 
