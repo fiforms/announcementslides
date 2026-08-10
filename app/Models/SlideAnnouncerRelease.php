@@ -8,22 +8,16 @@ use Illuminate\Support\Facades\Storage;
 class SlideAnnouncerRelease extends Model
 {
     const KINDS = ['os', 'app'];
+    const CHANNELS = ['stable', 'testing', 'developer'];
 
     protected $fillable = [
         'kind',
         'version',
-        'channel',
+        'architecture',
         'disk_path',
         'sha256',
-        'is_active',
         'notes',
-        'released_at',
         'created_by',
-    ];
-
-    protected $casts = [
-        'is_active' => 'boolean',
-        'released_at' => 'datetime',
     ];
 
     public function creator()
@@ -31,9 +25,30 @@ class SlideAnnouncerRelease extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function scopeActiveOnChannel($query, string $kind, string $channel)
+    public function channels()
     {
-        return $query->where('kind', $kind)->where('channel', $channel)->where('is_active', true);
+        return $this->hasMany(SlideAnnouncerReleaseChannel::class);
+    }
+
+    public function scopeOfKindAndArchitecture($query, string $kind, ?string $architecture)
+    {
+        return $query->where('kind', $kind)->where('architecture', $architecture);
+    }
+
+    public function scopeCurrentOnChannel($query, string $kind, ?string $architecture, string $channel)
+    {
+        return $query->ofKindAndArchitecture($kind, $architecture)
+            ->whereHas('channels', fn ($q) => $q->where('channel', $channel));
+    }
+
+    public function currentChannelNames(): array
+    {
+        return $this->channels->pluck('channel')->all();
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->channels->isEmpty();
     }
 
     public function url(): string
@@ -42,18 +57,29 @@ class SlideAnnouncerRelease extends Model
     }
 
     /**
-     * Deactivates any other release of the same kind+channel, then
-     * activates this one — the entire "rollout" mechanism for both OS
-     * bundles and local-app archives. See SLIDE_ANNOUNCER.md, "New data
-     * model."
+     * Tags this release as current on $channel. At most one release can
+     * hold a given (kind, architecture, channel) tag at a time, so any
+     * sibling release (same kind+architecture) currently holding it loses
+     * the tag first — a "move," not a toggle. See SLIDE_ANNOUNCER.md's
+     * "New data model" for why this replaced a per-row is_active flag.
      */
-    public function activate(): void
+    public function tagChannel(string $channel, ?int $userId = null): void
     {
-        static::where('kind', $this->kind)
-            ->where('channel', $this->channel)
-            ->where('id', '!=', $this->id)
-            ->update(['is_active' => false]);
+        SlideAnnouncerReleaseChannel::where('channel', $channel)
+            ->whereHas('release', fn ($q) => $q->ofKindAndArchitecture($this->kind, $this->architecture))
+            ->delete();
 
-        $this->update(['is_active' => true, 'released_at' => $this->released_at ?? now()]);
+        $this->channels()->firstOrCreate(['channel' => $channel], ['tagged_by' => $userId]);
+    }
+
+    /**
+     * Removes this release's tag for $channel, if any. A channel left
+     * with no tagged release simply has no current build for that
+     * (kind, architecture) — untagging every channel is what makes a
+     * release "archived" (see isArchived()), not a separate flag.
+     */
+    public function untagChannel(string $channel): void
+    {
+        $this->channels()->where('channel', $channel)->delete();
     }
 }

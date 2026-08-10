@@ -16,6 +16,7 @@ class SlideAnnouncer extends Model
         'device_uuid',
         'app_version',
         'os_version',
+        'architecture',
         'update_channel',
         'auto_update_enabled',
         'settings',

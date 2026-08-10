@@ -9,6 +9,8 @@ const props = defineProps({
     releases: { type: Array, default: () => [] },
 });
 
+const CHANNELS = ['developer', 'testing', 'stable'];
+
 const { isUploading, uploadError, overallProgress, upload } = useChunkedUpload({
     chunkRoute: 'admin.slide-announcer-releases.chunk',
     finalizeRoute: 'admin.slide-announcer-releases.finalize',
@@ -17,21 +19,24 @@ const { isUploading, uploadError, overallProgress, upload } = useChunkedUpload({
 const selectedFile = ref(null);
 const kind = ref('os');
 const version = ref('');
-const channel = ref('stable');
+const architecture = ref('');
+const initialChannel = ref('');
 const notes = ref('');
-const activateNow = ref(false);
 const finalizeError = ref(null);
 const releases = ref([...props.releases]);
 
 // Inertia re-renders this page with fresh props after any router.post/delete
-// (activate/destroy below), but releases was only ever seeded from props
+// (tag/untag/destroy below), but releases was only ever seeded from props
 // once — without this, the table stays stale until a manual reload.
 watch(() => props.releases, (updated) => {
     releases.value = [...updated];
 });
 
+const currentReleases = computed(() => releases.value.filter(r => r.channels.length > 0));
+const archivedReleases = computed(() => releases.value.filter(r => r.channels.length === 0));
+
 const acceptedExtension = computed(() => (kind.value === 'os' ? '.raucb' : '.tar.gz'));
-const canSubmit = computed(() => selectedFile.value && version.value.trim());
+const canSubmit = computed(() => selectedFile.value && version.value.trim() && architecture.value.trim());
 
 function onFileSelected(event) {
     selectedFile.value = event.target.files[0] ?? null;
@@ -44,15 +49,23 @@ function formatBytes(bytes) {
     return (bytes / (1024 * 1024 * 1024)).toFixed(2) + ' GB';
 }
 
+function channelBadgeClass(channel) {
+    return {
+        stable: 'bg-green-100 text-green-800',
+        testing: 'bg-amber-100 text-amber-800',
+        developer: 'bg-blue-100 text-blue-800',
+    }[channel] ?? 'bg-gray-100 text-gray-600';
+}
+
 async function submit() {
     finalizeError.value = null;
 
     const result = await upload([selectedFile.value], {
         kind: kind.value,
         version: version.value.trim(),
-        channel: channel.value,
+        architecture: architecture.value.trim(),
+        channel: initialChannel.value || null,
         notes: notes.value || null,
-        activate: activateNow.value,
     });
 
     if (!result) {
@@ -67,18 +80,29 @@ async function submit() {
     releases.value.unshift(result.release);
     selectedFile.value = null;
     version.value = '';
+    architecture.value = '';
+    initialChannel.value = '';
     notes.value = '';
-    activateNow.value = false;
 }
 
-function activate(release) {
-    if (confirm(`Activate ${release.kind} ${release.version} on ${release.channel}? This deactivates any other active ${release.kind} release on that channel.`)) {
-        router.post(route('admin.slide-announcer-releases.activate', { slideAnnouncerRelease: release.id }));
+function tagChannel(release, channel) {
+    const holder = releases.value.find(r => r.channels.some(c => c.channel === channel) && r.kind === release.kind && r.architecture === release.architecture);
+    const warning = holder && holder.id !== release.id
+        ? ` This removes it from ${holder.kind} ${holder.version} (${holder.architecture}), which currently holds that tag.`
+        : '';
+    if (confirm(`Tag ${release.kind} ${release.version} (${release.architecture}) as "${channel}"?${warning}`)) {
+        router.post(route('admin.slide-announcer-releases.channels.tag', { slideAnnouncerRelease: release.id }), { channel });
+    }
+}
+
+function untagChannel(release, channel) {
+    if (confirm(`Remove the "${channel}" tag from ${release.kind} ${release.version} (${release.architecture})?`)) {
+        router.delete(route('admin.slide-announcer-releases.channels.untag', { slideAnnouncerRelease: release.id, channel }));
     }
 }
 
 function destroy(release) {
-    if (confirm(`Delete ${release.kind} ${release.version} (${release.channel})? This cannot be undone.`)) {
+    if (confirm(`Delete ${release.kind} ${release.version} (${release.architecture})? This cannot be undone.`)) {
         router.delete(route('admin.slide-announcer-releases.destroy', { slideAnnouncerRelease: release.id }), {
             onSuccess: () => { detailsId.value = null; },
         });
@@ -89,15 +113,29 @@ function destroy(release) {
 
 const detailsId = ref(null);
 const copied = ref(null); // 'url' | 'sha256' | null
+const tagToAdd = ref('');
 const detailsRelease = computed(() => releases.value.find(r => r.id === detailsId.value) ?? null);
+const availableChannelsToAdd = computed(() => {
+    if (!detailsRelease.value) return [];
+    const current = detailsRelease.value.channels.map(c => c.channel);
+    return CHANNELS.filter(c => !current.includes(c));
+});
 
 function openDetails(release) {
     detailsId.value = release.id;
     copied.value = null;
+    tagToAdd.value = '';
 }
 
 function closeDetails() {
     detailsId.value = null;
+}
+
+function addTagFromDetails() {
+    if (tagToAdd.value) {
+        tagChannel(detailsRelease.value, tagToAdd.value);
+        tagToAdd.value = '';
+    }
 }
 
 async function copyToClipboard(text, which) {
@@ -128,13 +166,9 @@ async function copyToClipboard(text, which) {
                             </select>
                         </label>
                         <label class="block">
-                            <span class="text-sm font-medium text-gray-700">Channel</span>
-                            <select v-model="channel" :disabled="isUploading"
+                            <span class="text-sm font-medium text-gray-700">Architecture</span>
+                            <input type="text" v-model="architecture" :disabled="isUploading" placeholder="e.g. arm64"
                                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
-                                <option value="developer">Developer</option>
-                                <option value="testing">Testing</option>
-                                <option value="stable">Stable</option>
-                            </select>
                         </label>
                     </div>
 
@@ -159,9 +193,16 @@ async function copyToClipboard(text, which) {
                             class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm"></textarea>
                     </label>
 
-                    <label class="flex items-center gap-2 text-sm text-gray-700">
-                        <input type="checkbox" v-model="activateNow" :disabled="isUploading">
-                        Activate immediately on this channel
+                    <label class="block">
+                        <span class="text-sm font-medium text-gray-700">Tag as (optional)</span>
+                        <select v-model="initialChannel" :disabled="isUploading"
+                            class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
+                            <option value="">— none, leave archived —</option>
+                            <option v-for="c in CHANNELS" :key="c" :value="c">{{ c }}</option>
+                        </select>
+                        <span class="text-xs text-gray-500">
+                            Tagging moves that channel off whatever release currently holds it for this kind+architecture — it doesn't remove any other tags this release might also get later.
+                        </span>
                     </label>
 
                     <div v-if="isUploading" class="rounded-lg bg-indigo-50 px-4 py-3">
@@ -185,51 +226,82 @@ async function copyToClipboard(text, which) {
                 </form>
             </div>
 
-            <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
-                <table class="min-w-full divide-y divide-gray-200 text-sm">
-                    <thead class="bg-gray-50">
-                        <tr>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Kind</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Version</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Channel</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Status</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Size</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Published</th>
-                            <th class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        <tr v-for="release in releases" :key="release.id" class="hover:bg-gray-50 cursor-pointer"
-                            @click="openDetails(release)">
-                            <td class="px-4 py-3">{{ release.kind }}</td>
-                            <td class="px-4 py-3 font-mono">{{ release.version }}</td>
-                            <td class="px-4 py-3">{{ release.channel }}</td>
-                            <td class="px-4 py-3">
-                                <span :class="release.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
-                                    class="rounded-full px-2 py-0.5 text-xs font-medium">
-                                    {{ release.is_active ? 'Active' : 'Inactive' }}
-                                </span>
-                            </td>
-                            <td class="px-4 py-3 hidden md:table-cell text-gray-600">{{ formatBytes(release.file_size) }}</td>
-                            <td class="px-4 py-3 hidden lg:table-cell text-gray-600">
-                                {{ new Date(release.created_at).toLocaleString() }}
-                            </td>
-                            <td class="px-4 py-3 text-right space-x-3" @click.stop>
-                                <button v-if="!release.is_active" @click="activate(release)"
-                                    class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                                    Activate
-                                </button>
-                                <button v-if="!release.is_active" @click="destroy(release)"
-                                    class="text-red-600 hover:text-red-800 text-sm font-medium">
-                                    Delete
-                                </button>
-                            </td>
-                        </tr>
-                        <tr v-if="!releases.length">
-                            <td colspan="7" class="px-4 py-8 text-center text-gray-500">No releases published yet.</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <div>
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Current ({{ currentReleases.length }})</h2>
+                <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Kind</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Version</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Architecture</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Channels</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Size</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Published</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr v-for="release in currentReleases" :key="release.id" class="hover:bg-gray-50 cursor-pointer"
+                                @click="openDetails(release)">
+                                <td class="px-4 py-3">{{ release.kind }}</td>
+                                <td class="px-4 py-3 font-mono">{{ release.version }}</td>
+                                <td class="px-4 py-3">{{ release.architecture }}</td>
+                                <td class="px-4 py-3">
+                                    <span v-for="c in release.channels" :key="c.channel" :class="channelBadgeClass(c.channel)"
+                                        class="rounded-full px-2 py-0.5 text-xs font-medium mr-1">
+                                        {{ c.channel }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-3 hidden md:table-cell text-gray-600">{{ formatBytes(release.file_size) }}</td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-gray-600">
+                                    {{ new Date(release.created_at).toLocaleString() }}
+                                </td>
+                            </tr>
+                            <tr v-if="!currentReleases.length">
+                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">No releases currently tagged on any channel.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Archived ({{ archivedReleases.length }})</h2>
+                <p class="text-xs text-gray-500 mb-2">Not tagged on any channel — still downloadable at their same URL.</p>
+                <div class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Kind</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Version</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500">Architecture</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Size</th>
+                                <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Published</th>
+                                <th class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr v-for="release in archivedReleases" :key="release.id" class="hover:bg-gray-50 cursor-pointer"
+                                @click="openDetails(release)">
+                                <td class="px-4 py-3">{{ release.kind }}</td>
+                                <td class="px-4 py-3 font-mono">{{ release.version }}</td>
+                                <td class="px-4 py-3">{{ release.architecture }}</td>
+                                <td class="px-4 py-3 hidden md:table-cell text-gray-600">{{ formatBytes(release.file_size) }}</td>
+                                <td class="px-4 py-3 hidden lg:table-cell text-gray-600">
+                                    {{ new Date(release.created_at).toLocaleString() }}
+                                </td>
+                                <td class="px-4 py-3 text-right" @click.stop>
+                                    <button @click="destroy(release)" class="text-red-600 hover:text-red-800 text-sm font-medium">
+                                        Delete
+                                    </button>
+                                </td>
+                            </tr>
+                            <tr v-if="!archivedReleases.length">
+                                <td colspan="6" class="px-4 py-8 text-center text-gray-500">Nothing archived.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
 
@@ -240,12 +312,34 @@ async function copyToClipboard(text, which) {
                         <h3 class="text-lg font-semibold text-gray-900">
                             {{ detailsRelease.kind }} {{ detailsRelease.version }}
                         </h3>
-                        <p class="text-sm text-gray-500">{{ detailsRelease.channel }} channel</p>
+                        <p class="text-sm text-gray-500">{{ detailsRelease.architecture }}</p>
                     </div>
-                    <span :class="detailsRelease.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
-                        class="rounded-full px-2 py-0.5 text-xs font-medium">
-                        {{ detailsRelease.is_active ? 'Active' : 'Inactive' }}
-                    </span>
+                </div>
+
+                <div>
+                    <dt class="text-sm text-gray-500 mb-1">Channels</dt>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span v-for="c in detailsRelease.channels" :key="c.channel"
+                            :class="channelBadgeClass(c.channel)"
+                            class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
+                            {{ c.channel }}
+                            <button @click="untagChannel(detailsRelease, c.channel)" class="hover:opacity-60" title="Untag">
+                                &times;
+                            </button>
+                        </span>
+                        <span v-if="!detailsRelease.channels.length" class="text-xs text-gray-500">Archived — not tagged on any channel.</span>
+
+                        <div v-if="availableChannelsToAdd.length" class="flex items-center gap-1 ml-2">
+                            <select v-model="tagToAdd" class="text-xs rounded-lg border-gray-300 shadow-sm">
+                                <option value="">Tag as…</option>
+                                <option v-for="c in availableChannelsToAdd" :key="c" :value="c">{{ c }}</option>
+                            </select>
+                            <button @click="addTagFromDetails" :disabled="!tagToAdd"
+                                class="rounded-lg border border-gray-300 px-2 py-1 text-xs text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                                Add
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <dl class="grid grid-cols-2 gap-3 text-sm">
@@ -256,12 +350,6 @@ async function copyToClipboard(text, which) {
                     <div>
                         <dt class="text-gray-500">Published</dt>
                         <dd class="text-gray-900">{{ new Date(detailsRelease.created_at).toLocaleString() }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Activated</dt>
-                        <dd class="text-gray-900">
-                            {{ detailsRelease.released_at ? new Date(detailsRelease.released_at).toLocaleString() : '—' }}
-                        </dd>
                     </div>
                     <div>
                         <dt class="text-gray-500">Published by</dt>
@@ -316,16 +404,11 @@ async function copyToClipboard(text, which) {
                 </div>
 
                 <div class="flex items-center justify-between border-t border-gray-100 pt-4">
-                    <div class="space-x-3">
-                        <button v-if="!detailsRelease.is_active" @click="activate(detailsRelease)"
-                            class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                            Activate
-                        </button>
-                        <button v-if="!detailsRelease.is_active" @click="destroy(detailsRelease)"
-                            class="text-red-600 hover:text-red-800 text-sm font-medium">
-                            Delete
-                        </button>
-                    </div>
+                    <button v-if="!detailsRelease.channels.length" @click="destroy(detailsRelease)"
+                        class="text-red-600 hover:text-red-800 text-sm font-medium">
+                        Delete
+                    </button>
+                    <span v-else></span>
                     <button @click="closeDetails" class="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
                         Close
                     </button>

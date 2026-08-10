@@ -12,8 +12,8 @@ class SlideAnnouncerPublishRelease extends Command
                             {kind : os|app}
                             {path : Local filesystem path to the release file (.raucb for os, .tar.gz for app)}
                             {version : Version string, e.g. 2026.08.1 or 0.2.0}
-                            {channel : stable|testing|developer}
-                            {--activate : Activate this release on its channel immediately}';
+                            {architecture : e.g. arm64, armhf, x64}
+                            {--channel= : Tag this release as current on this channel immediately (stable|testing|developer)}';
 
     protected $description = 'Upload an OS bundle or local-app archive and register it as a slide_announcer_releases row';
 
@@ -22,15 +22,16 @@ class SlideAnnouncerPublishRelease extends Command
         $kind = $this->argument('kind');
         $path = $this->argument('path');
         $version = $this->argument('version');
-        $channel = $this->argument('channel');
+        $architecture = $this->argument('architecture');
+        $channel = $this->option('channel');
 
         if (! in_array($kind, SlideAnnouncerRelease::KINDS, true)) {
             $this->error('Kind must be one of: ' . implode(', ', SlideAnnouncerRelease::KINDS) . '.');
             return self::FAILURE;
         }
 
-        if (! in_array($channel, ['stable', 'testing', 'developer'], true)) {
-            $this->error('Channel must be one of: stable, testing, developer.');
+        if ($channel !== null && ! in_array($channel, SlideAnnouncerRelease::CHANNELS, true)) {
+            $this->error('Channel must be one of: ' . implode(', ', SlideAnnouncerRelease::CHANNELS) . '.');
             return self::FAILURE;
         }
 
@@ -45,23 +46,23 @@ class SlideAnnouncerPublishRelease extends Command
         // what's actually inside the file, only the model/heartbeat
         // contract's kind field does.
         $extension = $this->fullExtension($path);
-        $diskPath = "slide-announcer/releases/{$kind}/{$channel}/{$version}{$extension}";
+        $diskPath = "slide-announcer/releases/{$kind}/{$architecture}/{$version}{$extension}";
 
         Storage::disk('public')->put($diskPath, file_get_contents($path));
 
         $release = SlideAnnouncerRelease::create([
             'kind' => $kind,
             'version' => $version,
-            'channel' => $channel,
+            'architecture' => $architecture,
             'disk_path' => $diskPath,
             'sha256' => $sha256,
         ]);
 
-        if ($this->option('activate')) {
-            $release->activate();
-            $this->info("Published and activated {$kind} {$version} on {$channel}.");
+        if ($channel !== null) {
+            $release->tagChannel($channel);
+            $this->info("Published {$kind} {$version} ({$architecture}) and tagged it {$channel}.");
         } else {
-            $this->info("Published {$kind} {$version} on {$channel} (not activated — pass --activate to enable it).");
+            $this->info("Published {$kind} {$version} ({$architecture}) untagged — pass --channel=<name> to make it current somewhere.");
         }
 
         return self::SUCCESS;

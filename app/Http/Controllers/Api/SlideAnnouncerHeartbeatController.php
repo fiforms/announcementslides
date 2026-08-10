@@ -14,15 +14,17 @@ class SlideAnnouncerHeartbeatController extends Controller
      * appends a row to the rolling log (slide_announcer_heartbeats), then
      * folds both the local-app and OS update checks into the one response
      * — see SLIDE_ANNOUNCER.md, "Heartbeat + version checks." Both checks
-     * go through the same channel-staged slide_announcer_releases table
-     * (kind 'os'/'app') — a device's update_channel governs which release
-     * of *either* kind it's offered, not just OS bundles.
+     * look up the release currently *tagged* with this device's
+     * update_channel, matching its reported architecture — a device with
+     * no architecture reported yet (first-ever heartbeat) simply matches
+     * nothing, same as any other "no release currently offered" case.
      */
     public function store(Request $request)
     {
         $data = $request->validate([
             'app_version' => 'nullable|string|max:255',
             'os_version' => 'nullable|string|max:255',
+            'architecture' => 'nullable|string|max:64',
             'cpu_temp_c' => 'nullable|numeric',
         ]);
 
@@ -32,6 +34,7 @@ class SlideAnnouncerHeartbeatController extends Controller
         $device->update([
             'app_version' => $data['app_version'] ?? $device->app_version,
             'os_version' => $data['os_version'] ?? $device->os_version,
+            'architecture' => $data['architecture'] ?? $device->architecture,
             'last_ip' => $ip,
             'last_cpu_temp_c' => $data['cpu_temp_c'] ?? $device->last_cpu_temp_c,
             'last_seen_at' => now(),
@@ -45,10 +48,10 @@ class SlideAnnouncerHeartbeatController extends Controller
             'cpu_temp_c' => $data['cpu_temp_c'] ?? null,
         ]);
 
-        $activeAppRelease = SlideAnnouncerRelease::activeOnChannel('app', $device->update_channel)->first();
+        $activeAppRelease = SlideAnnouncerRelease::currentOnChannel('app', $device->architecture, $device->update_channel)->first();
         $appUpdateAvailable = $activeAppRelease && $activeAppRelease->version !== $device->app_version;
 
-        $activeOsRelease = SlideAnnouncerRelease::activeOnChannel('os', $device->update_channel)->first();
+        $activeOsRelease = SlideAnnouncerRelease::currentOnChannel('os', $device->architecture, $device->update_channel)->first();
         $osUpdateAvailable = $activeOsRelease && $activeOsRelease->version !== $device->os_version;
 
         return response()->json([

@@ -118,7 +118,8 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
         Route::get('/', [SlideAnnouncerReleaseController::class, 'index'])->name('index');
         Route::post('/chunk', [SlideAnnouncerReleaseController::class, 'chunk'])->name('chunk');
         Route::post('/finalize', [SlideAnnouncerReleaseController::class, 'finalize'])->name('finalize');
-        Route::post('/{slideAnnouncerRelease}/activate', [SlideAnnouncerReleaseController::class, 'activate'])->name('activate');
+        Route::post('/{slideAnnouncerRelease}/channels', [SlideAnnouncerReleaseController::class, 'tag'])->name('channels.tag');
+        Route::delete('/{slideAnnouncerRelease}/channels/{channel}', [SlideAnnouncerReleaseController::class, 'untag'])->name('channels.untag');
         Route::delete('/{slideAnnouncerRelease}', [SlideAnnouncerReleaseController::class, 'destroy'])->name('destroy');
     });
 });

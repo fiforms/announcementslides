@@ -21,7 +21,7 @@ class SlideAnnouncerReleaseController extends Controller
 
     public function index(): Response
     {
-        $releases = SlideAnnouncerRelease::with('creator')
+        $releases = SlideAnnouncerRelease::with(['creator', 'channels.taggedBy'])
             ->orderByDesc('created_at')
             ->get()
             ->map(fn (SlideAnnouncerRelease $release) => $this->releaseResource($release));
@@ -65,9 +65,9 @@ class SlideAnnouncerReleaseController extends Controller
         }
 
         // All chunks received — assemble into a staging path. Final
-        // placement under slide-announcer/releases/{kind}/{channel}/... is
-        // finalize()'s job, once it knows those (chunk() only ever sees a
-        // filename), matching ChunkedUploadController's own two-step split.
+        // placement under slide-announcer/releases/{kind}/{architecture}/...
+        // is finalize()'s job, once it knows those (chunk() only ever sees
+        // a filename), matching ChunkedUploadController's own two-step split.
         $uuid = (string) Str::uuid();
         $stagedName = "{$uuid}.{$extension}";
 
@@ -105,9 +105,12 @@ class SlideAnnouncerReleaseController extends Controller
             'uploads.0.disk_path' => ['required', 'string', 'regex:#^slide-announcer/uploads/[0-9a-f\-]{36}\.(raucb|tar\.gz)$#'],
             'kind' => ['required', 'string', Rule::in(SlideAnnouncerRelease::KINDS)],
             'version' => 'required|string|max:255',
-            'channel' => 'required|in:stable,testing,developer',
+            'architecture' => 'required|string|max:64',
+            // Optional initial tag — a release can be published untagged
+            // (archived from the moment it lands) or tagged immediately,
+            // same as tagging it later via the tag() endpoint.
+            'channel' => ['nullable', Rule::in(SlideAnnouncerRelease::CHANNELS)],
             'notes' => 'nullable|string',
-            'activate' => 'boolean',
         ]);
 
         $diskPath = $data['uploads'][0]['disk_path'];
@@ -117,7 +120,7 @@ class SlideAnnouncerReleaseController extends Controller
         }
 
         $extension = str_ends_with($diskPath, '.tar.gz') ? 'tar.gz' : 'raucb';
-        $finalPath = "slide-announcer/releases/{$data['kind']}/{$data['channel']}/{$data['version']}.{$extension}";
+        $finalPath = "slide-announcer/releases/{$data['kind']}/{$data['architecture']}/{$data['version']}.{$extension}";
 
         $sha256 = hash_file('sha256', Storage::disk('public')->path($diskPath));
 
@@ -129,30 +132,43 @@ class SlideAnnouncerReleaseController extends Controller
         $release = SlideAnnouncerRelease::create([
             'kind' => $data['kind'],
             'version' => $data['version'],
-            'channel' => $data['channel'],
+            'architecture' => $data['architecture'],
             'disk_path' => $finalPath,
             'sha256' => $sha256,
             'notes' => $data['notes'] ?? null,
             'created_by' => $request->user()->id,
         ]);
 
-        if ($request->boolean('activate')) {
-            $release->activate();
+        if (! empty($data['channel'])) {
+            $release->tagChannel($data['channel'], $request->user()->id);
         }
 
-        return response()->json(['success' => true, 'release' => $this->releaseResource($release->fresh())]);
+        return response()->json(['success' => true, 'release' => $this->releaseResource($release->fresh('channels'))]);
     }
 
-    public function activate(Request $request, SlideAnnouncerRelease $slideAnnouncerRelease)
+    public function tag(Request $request, SlideAnnouncerRelease $slideAnnouncerRelease)
     {
-        $slideAnnouncerRelease->activate();
+        $data = $request->validate([
+            'channel' => ['required', Rule::in(SlideAnnouncerRelease::CHANNELS)],
+        ]);
 
-        return back()->with('success', "Activated {$slideAnnouncerRelease->kind} {$slideAnnouncerRelease->version} on {$slideAnnouncerRelease->channel}.");
+        $slideAnnouncerRelease->tagChannel($data['channel'], $request->user()->id);
+
+        return back()->with('success', "Tagged {$slideAnnouncerRelease->kind} {$slideAnnouncerRelease->version} ({$slideAnnouncerRelease->architecture}) as {$data['channel']}.");
+    }
+
+    public function untag(Request $request, SlideAnnouncerRelease $slideAnnouncerRelease, string $channel)
+    {
+        abort_unless(in_array($channel, SlideAnnouncerRelease::CHANNELS, true), 404);
+
+        $slideAnnouncerRelease->untagChannel($channel);
+
+        return back()->with('success', "Removed the {$channel} tag from {$slideAnnouncerRelease->kind} {$slideAnnouncerRelease->version}.");
     }
 
     public function destroy(SlideAnnouncerRelease $slideAnnouncerRelease)
     {
-        abort_if($slideAnnouncerRelease->is_active, 422, 'Deactivate this release before deleting it.');
+        abort_if($slideAnnouncerRelease->channels()->exists(), 422, 'Untag this release from every channel before deleting it.');
 
         Storage::disk('public')->delete($slideAnnouncerRelease->disk_path);
         $slideAnnouncerRelease->delete();
@@ -182,8 +198,7 @@ class SlideAnnouncerReleaseController extends Controller
             'id' => $release->id,
             'kind' => $release->kind,
             'version' => $release->version,
-            'channel' => $release->channel,
-            'is_active' => $release->is_active,
+            'architecture' => $release->architecture,
             'sha256' => $release->sha256,
             'disk_path' => $release->disk_path,
             'url' => $release->url(),
@@ -191,9 +206,13 @@ class SlideAnnouncerReleaseController extends Controller
             'file_size' => Storage::disk('public')->exists($release->disk_path)
                 ? Storage::disk('public')->size($release->disk_path)
                 : null,
-            'released_at' => $release->released_at?->toIso8601String(),
             'created_at' => $release->created_at->toIso8601String(),
             'creator' => $release->creator?->only('id', 'name'),
+            'channels' => $release->channels->map(fn ($c) => [
+                'channel' => $c->channel,
+                'tagged_at' => $c->created_at->toIso8601String(),
+                'tagged_by' => $c->taggedBy?->only('id', 'name'),
+            ])->all(),
         ];
     }
 }

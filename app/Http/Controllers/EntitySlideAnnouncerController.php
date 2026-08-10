@@ -104,6 +104,7 @@ class EntitySlideAnnouncerController extends Controller
             'device_uuid' => $device->device_uuid,
             'app_version' => $device->app_version,
             'os_version' => $device->os_version,
+            'architecture' => $device->architecture,
             'update_channel' => $device->update_channel,
             'auto_update_enabled' => $device->auto_update_enabled,
             'settings' => $device->settings,
