@@ -601,9 +601,16 @@ server, not this repo).
   `os_update_available`, runs `rauc install <os_bundle_url>` (RAUC streams
   and verifies the signature against the baked-in cert as it installs — no
   separate download-then-verify step), then reboots into the new slot via
-  tryboot. Only after the new slot boots and a health-check script passes
-  does the unit call `rauc status mark-good`; if the check fails, tryboot's
-  own fallback returns the device to the previous slot on the next boot
+  tryboot. Confirmed on real hardware that a tryboot-*flagged* boot's GPU
+  init is unreliable (a Raspberry Pi firmware quirk, not something this
+  project's config controls), so a tryboot session is only ever a brief,
+  headless verification window — kernel boots, root mounts, system comes
+  up — never expected to show anything on screen. Only after that health
+  check passes does the unit call `rauc status mark-good` and flip
+  `config.txt`'s permanent `os_prefix=` to the new slot (not a file copy),
+  then immediately reboot normally so the device actually starts using
+  the new slot's working display. If the check fails, tryboot's own
+  fallback returns the device to the previous slot on the next boot
   automatically — the same auto-rollback property Mender would have given,
   achieved through RAUC's native mechanism instead.
 - **Read-only rootfs**: `rootA`/`rootB` are mounted `ro` (kernel cmdline +
@@ -917,23 +924,39 @@ scheduling an OS update and a local-app update in the same maintenance
 window on one device, to keep failure attribution simple.
 
 ### Open questions / tradeoffs flagged
-1. Hardware validation still pending for RAUC's tryboot integration (flash,
-   install a bundle, force a bad health check, confirm fallback) — no
-   design change riding on the outcome, just needs to happen before relying
-   on this across a fleet you can't physically reach. Wayland/labwc on the
-   actual target Pi model is confirmed working on real hardware. The
-   hotfix path (`slideannouncer/image-builder/make-hotfix-bundle.sh`,
-   no A/B involved) is also confirmed working end-to-end on real
-   hardware (2026-08-10) — `rauc install` over HTTP, version-gate check,
-   live-rootfs write-through, and the on-device VERSION bump all
-   verified. A first tryboot implementation attempt now exists
-   (`slideannouncer/system/rauc/rpi-tryboot-backend.sh` and
-   `rpi-tryboot-commit.sh`, kernel/initramfs shipped as a RAUC custom slot
-   alongside rootfs) — but it's reconstructed from general RAUC/Raspberry
-   Pi tryboot documentation, not confirmed against this project's actual
-   RAUC version or hardware, and the post-update health check is still
-   just a placeholder ("did we reach this systemd unit"). This is the
-   concrete thing still needing a hardware pass.
+1. RAUC's tryboot integration is now hardware-validated end-to-end
+   (2026-08-10): `rauc install` over HTTP (verity/streaming), install onto
+   the inactive rootfs+kernel slots, `reboot "0 tryboot"`, boot into the
+   staged slot, and commit all confirmed working on a real Pi 4. The
+   hotfix path (no A/B involved) was confirmed the same day — version-gate
+   check, live-rootfs write-through, on-device VERSION bump.
+   Along the way, real hardware surfaced (and this project fixed) several
+   concrete bugs the original design doc's guesses got wrong: RAUC's
+   custom bootloader backend exchanges *bootnames* ("A"/"B"), not slot
+   names; `root=LABEL=...` doesn't reliably resolve during a tryboot boot
+   (switched to `root=PARTUUID=`, resolved dynamically per-device at
+   install time); and — the significant one — **a tryboot-*flagged*
+   `os_prefix` boot's DTB-fixup step silently fails to apply the
+   `vc4-kms-v3d` overlay** (zero DRM devices, no kiosk display), while the
+   identical files loaded via a *permanent*, non-tryboot `os_prefix` boot
+   with a working GPU every time. That's a Raspberry Pi firmware quirk
+   specific to the tryboot flag, not to `os_prefix` in general, and it
+   reshaped the design: `config.txt` now carries a permanent
+   `os_prefix=slotA/` (or `slotB/`) line that every *normal* boot reads;
+   `slotA`/`slotB` (populated at build time / by each OTA install) are the
+   *only* copies of kernel/initramfs/`.dtb`s/overlays/`cmdline.txt` — no
+   third "promoted to partition-root" copy anymore. A tryboot session is
+   now used only for a brief, headless-acceptable verification window (does
+   the kernel boot, does root mount, does the system come up); on success,
+   `rpi-tryboot-commit.sh` flips `config.txt`'s `os_prefix=` line (not a
+   file copy) and immediately reboots normally, so the device starts using
+   the new slot's working GPU/kiosk right away rather than sitting on the
+   tryboot-flagged session any longer than the health check needs. See
+   `slideannouncer/image-builder/repartition.sh` and
+   `slideannouncer/system/rauc/rpi-tryboot-commit.sh` for the full
+   rationale. The post-update health check is still just a placeholder
+   ("did we reach this systemd unit") — a real check of network/backend/
+   sync health is the next concrete gap here, not hardware validation.
 2. Symlink-swap (no A/B) for the local-app tier — revisit only if future
    local-app releases start needing local-state migrations a plain swap
    can't cleanly roll back.
