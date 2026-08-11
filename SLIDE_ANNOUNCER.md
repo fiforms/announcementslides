@@ -637,21 +637,30 @@ server, not this repo).
   time — since they must exist before the very first boot's overlay mount
   *and* after a factory reset reformats `/data` at runtime, one boot-time
   mechanism covers both instead of a build-time seed a reset would bypass).
-- **Future idea: `/data`-backed swap file as a low-priority zram backstop
-  (not implemented)** — on low-memory devices, Chromium's disk cache has
-  nowhere to live but RAM (home dir is read-only, `/tmp` is tmpfs), and
-  zram swap is the only relief valve today. tmpfs pages are themselves
-  swappable, so a small (256-512MB) swap file on `/data`, added at
-  `swapon -p 0` (below zram's default priority) so the kernel drains zram
-  first, would let that tmpfs-backed cache spill to the SD card under
-  genuine memory pressure instead of getting reclaimed or triggering an
-  OOM kill — a possible reliability win on constrained hardware. Tradeoffs
-  to weigh before building it: SD card write endurance and much slower
-  random I/O than zram mean heavy reliance on it could cause thrashing
-  that's arguably worse for a kiosk than an OOM-killed Chromium the kiosk
-  service just restarts; would need the same idempotent boot-time
-  creation pattern as `slide-announcer-data-dirs.service` above, since
-  `/data` doesn't exist yet on first boot and is wiped on factory reset.
+- **Fixed (2026-08-10): swap's file half was on tmpfs, not disk.** Current
+  Raspberry Pi OS doesn't use `dphys-swapfile` (this section's original
+  draft assumed it did, and even briefly misdiagnosed the fix around it —
+  the package isn't installed on this image at all); the real mechanism is
+  `rpi-swap`, a zram + file-backed-overflow hybrid (`dev-zram0.swap`, "rpi-swap
+  managed swap device (zram+file)"). The zram half is fine — RAM-backed by
+  design — but the file half defaulted to `/var/swap`, and once `/var`'s
+  upper layer became tmpfs (see "Read-only rootfs" above), that file was
+  silently backed by RAM, not disk. Confirmed on real hardware:
+  `rpi-resize-swap-file.service` creates it at full configured size on
+  every boot regardless of usage — a freshly booted device had ~375MB
+  resident in `/run/overlay-var/upper` for a file `free` reported as 0
+  used swap. Under real memory pressure this would have made things
+  *worse*, not better. Fixed by repointing the file half at a fixed
+  1536MB file on `/data` via an `/etc/rpi/swap.conf.d/` drop-in
+  (`slideannouncer/system/read-only-root/rpi-swap-data.conf`, wired into
+  `01-system-files/00-run.sh`; see `system/README.md`) — no manual
+  ordering against `data.mount` needed, since `rpi-swap-generator` derives
+  each unit's `RequiresMountsFor=` from the drop-in's `Path=` fresh on
+  every boot. Shipped as hotfix 0.1.5 for devices already in the field,
+  which also tears down the old `/var/swap`-backed device live to free
+  that RAM immediately rather than waiting for a reboot. Fixed size rather
+  than auto-sized, for the same SD-card write-endurance/random-I/O reasons
+  this section originally raised about heavy swap reliance on a kiosk.
 - **Persistent state discipline**: anything that must survive an OS update
   and needs Unix semantics (symlinks for atomic app-release swaps, `chmod
   600` on the pairing token and the identity secret, synced slide media,
