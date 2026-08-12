@@ -49,10 +49,10 @@ class SlideAnnouncerHeartbeatController extends Controller
         ]);
 
         $activeAppRelease = SlideAnnouncerRelease::resolveForDevice('app', $device->architecture, $device->update_channel, $device->app_version);
-        $appUpdateAvailable = $activeAppRelease && $activeAppRelease->version !== $device->app_version;
+        $appUpdateAvailable = $activeAppRelease && static::releaseIsNewer($activeAppRelease, $device->app_version);
 
         $activeOsRelease = SlideAnnouncerRelease::resolveForDevice('os', $device->architecture, $device->update_channel, $device->os_version);
-        $osUpdateAvailable = $activeOsRelease && $activeOsRelease->version !== $device->os_version;
+        $osUpdateAvailable = $activeOsRelease && static::releaseIsNewer($activeOsRelease, $device->os_version);
 
         return response()->json([
             'ok' => true,
@@ -64,7 +64,37 @@ class SlideAnnouncerHeartbeatController extends Controller
             'os_update_available' => $osUpdateAvailable,
             'os_bundle_url' => $osUpdateAvailable ? $activeOsRelease->url() : null,
             'os_bundle_sha256' => $osUpdateAvailable ? $activeOsRelease->sha256 : null,
+            // Lets the device tell a hotfix (live-rootfs write, no reboot
+            // needed — see make-hotfix-bundle.sh) apart from a full image
+            // (needs the install -> tryboot -> health-check -> commit
+            // dance) without guessing from the URL/filename.
+            'os_release_type' => $osUpdateAvailable ? $activeOsRelease->release_type : null,
             'os_auto_update_enabled' => $device->auto_update_enabled,
         ]);
+    }
+
+    /**
+     * A hotfix's version is only ever compared for "is this different from
+     * what the device is on" — resolveForDevice() already guarantees a
+     * hotfix's required_base_version exactly equals the device's current
+     * version before it's even considered, so there's no forward/backward
+     * ambiguity to resolve here (a hotfix can't apply to a device that
+     * isn't already on its exact prerequisite version).
+     *
+     * A 'full' release is different: it's just "whatever this channel has
+     * tagged," with nothing structurally preventing an admin from tagging
+     * one whose version is lower than (or equal to) what some devices on
+     * that channel already run — which, without this check, would report
+     * an "update" that's actually a downgrade or a no-op re-install. Only
+     * offer it when it's a genuine forward version move (or the device has
+     * never reported a version at all yet).
+     */
+    protected static function releaseIsNewer(SlideAnnouncerRelease $release, ?string $currentVersion): bool
+    {
+        if ($release->release_type === 'hotfix') {
+            return $release->version !== $currentVersion;
+        }
+
+        return $currentVersion === null || version_compare($release->version, $currentVersion, '>');
     }
 }

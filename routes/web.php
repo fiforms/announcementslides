@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\EntityConsoleController;
+use App\Http\Controllers\Admin\SlideAnnouncerConsoleController;
 use App\Http\Controllers\Admin\SlideAnnouncerReleaseController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
@@ -77,6 +78,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::prefix('entity/{entity}/slide-announcers')->name('entity.slide-announcers.')->group(function () {
         Route::get('/', [EntitySlideAnnouncerController::class, 'index'])->name('index');
         Route::post('/pairing-codes', [EntitySlideAnnouncerController::class, 'storePairingCode'])->name('pairing-codes.store');
+        Route::get('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'show'])->name('show');
         Route::patch('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'update'])->name('update');
         Route::delete('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'destroy'])->name('destroy');
     });
@@ -112,6 +114,9 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     // ── Entity console (admin oversight of entity-scoped slides) ──────────
     Route::get('/entities', [EntityConsoleController::class, 'index'])->name('entities.index');
     Route::get('/entities/{entity}/slides', [EntityConsoleController::class, 'slides'])->name('entities.slides');
+
+    // ── Slide Announcer fleet console (cross-entity device list) ──────────
+    Route::get('/slide-announcers', [SlideAnnouncerConsoleController::class, 'index'])->name('slide-announcers.index');
 
     // ── Slide Announcer releases (OS bundles + local-app archives) ────────
     Route::prefix('slide-announcer-releases')->name('slide-announcer-releases.')->group(function () {

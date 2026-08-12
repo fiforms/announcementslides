@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Entity;
 use App\Models\SlideAnnouncer;
+use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerPairingCode;
 use App\Models\SlideAnnouncerRelease;
 use Illuminate\Http\Request;
@@ -86,6 +87,40 @@ class EntitySlideAnnouncerController extends Controller
                 : null,
             'created_at' => $release->created_at->toIso8601String(),
         ];
+    }
+
+    /**
+     * Single-device detail: everything deviceResource() already exposes,
+     * plus its recent heartbeat log (never surfaced anywhere before this —
+     * SlideAnnouncerHeartbeat rows were written on every check-in but only
+     * ever read by the pruning command). Same guard as every other action
+     * here; also reachable by a platform admin via
+     * Admin/SlideAnnouncerConsoleController's fleet list linking straight
+     * into this route rather than duplicating a detail page.
+     */
+    public function show(Request $request, Entity $entity, SlideAnnouncer $slideAnnouncer): Response
+    {
+        $user = $request->user();
+        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
+        abort_unless($slideAnnouncer->entity_id === $entity->id, 404);
+
+        $heartbeats = $slideAnnouncer->heartbeats()
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->map(fn (SlideAnnouncerHeartbeat $heartbeat) => [
+                'app_version' => $heartbeat->app_version,
+                'os_version' => $heartbeat->os_version,
+                'ip_address' => $heartbeat->ip_address,
+                'cpu_temp_c' => $heartbeat->cpu_temp_c,
+                'created_at' => $heartbeat->created_at->toIso8601String(),
+            ]);
+
+        return Inertia::render('Entity/SlideAnnouncerShow', [
+            'entity' => ['id' => $entity->id, 'name' => $entity->name],
+            'device' => $this->deviceResource($slideAnnouncer),
+            'heartbeats' => $heartbeats,
+        ]);
     }
 
     public function storePairingCode(Request $request, Entity $entity)

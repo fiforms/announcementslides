@@ -118,7 +118,10 @@ function formatBytes(bytes) {
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="device in devices" :key="device.id" class="hover:bg-gray-50">
                             <td class="px-4 py-3">
-                                <div class="font-medium text-gray-900">{{ device.name }}</div>
+                                <Link :href="route('entity.slide-announcers.show', { entity: entity.id, slideAnnouncer: device.id })"
+                                    class="font-medium text-indigo-600 hover:text-indigo-800">
+                                    {{ device.name }}
+                                </Link>
                                 <div class="text-xs text-gray-500">{{ device.mac_address || 'no MAC on file' }}</div>
                             </td>
                             <td class="px-4 py-3">

@@ -536,15 +536,40 @@ until that need is real.
 
 ## Part 2 — Device-side architecture ([`slideannouncer`](slideannouncer/) submodule)
 
-**Status (2026-08-10): pairing + heartbeat implemented** —
-`local-app/backend/pairing.py` (pairing client, wipe-and-unpair),
-`heartbeat.py` (5-minute background task, reports `app_version`/
-`os_version`/`architecture`/`cpu_temp_c`, handles 401 revocation), and a
-`Pairing.vue` screen exist and are described below as built. **Still
-stubs:** the real slide sync daemon and kiosk slideshow renderer
-(`local-app/backend/sync.py` is a one-function placeholder), the
-`updater/` self-update client, and Tier 1's tryboot integration remains
-hardware-unverified (see that section).
+**Status (2026-08-11): pairing + heartbeat + slide sync + all three update
+tiers implemented** — `local-app/backend/pairing.py` (pairing client,
+wipe-and-unpair), `heartbeat.py` (5-minute background task, reports
+`app_version`/`os_version`/`architecture`/`cpu_temp_c`, handles 401
+revocation), `sync.py` (60s slide sync daemon: polls
+`GET /api/slide-announcers/slides`, downloads new/changed media, writes
+`manifest.json`/`settings.json`/`active-playlist.json`, prunes locally
+expired slides even while offline), `updater/local_app_updater.py` (reads
+heartbeat's cached update-availability fields, downloads+smoke-checks+
+atomically-swaps `/data/local-app/current`, restarts services, auto-reverts
+on a failed post-restart health check), and `system/scripts/os-updater.py`
+(reads the same cached heartbeat fields, `rauc install`s a resolved
+hotfix or full-image release and, for a full image, triggers the existing
+tryboot/health-check/commit cycle) all exist and are described below as
+built. Both updaters share one idle-window gate (default 02:00–05:00
+local) and run as independent, offset systemd timers; `os-updater.py`
+additionally defers any OS-level change while `app_update_available` is
+still true, so a local-app update and an OS reboot never land in the same
+window on one device (see "Cross-tier update safety"). Hotfix-before-
+full-image ordering needs no separate client logic at all —
+`SlideAnnouncerRelease::resolveForDevice()` already only offers a hotfix
+when its `required_base_version` exactly matches the device's current
+`os_version`, falling back to the tagged full release otherwise, so the
+device just installs whatever the server resolves, one hop per heartbeat.
+`SlideAnnouncerHeartbeatController::releaseIsNewer()` (added 2026-08-11)
+guards the `app`/`full`-OS case with a real `version_compare(..., '>')`
+check, since an admin mistagging a lower-or-equal-versioned full release
+used to read back as an "update" a device would install as a downgrade —
+a hotfix's exact-base-match requirement already made this a non-issue for
+that path. **Still stubs:** the kiosk slideshow renderer itself (nothing
+yet reads `active-playlist.json` to display anything), and Tier 1's
+tryboot/health-check/rollback path remains verified only for the
+happy path on real hardware — the forced-bad-health → automatic-rollback
+case is still unverified (see that section's open questions).
 
 ### Repo layout
 ```
