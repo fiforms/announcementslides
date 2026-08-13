@@ -9,11 +9,18 @@ const props = defineProps({
     heartbeats: { type: Array, default: () => [] },
 });
 
+// interval_seconds also lives in the same `settings` JSON blob the raw
+// textarea edits (Slideshow.vue's DEFAULT_INTERVAL_SECONDS is 10) — pulled
+// out into its own field since "how fast do slides switch" is common enough
+// to deserve a real control instead of hand-editing JSON.
+const { interval_seconds, ...otherSettings } = props.device.settings ?? {};
+
 const form = useForm({
     name: props.device.name,
     update_channel: props.device.update_channel,
     auto_update_enabled: props.device.auto_update_enabled,
-    settings_text: JSON.stringify(props.device.settings ?? {}, null, 2),
+    interval_seconds: interval_seconds ?? 10,
+    settings_text: JSON.stringify(otherSettings, null, 2),
 });
 
 const settingsError = ref('');
@@ -41,7 +48,7 @@ function submit() {
         name: data.name,
         update_channel: data.update_channel,
         auto_update_enabled: data.auto_update_enabled,
-        settings,
+        settings: { ...settings, interval_seconds: Number(data.interval_seconds) },
     })).patch(route('entity.slide-announcers.update', { entity: props.entity.id, slideAnnouncer: props.device.id }));
 }
 
@@ -153,8 +160,15 @@ function formatDate(iso) {
                 </div>
 
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Slide duration (seconds)</label>
+                    <input v-model.number="form.interval_seconds" type="number" min="1" step="1" required
+                        class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    <p class="mt-1 text-xs text-gray-500">How long each slide stays on screen before switching to the next.</p>
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
-                        Custom settings <span class="text-gray-400 font-normal">(JSON, e.g. slide duration/transition — sent to the device with every slide sync)</span>
+                        Custom settings <span class="text-gray-400 font-normal">(JSON — sent to the device with every slide sync)</span>
                     </label>
                     <textarea v-model="form.settings_text" rows="6" spellcheck="false"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 font-mono text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
