@@ -991,6 +991,11 @@ window on one device, to keep failure attribution simple.
    rationale. The post-update health check is still just a placeholder
    ("did we reach this systemd unit") — a real check of network/backend/
    sync health is the next concrete gap here, not hardware validation.
+   Reconfirmed 2026-08-13 on a paired production device doing a real
+   0.1.10 → 0.2.1 field OTA: `install` + `tryboot --yes` came up correctly
+   on 0.2.0 and resumed slide sync/display, and a subsequent power cycle
+   stayed on 0.2.0 — the commit (not just the tryboot boot) survives a
+   normal reboot.
 2. Symlink-swap (no A/B) for the local-app tier — revisit only if future
    local-app releases start needing local-state migrations a plain swap
    can't cleanly roll back.
