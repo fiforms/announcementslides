@@ -565,11 +565,14 @@ guards the `app`/`full`-OS case with a real `version_compare(..., '>')`
 check, since an admin mistagging a lower-or-equal-versioned full release
 used to read back as an "update" a device would install as a downgrade —
 a hotfix's exact-base-match requirement already made this a non-issue for
-that path. **Still stubs:** the kiosk slideshow renderer itself (nothing
-yet reads `active-playlist.json` to display anything), and Tier 1's
-tryboot/health-check/rollback path remains verified only for the
-happy path on real hardware — the forced-bad-health → automatic-rollback
-case is still unverified (see that section's open questions).
+that path. **Confirmed on real hardware (2026-08-16):** the kiosk
+slideshow renderer reads `active-playlist.json` and displays a paired
+site's real synced slides, not just a stub — the Menu key (or Esc)
+toggles between the live slideshow and the on-device Settings screen.
+**Still stubs:** Tier 1's tryboot/health-check/rollback path remains
+verified only for the happy path on real hardware — the forced-bad-health
+→ automatic-rollback case is still unverified (see that section's open
+questions).
 
 ### Repo layout
 ```
@@ -690,15 +693,16 @@ server, not this repo).
   and needs Unix semantics (symlinks for atomic app-release swaps, `chmod
   600` on the pairing token and the identity secret, synced slide media,
   sync-status file) lives on the persistent ext4 `/data` slot, never on
-  rootfs — rootfs is replaced wholesale on each RAUC install. The one
-  exception is `slideannouncer.yaml` (WiFi credentials + declared device
-  identity), which deliberately lives on the separate FAT32 boot/firmware
-  partition instead — see "First-boot / WiFi setup flow" and "Device
-  identity & anti-clone protection" under Tier 2 for why (human-editable
-  from a PC/Mac; that partition is untouched by RAUC updates too, so it's
-  just as persistent as `/data` for this purpose). Systemd units reference
-  `/data`- and `/boot/firmware`-relative paths so both are unaffected by OS
-  upgrades.
+  rootfs — rootfs is replaced wholesale on each RAUC install. The
+  exceptions are `slideannouncer.yaml` (declared device identity +
+  initial-setup hints) and `network-config` (WiFi/network settings, via
+  cloud-init's own NoCloud mechanism), which deliberately live on the
+  separate FAT32 boot/firmware partition instead — see "First-boot /
+  network setup flow" and "Device identity & anti-clone protection" under
+  Tier 2 for why (human-editable from a PC/Mac; that partition is
+  untouched by RAUC updates too, so it's just as persistent as `/data` for
+  this purpose). Systemd units reference `/data`- and `/boot/firmware`-
+  relative paths so both are unaffected by OS upgrades.
 - **Update safety (no Sunday-morning surprises, without a scheduling
   server)**: since there's no Mender-Server-style deployment scheduler, the
   "don't reboot mid-service" safeguard moves entirely to the device, using
@@ -753,7 +757,7 @@ server, not this repo).
   independent of whichever release `current` points at, on the assumption
   that app-only updates (no OS reflash) stay code-only.
 
-### First-boot / WiFi setup flow
+### First-boot / network setup flow
 - Backend drives NetworkManager via `nmcli` subprocess calls (not raw D-Bus
   bindings — more stable, testable), running as a dedicated non-root user
   authorized via a polkit rule.
@@ -765,38 +769,53 @@ server, not this repo).
 
 Three setup modalities exist, tried in order at boot:
 
-**0. Pre-provisioned config file (`/boot/firmware/slideannouncer.yaml`) —
-true headless, and doubles as the human-editable identity file.** This is a
-plain-text YAML file at the root of the Pi's existing FAT32 boot/firmware
-partition — the same well-established mechanism Raspberry Pi OS itself uses
-for headless WiFi setup (dropping `wpa_supplicant.conf`/an empty `ssh` file
-onto that partition before first boot). It's the right home for this rather
-than a new dedicated partition: FAT32 needs no driver on any OS (Mac,
-Windows, Linux) to read/write, a tiny config file never approaches its 4GB
-file-size limit, and it's a partition that already exists in the image
-rather than an addition to an already-nontrivial A/B + `/data` layout.
-Because it's plain FAT32 (no symlinks, no Unix permissions), it only ever
-holds things that are safe to be world-readable and don't need atomic
-symlink swaps — WiFi credentials and the *declared* device identity, not
-the local-app releases or the pairing token (those still need `/data`,
-ext4, exactly as designed before).
+**0. Pre-provisioned config files — true headless.** Two plain-text files
+at the root of the Pi's existing FAT32 boot/firmware partition — the same
+well-established mechanism Raspberry Pi OS itself uses for headless setup
+(dropping `wpa_supplicant.conf`/an empty `ssh` file onto that partition
+before first boot). FAT32 is the right home for both rather than a new
+dedicated partition: no driver needed on any OS (Mac, Windows, Linux) to
+read/write, tiny files that never approach its 4GB file-size limit, and a
+partition that already exists in the image rather than an addition to an
+already-nontrivial A/B + `/data` layout. Because it's plain FAT32 (no
+symlinks, no Unix permissions), it only ever holds things that are safe to
+be world-readable and don't need atomic symlink swaps — network settings
+and the *declared* device identity, not the local-app releases or the
+pairing token (those still need `/data`, ext4, exactly as designed
+before).
 
-Contents:
-```yaml
-wifi:
-  ssid: "Church Wifi"
-  password: "..."
-device_uuid: "3f29b6d2-....-....-...."
-device_uuid_check: "a1b2c3...(hex)"
-```
-On boot, if this file is present with WiFi credentials, the backend
-connects directly via `nmcli` — no AP-mode hotspot, no keyboard needed at
-all. This is genuinely zero-touch: a technician can hand-edit this file (or
-a provisioning script can generate it) before a card is ever put in a
-device or shipped anywhere, closing the "true headless" gap flagged
-earlier. Pairing itself still needs a fresh code from the website (codes
-are short-lived by design), so this path removes the WiFi step from
-zero-touch provisioning, not the pairing step.
+- **`network-config`** — a standard netplan-format file, applied by
+  cloud-init's NoCloud datasource before anything of this project's own
+  code runs at all. Deliberately NOT this project's own bespoke format:
+  netplan's own reference covers static IP/gateway/DNS, multiple access
+  points, enterprise WiFi (EAP), etc. — reusing a well-documented existing
+  format beats inventing and maintaining a parallel one that would only
+  ever cover a fraction of it. `image-builder`'s build ships a commented
+  example (DHCP and static-IP variants) here by default.
+- **`slideannouncer.yaml`** — identity and initial-setup hints only, never
+  network settings:
+  ```yaml
+  default_language: en
+  device_uuid: "3f29b6d2-....-....-...."
+  device_uuid_check: "a1b2c3...(hex)"
+  ```
+  `default_language` ("en"/"es") is read once, purely as a hint for the
+  very first setup screen — changing the language later from the device's
+  own Settings menu has no effect on this file. `device_uuid`/
+  `device_uuid_check` should normally be left out entirely; see "Device
+  identity & anti-clone protection" below for why.
+
+On boot, `provisioning/firstboot.py` polls NetworkManager for an already-
+active connection (i.e. cloud-init's `network-config` already succeeded)
+to label the detected setup mode `headless-config` — it doesn't itself
+join WiFi or read credentials from anywhere; cloud-init already did that
+before this project's own code ever ran. This is genuinely zero-touch: a
+technician can hand-edit both files (or a provisioning script can generate
+them) before a card is ever put in a device or shipped anywhere, closing
+the "true headless" gap flagged earlier. Pairing itself still needs a
+fresh code from the website (codes are short-lived by design), so this
+path removes the network-setup step from zero-touch provisioning, not the
+pairing step.
 
 **1. On-device setup via an attached HID input** (e.g. an RF remote
 presenting as a keyboard/mouse combo), if no usable config file was found.
@@ -917,9 +936,22 @@ needing separate cases for each:
 ### Kiosk display
 - **Decided: Wayland (labwc, or `cage`) over classic X11** — matches where
   Raspberry Pi OS Trixie+ already defaults, and current Chromium has
-  better Wayland/Ozone support than X11 at this point. **Still needs a
-  hands-on smoke test on the actual target Pi hardware** before locking it
-  in for the fleet — no design change pending, just verification.
+  better Wayland/Ozone support than X11 at this point. **Confirmed on real
+  hardware (2026-08-15):** a freshly-imaged device now boots all the way
+  to the kiosk display (labwc + Chromium) end-to-end. Getting there
+  surfaced (and this project fixed) several concrete first-boot bugs
+  along the way, none of them about Wayland/labwc itself — see
+  `slideannouncer`'s commit history around 2026-08-13/15 for the specifics
+  (`/boot/firmware` mounted read-only by default plus every writer that
+  needed bracketing for it, `/data`'s partition grown before it's
+  formatted rather than after so `mke2fs` sizes it correctly the first
+  time, and a couple of first-boot systemd ordering races: `growpart`'s
+  own `/tmp` scratch dir vs. `tmp.mount`, and
+  `rpi-resize-swap-file.service`'s fixed-size swapfile vs. `/data`
+  actually being grown yet). **Confirmed 2026-08-16:** the full loop
+  works, not just the boot — once paired, a device displays that site's
+  real synced slides on the kiosk display, and the Menu key (or Esc)
+  toggles between the live slideshow and the on-device Settings screen.
 - `slide-announcer-kiosk.service` starts the compositor then execs
   `chromium --kiosk --ozone-platform=wayland ... --app=http://localhost/kiosk`,
   pointed only at the local nginx-served app — never the remote server
@@ -1002,9 +1034,10 @@ window on one device, to keep failure attribution simple.
 3. Exact archive format for local-app releases (`.tar.gz` proposed) — to be
    finalized next.
 4. ~~True headless configuration~~ — resolved: the pre-provisioned
-   `slideannouncer.yaml` on the boot partition covers zero-touch WiFi setup
-   (see First-boot flow, above). Pairing itself still needs a fresh code
-   generated on-demand from the website, since codes are intentionally
+   `network-config` on the boot partition (cloud-init's own NoCloud
+   mechanism) covers zero-touch WiFi setup, alongside `slideannouncer.yaml`
+   for identity (see First-boot flow, above). Pairing itself still needs a
+   fresh code generated on-demand from the website, since codes are intentionally
    short-lived — fully zero-touch *pairing* (no human action at all once a
    device is powered on at its site) is still an open question if that ever
    becomes a requirement.
@@ -1016,6 +1049,31 @@ window on one device, to keep failure attribution simple.
    hash of the concatenation) is the part that matters, since it's what
    makes the check unforgeable without `identity_key`; SHA-256 itself is
    just a reasonable, unremarkable choice of underlying hash.
+7. **Not yet implemented: self-healing `/data` on corruption/fsck failure.**
+   `/data` currently mounts `nofail` with no automatic fsck (`passno=0` —
+   see `slide-announcer-data-resize.service`'s own comment for why an
+   auto-generated `systemd-fsck@...` unit is actively dangerous here, it
+   raced the factory-reset reformat and caused a real first-boot hang).
+   That means a genuinely corrupt `/data` today just fails to mount and
+   stays failed — `nofail` keeps the boot from dropping to an emergency
+   shell, but doesn't get the kiosk/backend back up either, since both
+   depend on `/data` being real (identity, pairing, cached slides). For an
+   unattended device with no local user and often awkward physical access,
+   silently staying broken forever until someone notices and re-images is
+   a bad failure mode.
+   Proposed design (discussed 2026-08-14, not built): don't wipe on a bare
+   mount failure — react to it (e.g. an `OnFailure=` unit on `data.mount`,
+   or a single script that tries mount → `fsck.ext4 -y` → retry the mount
+   → only *then* wipe) so a repairable case (the common one — SD card was
+   mid-write during an unclean power-off, which this hardware sees often)
+   gets fixed via fsck first, and a full reformat (identical to the
+   existing `FACTORY_RESET` path) is the last resort, not the first
+   response. Also needs some marker that survives the wipe long enough to
+   report "auto-recovered from `/data` corruption" on the device's next
+   check-in — without that, a card that's actually failing repeatedly just
+   reads as an unremarkable string of factory resets from the fleet's point
+   of view, and nobody notices the hardware is dying until it stops
+   recovering at all.
 
 ---
 
