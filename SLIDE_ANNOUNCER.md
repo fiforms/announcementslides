@@ -569,7 +569,24 @@ that path. **Confirmed on real hardware (2026-08-16):** the kiosk
 slideshow renderer reads `active-playlist.json` and displays a paired
 site's real synced slides, not just a stub — the Menu key (or Esc)
 toggles between the live slideshow and the on-device Settings screen.
-**Still stubs:** Tier 1's tryboot/health-check/rollback path remains
+**Confirmed on real hardware (2026-08-16): the Settings UI's "Update Now"
+button works end-to-end for both tiers** — an OS hotfix install and a
+local-app update each install and switch over cleanly from a single GUI
+click, no console access needed. Getting there fixed several real bugs
+surfaced along the way, none of them design changes: `os-updater.py` and
+`local_app_updater.py` both read update-availability from heartbeat.py's
+own up-to-5-minutes-stale background cache rather than the fresh result a
+"Check for Update" click had just produced, so "Update Now" could
+silently no-op right after finding a release; the app-tier updater
+demanded exact string equality between the server's plain version tag and
+a release tarball's own git-hash-suffixed `VERSION` content (`package.sh`
+always adds the suffix), so no release its own tooling built could ever
+pass; its extraction step didn't reapply `go+rX` the way
+`local-app-seed.py`'s already did, so a release built with a restrictive
+umask could extract unreadable to nginx; and the two tiers' shared
+lock file and `/data/local-app` directory permissions were never
+reconciled for both a root-run process and an unprivileged one writing to
+them. **Still stubs:** Tier 1's tryboot/health-check/rollback path remains
 verified only for the happy path on real hardware — the forced-bad-health
 → automatic-rollback case is still unverified (see that section's open
 questions).
