@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Entity;
+use App\Models\Language;
 use App\Models\SlideAnnouncer;
 use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerPairingCode;
@@ -38,6 +39,7 @@ class EntitySlideAnnouncerController extends Controller
                 'expires_at' => $pairingCode->expires_at->toIso8601String(),
             ] : null,
             'diskImages' => $this->diskImages(),
+            'languages' => Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']),
         ]);
     }
 
@@ -120,6 +122,7 @@ class EntitySlideAnnouncerController extends Controller
             'entity' => ['id' => $entity->id, 'name' => $entity->name],
             'device' => $this->deviceResource($slideAnnouncer),
             'heartbeats' => $heartbeats,
+            'languages' => Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']),
         ]);
     }
 
@@ -146,6 +149,7 @@ class EntitySlideAnnouncerController extends Controller
 
         $data = $request->validate([
             'name' => 'sometimes|string|max:255',
+            'language_id' => 'sometimes|nullable|exists:languages,id',
             'update_channel' => 'sometimes|in:stable,testing,developer',
             'auto_update_enabled' => 'sometimes|boolean',
             'settings' => 'sometimes|array',
@@ -186,6 +190,7 @@ class EntitySlideAnnouncerController extends Controller
         return [
             'id' => $device->id,
             'name' => $device->name,
+            'language_id' => $device->language_id,
             'mac_address' => $device->mac_address,
             'device_uuid' => $device->device_uuid,
             'app_version' => $device->app_version,

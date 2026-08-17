@@ -66,6 +66,11 @@ class SlideAnnouncerHeartbeatController extends Controller
             // moving to a different entity via re-pair, which changes
             // entity_id without touching device_name at all.
             'entity_name' => $device->entity->name,
+            // Null until an entity admin assigns one (EntitySlideAnnouncerController::update),
+            // in which case the device keeps using its own boot-yaml
+            // default — see local-app/backend/pairing.py's
+            // read_effective_language() and slideannouncer/LOCALIZATION_TODO.md.
+            'language' => $device->language?->abbreviation,
             'latest_app_version' => $activeAppRelease?->version,
             'app_update_available' => $appUpdateAvailable,
             'app_download_url' => $appUpdateAvailable ? $activeAppRelease->url() : null,

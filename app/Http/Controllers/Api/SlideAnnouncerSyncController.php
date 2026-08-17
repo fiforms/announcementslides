@@ -20,6 +20,7 @@ class SlideAnnouncerSyncController extends Controller
 
         $slides = Slide::where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $device->entity_id))
             ->current()
+            ->language($device->language_id)
             ->orderBy('sort_order')
             ->get()
             ->map(fn (Slide $slide) => [

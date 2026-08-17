@@ -11,6 +11,7 @@ class SlideAnnouncer extends Model
 
     protected $fillable = [
         'entity_id',
+        'language_id',
         'name',
         'mac_address',
         'device_uuid',
@@ -39,6 +40,11 @@ class SlideAnnouncer extends Model
     public function entity()
     {
         return $this->belongsTo(Entity::class);
+    }
+
+    public function language()
+    {
+        return $this->belongsTo(Language::class);
     }
 
     public function pairedBy()

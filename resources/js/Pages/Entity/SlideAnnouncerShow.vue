@@ -7,6 +7,7 @@ const props = defineProps({
     entity: { type: Object, required: true },
     device: { type: Object, required: true },
     heartbeats: { type: Array, default: () => [] },
+    languages: { type: Array, default: () => [] },
 });
 
 // interval_seconds also lives in the same `settings` JSON blob the raw
@@ -18,6 +19,7 @@ const { interval_seconds, settings_pin, ...otherSettings } = props.device.settin
 
 const form = useForm({
     name: props.device.name,
+    language_id: props.device.language_id ?? '',
     update_channel: props.device.update_channel,
     auto_update_enabled: props.device.auto_update_enabled,
     interval_seconds: interval_seconds ?? 10,
@@ -54,6 +56,7 @@ function submit() {
 
     form.transform((data) => ({
         name: data.name,
+        language_id: data.language_id || null,
         update_channel: data.update_channel,
         auto_update_enabled: data.auto_update_enabled,
         settings: {
@@ -149,6 +152,20 @@ function formatDate(iso) {
                     <input v-model="form.name" type="text" required
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     <p v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Language</label>
+                    <select v-model="form.language_id"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">Use the device's own default</option>
+                        <option v-for="lang in languages" :key="lang.id" :value="lang.id">{{ lang.name }}</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Filters which language-specific slides sync to this device, and sets its on-screen UI language.
+                        Leave unset to fall back to the language configured on the device itself before pairing.
+                    </p>
+                    <p v-if="form.errors.language_id" class="mt-1 text-xs text-red-600">{{ form.errors.language_id }}</p>
                 </div>
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
