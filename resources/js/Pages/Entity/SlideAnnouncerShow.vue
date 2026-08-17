@@ -12,14 +12,16 @@ const props = defineProps({
 // interval_seconds also lives in the same `settings` JSON blob the raw
 // textarea edits (Slideshow.vue's DEFAULT_INTERVAL_SECONDS is 10) — pulled
 // out into its own field since "how fast do slides switch" is common enough
-// to deserve a real control instead of hand-editing JSON.
-const { interval_seconds, ...otherSettings } = props.device.settings ?? {};
+// to deserve a real control instead of hand-editing JSON. settings_pin is
+// the on-device Settings PIN gate (4-6 digits, optional) — same treatment.
+const { interval_seconds, settings_pin, ...otherSettings } = props.device.settings ?? {};
 
 const form = useForm({
     name: props.device.name,
     update_channel: props.device.update_channel,
     auto_update_enabled: props.device.auto_update_enabled,
     interval_seconds: interval_seconds ?? 10,
+    settings_pin: settings_pin ?? '',
     settings_text: JSON.stringify(otherSettings, null, 2),
 });
 
@@ -34,6 +36,8 @@ const jsonValid = computed(() => {
     }
 });
 
+const pinValid = computed(() => /^\d{4,6}$/.test(form.settings_pin) || form.settings_pin === '');
+
 function submit() {
     settingsError.value = '';
     let settings;
@@ -43,12 +47,20 @@ function submit() {
         settingsError.value = `Settings must be valid JSON: ${e.message}`;
         return;
     }
+    if (!pinValid.value) {
+        settingsError.value = 'Settings PIN must be 4-6 digits, or blank to disable.';
+        return;
+    }
 
     form.transform((data) => ({
         name: data.name,
         update_channel: data.update_channel,
         auto_update_enabled: data.auto_update_enabled,
-        settings: { ...settings, interval_seconds: Number(data.interval_seconds) },
+        settings: {
+            ...settings,
+            interval_seconds: Number(data.interval_seconds),
+            settings_pin: data.settings_pin || null,
+        },
     })).patch(route('entity.slide-announcers.update', { entity: props.entity.id, slideAnnouncer: props.device.id }));
 }
 
@@ -167,6 +179,17 @@ function formatDate(iso) {
                 </div>
 
                 <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Settings PIN <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input v-model="form.settings_pin" type="text" inputmode="numeric" maxlength="6" placeholder="Off"
+                        class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        :class="{ 'border-red-400': !pinValid }" />
+                    <p class="mt-1 text-xs text-gray-500">
+                        4-6 digits. When set, opening Settings on the device requires this PIN first (leave blank to disable).
+                    </p>
+                    <p v-if="!pinValid" class="mt-1 text-xs text-red-600">Must be 4-6 digits, or blank.</p>
+                </div>
+
+                <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">
                         Custom settings <span class="text-gray-400 font-normal">(JSON — sent to the device with every slide sync)</span>
                     </label>
@@ -179,7 +202,7 @@ function formatDate(iso) {
                 </div>
 
                 <div class="flex items-center gap-3 pt-2">
-                    <button type="submit" :disabled="form.processing || !jsonValid"
+                    <button type="submit" :disabled="form.processing || !jsonValid || !pinValid"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
                         {{ form.processing ? 'Saving…' : 'Save Changes' }}
                     </button>

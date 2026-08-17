@@ -999,6 +999,26 @@ needing separate cases for each:
   Once pairing exists, "Unpair this device" should probably stay a
   separate, lighter action from this — it doesn't need to take WiFi down
   with it.
+- **Settings PIN (optional, low-effort deterrent, not real access
+  control)**: an entity leader can set a 4-6 digit PIN on
+  `Entity/SlideAnnouncerShow.vue`, stored in the same per-device `settings`
+  JSON blob `interval_seconds` already lives in (`settings_pin` key) — no
+  new backend endpoint, it rides the existing sync endpoint down to the
+  device just like every other setting. Frontend (`local-app/frontend`):
+  a `router.beforeEach` guard in `router.js` checks `settings_pin` (via the
+  same `/api/local/slideshow` response the kiosk already polls) whenever
+  navigation enters `/settings` from outside it, and — if a PIN is set and
+  this in-memory session (`pinLock.js`) hasn't already cleared it —
+  redirects to a full-screen `/pin-lock` route (`PinGate.vue`) instead.
+  Entering the correct PIN unlocks the session and continues to the
+  originally-requested settings screen; getting it wrong just clears the
+  attempt. Failing to enter it within 15 seconds of the gate appearing
+  bounces back to `/kiosk` — the countdown doesn't reset per attempt.
+  Leaving the `/settings` section back out to the kiosk re-locks the
+  session, so the PIN is required again next time. Deliberately no backend
+  validation, hashing, or rate-limiting — this is meant only to stop
+  someone with the remote from casually opening settings, not to resist a
+  determined attacker with the PIN unknown to them but console access.
 
 ### Cross-tier update safety
 No tier blocks another — local-app updates and slide sync both continue
