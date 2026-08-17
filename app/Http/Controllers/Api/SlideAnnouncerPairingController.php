@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Language;
 use App\Models\SlideAnnouncer;
 use App\Models\SlideAnnouncerPairingCode;
 use Illuminate\Http\Request;
@@ -25,6 +26,10 @@ class SlideAnnouncerPairingController extends Controller
             'device_name' => 'required|string|max:255',
             'mac_address' => 'nullable|string|max:255',
             'device_uuid' => 'nullable|string|max:255',
+            // Boot-yaml language hint (see slideannouncer's pairing.py) —
+            // only ever used to seed language_id when it isn't already set,
+            // never to override an entity admin's explicit choice.
+            'language' => 'nullable|string|max:10',
         ]);
 
         // Backoff-style hit counter on top of the route's throttle:10,1 —
@@ -44,7 +49,11 @@ class SlideAnnouncerPairingController extends Controller
             abort(422, 'Invalid or expired pairing code.');
         }
 
-        [$device, $token] = DB::transaction(function () use ($pairingCode, $data) {
+        $hintedLanguageId = ! empty($data['language'])
+            ? Language::where('abbreviation', $data['language'])->value('id')
+            : null;
+
+        [$device, $token] = DB::transaction(function () use ($pairingCode, $data, $hintedLanguageId) {
             // Re-pairing: a device_uuid already on file means this is the
             // same physical device moving sites (or re-pairing after an
             // unpair/revoke), not a new fleet entry — see SLIDE_ANNOUNCER.md
@@ -64,6 +73,10 @@ class SlideAnnouncerPairingController extends Controller
                     'paired_at' => now(),
                     'paired_by' => $pairingCode->created_by,
                     'revoked_at' => null,
+                    // Only seed from the device's boot-yaml hint if no one
+                    // has already assigned this device a language — an
+                    // entity admin's explicit choice always wins.
+                    'language_id' => $device->language_id ?? $hintedLanguageId,
                 ]);
             } else {
                 $device = SlideAnnouncer::create([
@@ -74,6 +87,7 @@ class SlideAnnouncerPairingController extends Controller
                     'last_ip' => request()->ip(),
                     'paired_at' => now(),
                     'paired_by' => $pairingCode->created_by,
+                    'language_id' => $hintedLanguageId,
                 ]);
             }
 

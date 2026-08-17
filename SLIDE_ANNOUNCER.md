@@ -286,10 +286,14 @@ already soft-deletes.
   - `DELETE /entity/{entity}/slide-announcers/{slideAnnouncer}` —
     revoke/unpair.
 - **Device side** (public, unauthenticated, `routes/api.php`):
-  - `POST /api/slide-announcers/pair {code, device_name, mac_address?, device_uuid?}`
+  - `POST /api/slide-announcers/pair {code, device_name, mac_address?, device_uuid?, language?}`
     — validates the code (unused, unexpired), creates `SlideAnnouncer`
     (storing `mac_address`/`device_uuid` as sent), issues a Sanctum token
-    (`abilities: ['slide-announcer']`), returns it once. Generic error on
+    (`abilities: ['slide-announcer']`), returns it once. `language` is the
+    device's boot-yaml hint (its abbreviation, e.g. `en`); resolved to a
+    `Language` and seeded onto `language_id` only if the device doesn't
+    already have one assigned, so a re-pair never overwrites an entity
+    admin's explicit choice. Generic error on
     bad/expired code (don't leak which). Rate-limited (`throttle:10,1` per
     IP, consistent with `routes/auth.php`'s existing pattern) plus a
     backoff-style `Cache`-backed hit counter (>20 attempts per IP in 10
