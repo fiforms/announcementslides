@@ -2,6 +2,7 @@
 import { useForm, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
+import MediaManager from '@/Components/MediaManager.vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
@@ -9,6 +10,7 @@ const { t } = useI18n();
 const props = defineProps({
     slide: { type: Object, required: true },
     languages: { type: Array, default: () => [] },
+    mediaTypes: { type: Array, default: () => [] },
 });
 
 function toLocalDatetime(iso) {
@@ -17,14 +19,16 @@ function toLocalDatetime(iso) {
 }
 
 const form = useForm({
-    title:       props.slide.title,
-    notes:       props.slide.notes ?? '',
-    language_id: props.slide.language_id ?? '',
-    publish_at:  toLocalDatetime(props.slide.publish_at),
-    expires_at:  toLocalDatetime(props.slide.expires_at),
-    status:      props.slide.status,
-    sort_order:  props.slide.sort_order,
-    share_nearby: props.slide.share_nearby ?? false,
+    title:            props.slide.title,
+    notes:            props.slide.notes ?? '',
+    text_description: props.slide.text_description ?? '',
+    link:             props.slide.link ?? '',
+    language_id:      props.slide.language_id ?? '',
+    publish_at:       toLocalDatetime(props.slide.publish_at),
+    expires_at:       toLocalDatetime(props.slide.expires_at),
+    status:           props.slide.status,
+    sort_order:       props.slide.sort_order,
+    share_nearby:     props.slide.share_nearby ?? false,
 });
 
 function submit() {
@@ -71,6 +75,19 @@ function submit() {
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.notes') }}</label>
                     <textarea v-model="form.notes" rows="3"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <textarea v-model="form.text_description" rows="3"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input v-model="form.link" type="url" placeholder="https://…"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    <p v-if="form.errors.link" class="mt-1 text-xs text-red-600">{{ form.errors.link }}</p>
                 </div>
 
                 <div>
@@ -136,6 +153,11 @@ function submit() {
                     </Link>
                 </div>
             </form>
+
+            <div class="mt-6">
+                <MediaManager :slide="slide" :media-types="mediaTypes"
+                    store-route="admin.slides.media.store" destroy-route="admin.slides.media.destroy" />
+            </div>
         </div>
     </AdminLayout>
 </template>

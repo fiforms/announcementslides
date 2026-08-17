@@ -52,6 +52,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::get('/{slide}/edit', [MySlideController::class, 'edit'])->name('edit');
         Route::patch('/{slide}', [MySlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [MySlideController::class, 'archive'])->name('archive');
+        Route::post('/{slide}/media', [MySlideController::class, 'storeMedia'])->name('media.store');
+        Route::delete('/{slide}/media/{media}', [MySlideController::class, 'destroyMedia'])->name('media.destroy');
     });
 
     // ── Entity member: entity-scoped slide management (local slides) ────────
@@ -64,6 +66,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{slide}/share-nearby', [LocalSlideController::class, 'shareNearby'])->name('share-nearby');
         Route::post('/{slide}/unshare-nearby', [LocalSlideController::class, 'unshareNearby'])->name('unshare-nearby');
         Route::post('/reorder', [LocalSlideController::class, 'reorder'])->name('reorder');
+        Route::post('/{slide}/media', [LocalSlideController::class, 'storeMedia'])->name('media.store');
+        Route::delete('/{slide}/media/{media}', [LocalSlideController::class, 'destroyMedia'])->name('media.destroy');
     });
 
     // ── Entity leader: entity-scoped slide management ──────────────────────
@@ -72,6 +76,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::get('/{slide}/edit', [EntitySlideController::class, 'edit'])->name('edit');
         Route::patch('/{slide}', [EntitySlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [EntitySlideController::class, 'archive'])->name('archive');
+        Route::post('/{slide}/media', [EntitySlideController::class, 'storeMedia'])->name('media.store');
+        Route::delete('/{slide}/media/{media}', [EntitySlideController::class, 'destroyMedia'])->name('media.destroy');
     });
 
     // ── Entity leader: paired Slide Announcer devices ───────────────────────
@@ -101,6 +107,8 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/slides/{slide}/archive', [AdminSlideController::class, 'archive'])->name('slides.archive');
     Route::post('/slides/{slide}/unarchive', [AdminSlideController::class, 'unarchive'])->name('slides.unarchive');
     Route::post('/slides/reorder', [AdminSlideController::class, 'reorder'])->name('slides.reorder');
+    Route::post('/slides/{slide}/media', [AdminSlideController::class, 'storeMedia'])->name('slides.media.store');
+    Route::delete('/slides/{slide}/media/{media}', [AdminSlideController::class, 'destroyMedia'])->name('slides.media.destroy');
 
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
     Route::patch('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');

@@ -2,14 +2,18 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Models\Language;
 use App\Models\Slide;
+use App\Models\SlideMedia;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class MySlideController extends Controller
 {
+    use ManagesSlideMedia;
+
     public function index(Request $request): Response
     {
         // Group by effective status (published → draft → archived), then fall back
@@ -24,7 +28,7 @@ class MySlideController extends Controller
             'archived'  => 5,
         ];
 
-        $slides = Slide::with('entity')
+        $slides = Slide::with(['entity', 'primaryMedia'])
             ->where('uploaded_by', $request->user()->id)
             ->whereNull('entity_id')
             ->get()
@@ -46,13 +50,15 @@ class MySlideController extends Controller
     public function edit(Request $request, Slide $slide): Response
     {
         $this->authorizeOwnership($request, $slide);
+        $slide->load('media');
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
         return Inertia::render('MySlides/Edit', [
-            'slide' => $this->slideResource($slide),
+            'slide' => $this->slideResource($slide, withMedia: true),
             'languages' => $languages,
             'canSetStatus' => $request->user()->isContributor(),
+            'mediaTypes' => $this->mediaTypesForFrontend(),
         ]);
     }
 
@@ -61,15 +67,17 @@ class MySlideController extends Controller
         $this->authorizeOwnership($request, $slide);
 
         $request->validate([
-            'title'       => 'required|string|max:255',
-            'notes'       => 'nullable|string',
-            'language_id' => 'nullable|integer|exists:languages,id',
-            'publish_at'  => 'nullable|date',
-            'expires_at'  => 'nullable|date|after_or_equal:publish_at',
-            'status'      => 'nullable|in:draft,pending,published',
+            'title'            => 'required|string|max:255',
+            'notes'            => 'nullable|string',
+            'text_description' => 'nullable|string',
+            'link'             => 'nullable|url|max:2048',
+            'language_id'      => 'nullable|integer|exists:languages,id',
+            'publish_at'       => 'nullable|date',
+            'expires_at'       => 'nullable|date|after_or_equal:publish_at',
+            'status'           => 'nullable|in:draft,pending,published',
         ]);
 
-        $fields = $request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at');
+        $fields = $request->only('title', 'notes', 'text_description', 'link', 'language_id', 'publish_at', 'expires_at');
 
         // Only contributors may change the workflow status of their slide.
         if ($request->filled('status') && $request->user()->isContributor()) {
@@ -90,6 +98,22 @@ class MySlideController extends Controller
         return back()->with('success', 'Slide archived.');
     }
 
+    public function storeMedia(Request $request, Slide $slide)
+    {
+        $this->authorizeOwnership($request, $slide);
+        $this->storeMediaForSlide($request, $slide);
+
+        return back()->with('success', 'Media added.');
+    }
+
+    public function destroyMedia(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeOwnership($request, $slide);
+        $this->destroyMediaForSlide($slide, $media);
+
+        return back()->with('success', 'Media removed.');
+    }
+
     private function authorizeOwnership(Request $request, Slide $slide): void
     {
         // Ownership alone is not enough: a user demoted to "viewer" may still own
@@ -103,12 +127,14 @@ class MySlideController extends Controller
         );
     }
 
-    private function slideResource(Slide $slide): array
+    private function slideResource(Slide $slide, bool $withMedia = false): array
     {
         return [
             'id'                => $slide->id,
             'title'             => $slide->title,
             'notes'             => $slide->notes,
+            'text_description'  => $slide->text_description,
+            'link'              => $slide->link,
             'language_id'       => $slide->language_id,
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
@@ -122,6 +148,7 @@ class MySlideController extends Controller
             'validation_issues' => $slide->validation_issues,
             'validation_status' => $slide->validation_status,
             'created_at'        => $slide->created_at->toIso8601String(),
+            'media'             => $withMedia ? $this->mediaResource($slide) : null,
         ];
     }
 }

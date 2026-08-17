@@ -25,6 +25,8 @@ const filePreviews  = ref([]);
 const fileValidations = ref([]);
 const title         = ref('');
 const notes         = ref('');
+const textDescription = ref('');
+const link          = ref('');
 const languageId    = ref('');
 const publishAt     = ref('');
 const expiresAt     = ref('');
@@ -63,11 +65,13 @@ async function submit() {
     if (!canSubmit.value) return;
 
     const payload = {
-        title:       title.value,
-        notes:       notes.value,
-        language_id: languageId.value || null,
-        publish_at:  publishAt.value || null,
-        expires_at:  expiresAt.value || null,
+        title:             title.value,
+        notes:             notes.value,
+        text_description:  textDescription.value,
+        link:              link.value || null,
+        language_id:       languageId.value || null,
+        publish_at:        publishAt.value || null,
+        expires_at:        expiresAt.value || null,
     };
 
     if (props.showStatusSelect) {
@@ -88,6 +92,8 @@ async function submit() {
                 filePreviews.value  = [];
                 title.value         = '';
                 notes.value         = '';
+                textDescription.value = '';
+                link.value          = '';
                 languageId.value    = '';
                 publishAt.value     = '';
                 expiresAt.value     = '';
@@ -171,6 +177,19 @@ async function submit() {
                     <textarea v-model="notes" rows="2"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         placeholder="Optional context for administrators…" />
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <textarea v-model="textDescription" rows="2"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                        placeholder="Shown alongside the slide, e.g. event details…" />
+                </div>
+
+                <div class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input v-model="link" type="url" placeholder="https://…"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                 </div>
 
                 <div class="sm:col-span-2">

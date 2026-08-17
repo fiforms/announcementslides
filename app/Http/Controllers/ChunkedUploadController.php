@@ -12,19 +12,18 @@ use Illuminate\Validation\Rule;
 
 class ChunkedUploadController extends Controller
 {
-    private const ALLOWED_MIME_TYPES = [
-        'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-        'video/mp4', 'video/quicktime', 'video/webm',
-    ];
-
     public function chunk(Request $request)
     {
+        $mediaType = $request->input('media_type', 'slide');
+        $allowedMimes = config("slides.media_types.{$mediaType}.mimes", []);
+
         $request->validate([
             'upload_id'    => ['required', 'string', 'regex:/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/'],
             'chunk_index'  => 'required|integer|min:0|max:9999',
             'total_chunks' => 'required|integer|min:1|max:10000',
             'filename'     => 'required|string|max:255',
-            'mime_type'    => ['required', 'string', Rule::in(self::ALLOWED_MIME_TYPES)],
+            'media_type'   => ['nullable', 'string', Rule::in(array_keys(config('slides.media_types')))],
+            'mime_type'    => ['required', 'string', Rule::in($allowedMimes)],
             'chunk'        => 'required|file',
         ]);
 
@@ -83,9 +82,11 @@ class ChunkedUploadController extends Controller
             'uploads.*.disk_path'         => ['required', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.[a-z0-9]+$/'],
             'uploads.*.original_filename' => 'required|string|max:255',
             'uploads.*.file_size'         => 'required|integer|min:0',
-            'uploads.*.mime_type'         => ['required', 'string', Rule::in(self::ALLOWED_MIME_TYPES)],
+            'uploads.*.mime_type'         => ['required', 'string', Rule::in(config('slides.media_types.slide.mimes'))],
             'title'                       => 'required|string|max:255',
             'notes'                       => 'nullable|string',
+            'text_description'            => 'nullable|string',
+            'link'                        => 'nullable|url|max:2048',
             'language_id'                 => 'nullable|integer|exists:languages,id',
             'publish_at'                  => 'nullable|date',
             'expires_at'                  => 'nullable|date|after_or_equal:publish_at',
@@ -166,15 +167,8 @@ class ChunkedUploadController extends Controller
             $slide = Slide::create([
                 'title'             => $request->title,
                 'notes'             => $request->notes,
-                'filename'          => $upload['filename'],
-                'original_filename' => $upload['original_filename'],
-                'disk_path'         => $upload['disk_path'],
-                'file_size'         => $upload['file_size'],
-                'mime_type'         => $upload['mime_type'],
-                'image_width'       => $validation['width'],
-                'image_height'      => $validation['height'],
-                'validation_issues' => $validation['issues'],
-                'validation_status' => $validation['status'],
+                'text_description'  => $request->text_description,
+                'link'              => $request->link,
                 'publish_at'        => $request->publish_at,
                 'expires_at'        => $request->expires_at,
                 'status'            => $status,
@@ -184,7 +178,20 @@ class ChunkedUploadController extends Controller
                 'share_nearby'      => $shareNearby,
             ]);
 
-            GenerateThumbnail::dispatch($slide);
+            $media = $slide->media()->create([
+                'media_type'        => 'slide',
+                'filename'          => $upload['filename'],
+                'original_filename' => $upload['original_filename'],
+                'disk_path'         => $upload['disk_path'],
+                'file_size'         => $upload['file_size'],
+                'mime_type'         => $upload['mime_type'],
+                'image_width'       => $validation['width'],
+                'image_height'      => $validation['height'],
+                'validation_issues' => $validation['issues'],
+                'validation_status' => $validation['status'],
+            ]);
+
+            GenerateThumbnail::dispatch($media);
             $slides[] = $slide;
         }
 

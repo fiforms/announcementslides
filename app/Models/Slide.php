@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Illuminate\Support\Facades\Storage;
 use App\Models\Entity;
 use App\Models\User;
 
@@ -14,10 +13,9 @@ class Slide extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'title', 'notes', 'filename', 'original_filename', 'disk_path',
-        'file_size', 'mime_type', 'thumbnail_path', 'publish_at', 'expires_at',
+        'title', 'notes', 'text_description', 'link', 'publish_at', 'expires_at',
         'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
-        'image_width', 'image_height', 'validation_issues', 'validation_status', 'share_nearby',
+        'share_nearby',
     ];
 
     protected function casts(): array
@@ -26,11 +24,7 @@ class Slide extends Model
             'publish_at'  => 'datetime',
             'expires_at'  => 'datetime',
             'reviewed_at' => 'datetime',
-            'file_size'   => 'integer',
             'sort_order'  => 'integer',
-            'image_width' => 'integer',
-            'image_height' => 'integer',
-            'validation_issues' => 'array',
             'share_nearby' => 'boolean',
         ];
     }
@@ -55,6 +49,21 @@ class Slide extends Model
     public function language()
     {
         return $this->belongsTo(\App\Models\Language::class);
+    }
+
+    public function media()
+    {
+        return $this->hasMany(SlideMedia::class);
+    }
+
+    /**
+     * The slide's primary ('slide' type) media row. Every Slide has exactly
+     * one, seeded at creation time; this is what the file_url/thumbnail_url/
+     * mime_type/etc. proxy accessors below resolve against.
+     */
+    public function primaryMedia()
+    {
+        return $this->hasOne(SlideMedia::class)->where('media_type', 'slide')->oldest('sort_order');
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
@@ -119,14 +128,45 @@ class Slide extends Model
 
     // ── Accessors ─────────────────────────────────────────────────────────────
 
-    public function getFileUrlAttribute(): string
+    /**
+     * Back-compat proxies onto the primary ('slide') media row, so existing
+     * views/controllers built around "one file per slide" keep working
+     * unchanged now that files live on slide_media. Callers that list many
+     * slides should eager-load 'primaryMedia' to avoid N+1s.
+     */
+    public function getFileUrlAttribute(): ?string
     {
-        return Storage::disk('public')->url($this->disk_path);
+        return $this->primaryMedia?->file_url;
     }
 
     public function getThumbnailUrlAttribute(): ?string
     {
-        return $this->thumbnail_path ? Storage::disk('public')->url($this->thumbnail_path) : null;
+        return $this->primaryMedia?->thumbnail_url;
+    }
+
+    public function getMimeTypeAttribute(): ?string
+    {
+        return $this->primaryMedia?->mime_type;
+    }
+
+    public function getOriginalFilenameAttribute(): ?string
+    {
+        return $this->primaryMedia?->original_filename;
+    }
+
+    public function getFileSizeAttribute(): ?int
+    {
+        return $this->primaryMedia?->file_size;
+    }
+
+    public function getValidationIssuesAttribute(): ?array
+    {
+        return $this->primaryMedia?->validation_issues;
+    }
+
+    public function getValidationStatusAttribute(): ?string
+    {
+        return $this->primaryMedia?->validation_status;
     }
 
     /**
@@ -153,11 +193,11 @@ class Slide extends Model
 
     public function isImage(): bool
     {
-        return str_starts_with($this->mime_type, 'image/');
+        return (bool) $this->primaryMedia?->isImage();
     }
 
     public function isVideo(): bool
     {
-        return str_starts_with($this->mime_type, 'video/');
+        return (bool) $this->primaryMedia?->isVideo();
     }
 }

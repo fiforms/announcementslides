@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Models\Entity;
 use App\Models\Language;
 use App\Models\Slide;
+use App\Models\SlideMedia;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class LocalSlideController extends Controller
 {
+    use ManagesSlideMedia;
+
     public function index(Request $request): Response
     {
         $user = $request->user();
@@ -24,7 +28,7 @@ class LocalSlideController extends Controller
         $entity = Entity::findOrFail($entityId);
         $isAdmin = $user->isAdmin() || $user->isEntityAdmin($entityId);
 
-        $slides = Slide::with('uploader')
+        $slides = Slide::with(['uploader', 'primaryMedia'])
             ->entityScoped($entityId)
             ->orderBy('sort_order')
             ->orderByDesc('created_at')
@@ -55,12 +59,14 @@ class LocalSlideController extends Controller
         abort_unless($slide->entity_id === $entityId, 404);
 
         $entity = Entity::findOrFail($entityId);
+        $slide->load('media');
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
         return Inertia::render('LocalSlides/Edit', [
             'entity'  => ['id' => $entity->id, 'name' => $entity->name],
-            'slide'   => $this->slideResource($slide),
+            'slide'   => $this->slideResource($slide, withMedia: true),
             'languages' => $languages,
+            'mediaTypes' => $this->mediaTypesForFrontend(),
         ]);
     }
 
@@ -78,16 +84,34 @@ class LocalSlideController extends Controller
         abort_unless($slide->entity_id === $entityId, 404);
 
         $request->validate([
-            'title'       => 'required|string|max:255',
-            'notes'       => 'nullable|string',
-            'language_id' => 'nullable|integer|exists:languages,id',
-            'publish_at'  => 'nullable|date',
-            'expires_at'  => 'nullable|date|after_or_equal:publish_at',
+            'title'            => 'required|string|max:255',
+            'notes'            => 'nullable|string',
+            'text_description' => 'nullable|string',
+            'link'             => 'nullable|url|max:2048',
+            'language_id'      => 'nullable|integer|exists:languages,id',
+            'publish_at'       => 'nullable|date',
+            'expires_at'       => 'nullable|date|after_or_equal:publish_at',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'language_id', 'publish_at', 'expires_at'));
+        $slide->update($request->only('title', 'notes', 'text_description', 'link', 'language_id', 'publish_at', 'expires_at'));
 
         return redirect()->route('local-slides.index', ['entity_id' => $entityId])->with('success', 'Slide updated.');
+    }
+
+    public function storeMedia(Request $request, Slide $slide)
+    {
+        $entityId = $this->authorizeSlideAction($request, $slide);
+        $this->storeMediaForSlide($request, $slide);
+
+        return back()->with('success', 'Media added.');
+    }
+
+    public function destroyMedia(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeSlideAction($request, $slide);
+        $this->destroyMediaForSlide($slide, $media);
+
+        return back()->with('success', 'Media removed.');
     }
 
     public function archive(Request $request, Slide $slide)
@@ -201,12 +225,14 @@ class LocalSlideController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function slideResource(Slide $slide): array
+    private function slideResource(Slide $slide, bool $withMedia = false): array
     {
         return [
             'id'                => $slide->id,
             'title'             => $slide->title,
             'notes'             => $slide->notes,
+            'text_description'  => $slide->text_description,
+            'link'              => $slide->link,
             'language_id'       => $slide->language_id,
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
@@ -222,6 +248,7 @@ class LocalSlideController extends Controller
             'validation_status' => $slide->validation_status,
             'uploader'          => $slide->uploader?->only('id', 'name'),
             'created_at'        => $slide->created_at->toIso8601String(),
+            'media'             => $withMedia ? $this->mediaResource($slide) : null,
         ];
     }
 }

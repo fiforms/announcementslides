@@ -11,6 +11,8 @@ const selectedFiles = ref([]);
 const filePreviews  = ref([]);
 const title         = ref('');
 const notes         = ref('');
+const textDescription = ref('');
+const link          = ref('');
 const languageId    = ref('');
 const submitted     = ref(false);
 
@@ -46,6 +48,8 @@ async function submit() {
     const result = await upload(selectedFiles.value, {
         title: title.value,
         notes: notes.value,
+        text_description: textDescription.value,
+        link: link.value || null,
         language_id: languageId.value || null,
     });
 
@@ -55,6 +59,8 @@ async function submit() {
         filePreviews.value  = [];
         title.value         = '';
         notes.value         = '';
+        textDescription.value = '';
+        link.value          = '';
         languageId.value    = '';
     }
 }
@@ -143,6 +149,19 @@ async function submit() {
                         <textarea v-model="notes" rows="3"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             placeholder="Explain what this slide is for, or when it should run…" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <textarea v-model="textDescription" rows="3"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="Shown alongside the slide, e.g. event details…" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <input v-model="link" type="url" placeholder="https://…"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     </div>
 
                     <div v-if="uploadError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">

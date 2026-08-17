@@ -2,7 +2,7 @@
 
 namespace App\Jobs;
 
-use App\Models\Slide;
+use App\Models\SlideMedia;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
@@ -11,27 +11,27 @@ class GenerateThumbnail implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public Slide $slide) {}
+    public function __construct(public SlideMedia $media) {}
 
     public function handle(): void
     {
         $disk = Storage::disk('public');
-        $sourcePath = $disk->path($this->slide->disk_path);
+        $sourcePath = $disk->path($this->media->disk_path);
 
         if (! file_exists($sourcePath)) {
             return;
         }
 
-        $thumbRelPath = 'thumbs/' . pathinfo($this->slide->filename, PATHINFO_FILENAME) . '.jpg';
+        $thumbRelPath = 'thumbs/' . pathinfo($this->media->filename, PATHINFO_FILENAME) . '.jpg';
         $thumbFullPath = $disk->path($thumbRelPath);
 
-        if ($this->slide->isImage()) {
+        if ($this->media->isImage()) {
             $this->generateImageThumbnail($sourcePath, $thumbFullPath);
         }
         // Video thumbnail via ffmpeg can be added here later
 
         if (file_exists($thumbFullPath)) {
-            $this->slide->update(['thumbnail_path' => $thumbRelPath]);
+            $this->media->update(['thumbnail_path' => $thumbRelPath]);
         }
     }
 

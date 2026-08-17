@@ -30,12 +30,14 @@ const filePreviews    = ref([]);
 const fileValidations = ref([]);
 
 const form = useForm({
-    title:       '',
-    notes:       '',
-    language_id: '',
-    publish_at:  '',
-    expires_at:  '',
-    status:      'published',
+    title:            '',
+    notes:            '',
+    text_description: '',
+    link:             '',
+    language_id:      '',
+    publish_at:       '',
+    expires_at:       '',
+    status:           'published',
 });
 
 // Chunked upload state
@@ -131,13 +133,15 @@ async function submitUpload() {
         }
 
         await window.axios.post(route('uploads.finalize'), {
-            uploads:     completedUploads,
-            title:       form.title,
-            notes:       form.notes,
-            language_id: form.language_id || null,
-            publish_at:  form.publish_at,
-            expires_at:  form.expires_at,
-            status:      form.status,
+            uploads:          completedUploads,
+            title:            form.title,
+            notes:            form.notes,
+            text_description: form.text_description,
+            link:             form.link || null,
+            language_id:      form.language_id || null,
+            publish_at:       form.publish_at,
+            expires_at:       form.expires_at,
+            status:           form.status,
         }, {
             headers: { 'X-CSRF-TOKEN': csrfToken() },
         });
@@ -395,6 +399,19 @@ function statusBadge(status) {
                         <textarea v-model="form.notes" rows="2"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             placeholder="Optional notes for your team…" />
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <textarea v-model="form.text_description" rows="2"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="Shown alongside the slide, e.g. event details…" />
+                    </div>
+
+                    <div class="sm:col-span-2">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <input v-model="form.link" type="url" placeholder="https://…"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     </div>
 
                     <div class="sm:col-span-2">

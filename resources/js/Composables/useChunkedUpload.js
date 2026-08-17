@@ -9,6 +9,11 @@ function csrfToken() {
 export function useChunkedUpload(options = {}) {
     const chunkRoute    = options.chunkRoute ?? 'uploads.chunk';
     const finalizeRoute = options.finalizeRoute ?? 'uploads.finalize';
+    // Overrides the default `{ uploads: [...], ...payload }` finalize body —
+    // used by callers finalizing against a single-file endpoint instead of
+    // the batch uploads.finalize route (see MediaManager.vue).
+    const buildFinalizePayload = options.buildFinalizePayload
+        ?? ((completedUploads, payload) => ({ uploads: completedUploads, ...payload }));
 
     const isUploading     = ref(false);
     const uploadError     = ref(null);
@@ -18,7 +23,7 @@ export function useChunkedUpload(options = {}) {
         return Math.round(fileProgress.value.reduce((sum, f) => sum + f.progress, 0) / fileProgress.value.length);
     });
 
-    async function uploadChunks(file, uploadId, onProgress) {
+    async function uploadChunks(file, uploadId, mediaType, onProgress) {
         const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
         let result = null;
 
@@ -31,6 +36,7 @@ export function useChunkedUpload(options = {}) {
             fd.append('chunk_index',  i);
             fd.append('total_chunks', totalChunks);
             fd.append('filename',     file.name);
+            fd.append('media_type',   mediaType);
             fd.append('mime_type',    file.type);
             fd.append('chunk',        chunk, `chunk_${i}`);
 
@@ -54,13 +60,14 @@ export function useChunkedUpload(options = {}) {
         fileProgress.value = files.map(f => ({ name: f.name, progress: 0, done: false }));
 
         const completedUploads = [];
+        const mediaType = payload?.media_type ?? 'slide';
 
         try {
             for (let fi = 0; fi < files.length; fi++) {
                 const file     = files[fi];
                 const uploadId = crypto.randomUUID();
 
-                const assembled = await uploadChunks(file, uploadId, (pct) => {
+                const assembled = await uploadChunks(file, uploadId, mediaType, (pct) => {
                     fileProgress.value[fi].progress = pct;
                 });
 
@@ -68,12 +75,11 @@ export function useChunkedUpload(options = {}) {
                 completedUploads.push(assembled);
             }
 
-            const { data } = await window.axios.post(route(finalizeRoute), {
-                uploads: completedUploads,
-                ...payload,
-            }, {
-                headers: { 'X-CSRF-TOKEN': csrfToken() },
-            });
+            const { data } = await window.axios.post(
+                route(finalizeRoute),
+                buildFinalizePayload(completedUploads, payload),
+                { headers: { 'X-CSRF-TOKEN': csrfToken() } },
+            );
 
             return data;
         } catch (err) {

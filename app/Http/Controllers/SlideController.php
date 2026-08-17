@@ -50,7 +50,7 @@ class SlideController extends Controller
             $nearbyIds = $home ? NearbyEntities::within($home, $radius) : [];
         }
 
-        $query = Slide::current()->language($languageId);
+        $query = Slide::with('primaryMedia')->current()->language($languageId);
 
         if ($entityId) {
             // Home entity's slides + global slides, plus opt-in shared slides from
@@ -103,7 +103,7 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $query = Slide::archived()->language($languageId);
+        $query = Slide::with('primaryMedia')->archived()->language($languageId);
 
         if ($entityId) {
             $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
@@ -137,7 +137,10 @@ class SlideController extends Controller
             404
         );
 
-        return Storage::download($slide->disk_path, $slide->original_filename);
+        $media = $slide->primaryMedia;
+        abort_unless($media, 404);
+
+        return Storage::download($media->disk_path, $media->original_filename);
     }
 
     public function downloadZip(Request $request)
@@ -151,7 +154,8 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $query = Slide::current()
+        $query = Slide::with('primaryMedia')
+            ->current()
             ->visibleToUser($request->user())
             ->language($languageId)
             ->orderByRaw('entity_id IS NOT NULL DESC')
@@ -176,9 +180,13 @@ class SlideController extends Controller
         }
 
         foreach ($slides as $slide) {
-            $fullPath = Storage::disk('public')->path($slide->disk_path);
+            $media = $slide->primaryMedia;
+            if (! $media) {
+                continue;
+            }
+            $fullPath = Storage::disk('public')->path($media->disk_path);
             if (file_exists($fullPath)) {
-                $zip->addFile($fullPath, $slide->original_filename);
+                $zip->addFile($fullPath, $media->original_filename);
             }
         }
 
@@ -200,7 +208,8 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $query = Slide::current()
+        $query = Slide::with('primaryMedia')
+            ->current()
             ->visibleToUser($request->user())
             ->language($languageId)
             ->orderByRaw('entity_id IS NOT NULL DESC')
@@ -226,7 +235,11 @@ class SlideController extends Controller
         $slideHeight = 1080;
 
         foreach ($slides as $slide) {
-            $fullPath = Storage::disk('public')->path($slide->disk_path);
+            $media = $slide->primaryMedia;
+            if (! $media) {
+                continue;
+            }
+            $fullPath = Storage::disk('public')->path($media->disk_path);
             if (file_exists($fullPath)) {
                 $newSlide = $presentation->createSlide();
 
@@ -273,6 +286,8 @@ class SlideController extends Controller
             'id'                => $slide->id,
             'title'             => $slide->title,
             'notes'             => $slide->notes,
+            'text_description'  => $slide->text_description,
+            'link'              => $slide->link,
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
             'thumbnail_url'     => $slide->thumbnail_url,
