@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
 const props = defineProps({
@@ -20,12 +20,16 @@ const slidesList = computed(() => {
     }
     return props.slide ? [props.slide] : [];
 });
-const interval = ref(null);
+const advanceTimer = ref(null);
 const slideshowInterval = ref(10000); // Default 10 seconds
 const controlsHideTimer = ref(null);
 const containerRef = ref(null);
 
 const currentSlide = computed(() => slidesList.value[currentIndex.value]);
+
+function isVideoSlide(slide) {
+    return !!slide?.mime_type?.startsWith('video/');
+}
 
 const getSlideshowInterval = () => {
     if (typeof window !== 'undefined' && localStorage) {
@@ -35,23 +39,55 @@ const getSlideshowInterval = () => {
     return 10000;
 };
 
-const startSlideshow = () => {
-    slideshowInterval.value = getSlideshowInterval();
-    if (interval.value) clearInterval(interval.value);
+const advanceSlide = () => {
+    currentIndex.value = (currentIndex.value + 1) % slidesList.value.length;
+};
 
-    interval.value = setInterval(() => {
-        if (!isPaused.value) {
-            currentIndex.value = (currentIndex.value + 1) % slidesList.value.length;
-        }
+// Per-slide scheduler: an image or a video in 'hold_last_frame'/'loop' mode
+// advances after the normal slide delay; a 'play_through' video advances
+// instead from its 'ended' event (see onVideoEnded) — no fixed delay races
+// it. Re-runs on every currentIndex change (including manual nav), so
+// switching slides always restarts the countdown for the new slide.
+const clearAdvanceTimer = () => {
+    if (advanceTimer.value) {
+        clearTimeout(advanceTimer.value);
+        advanceTimer.value = null;
+    }
+};
+
+const scheduleAdvance = () => {
+    clearAdvanceTimer();
+    if (isPaused.value) return;
+
+    const slide = currentSlide.value;
+    if (isVideoSlide(slide) && slide.video_playback_mode === 'play_through') {
+        return;
+    }
+
+    advanceTimer.value = setTimeout(() => {
+        if (!isPaused.value) advanceSlide();
     }, slideshowInterval.value);
 };
 
-const stopSlideshow = () => {
-    if (interval.value) {
-        clearInterval(interval.value);
-        interval.value = null;
+const onVideoEnded = () => {
+    const slide = currentSlide.value;
+    if (isVideoSlide(slide) && slide.video_playback_mode === 'play_through') {
+        advanceSlide();
     }
+    // hold_last_frame: no-op — the <video> (not looping) naturally freezes
+    // on its last frame until scheduleAdvance()'s timeout fires.
 };
+
+const startSlideshow = () => {
+    slideshowInterval.value = getSlideshowInterval();
+    scheduleAdvance();
+};
+
+const stopSlideshow = () => {
+    clearAdvanceTimer();
+};
+
+watch(currentIndex, () => scheduleAdvance());
 
 const nextSlide = () => {
     currentIndex.value = (currentIndex.value + 1) % slidesList.value.length;
@@ -63,6 +99,11 @@ const prevSlide = () => {
 
 const togglePause = () => {
     isPaused.value = !isPaused.value;
+    if (isPaused.value) {
+        clearAdvanceTimer();
+    } else {
+        scheduleAdvance();
+    }
 };
 
 const scheduleControlsHide = () => {
@@ -164,7 +205,19 @@ const handleShow = () => {
                     leave-to-class="opacity-0"
                     mode="out-in"
                 >
+                    <video
+                        v-if="isVideoSlide(currentSlide)"
+                        :key="currentIndex"
+                        :src="currentSlide.file_url"
+                        :loop="currentSlide.video_playback_mode === 'loop'"
+                        autoplay
+                        muted
+                        playsinline
+                        class="h-full w-full object-contain"
+                        @ended="onVideoEnded"
+                    />
                     <img
+                        v-else
                         :key="currentIndex"
                         :src="currentSlide.file_url"
                         :alt="currentSlide.title"

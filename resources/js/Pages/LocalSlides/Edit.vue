@@ -1,4 +1,5 @@
 <script setup>
+import { computed } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
@@ -16,14 +17,17 @@ function toLocalDatetime(iso) {
     return iso.slice(0, 16);
 }
 
+const isVideoSlide = computed(() => props.slide.mime_type?.startsWith('video/'));
+
 const form = useForm({
-    title:            props.slide.title,
-    notes:            props.slide.notes ?? '',
-    text_description: props.slide.text_description ?? '',
-    link:             props.slide.link ?? '',
-    language_id:      props.slide.language_id ?? '',
-    publish_at:       toLocalDatetime(props.slide.publish_at),
-    expires_at:       toLocalDatetime(props.slide.expires_at),
+    title:               props.slide.title,
+    notes:               props.slide.notes ?? '',
+    text_description:    props.slide.text_description ?? '',
+    link:                props.slide.link ?? '',
+    video_playback_mode: props.slide.video_playback_mode ?? 'hold_last_frame',
+    language_id:         props.slide.language_id ?? '',
+    publish_at:          toLocalDatetime(props.slide.publish_at),
+    expires_at:          toLocalDatetime(props.slide.expires_at),
 });
 
 function submit() {
@@ -70,6 +74,16 @@ function submit() {
                     <input v-model="form.link" type="url" placeholder="https://…"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     <p v-if="form.errors.link" class="mt-1 text-xs text-red-600">{{ form.errors.link }}</p>
+                </div>
+
+                <div v-if="isVideoSlide">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
+                    <select v-model="form.video_playback_mode"
+                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="play_through">Play through, then advance immediately</option>
+                        <option value="hold_last_frame">Hold last frame until slide delay</option>
+                        <option value="loop">Loop until slide delay</option>
+                    </select>
                 </div>
 
                 <div>

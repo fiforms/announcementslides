@@ -288,6 +288,7 @@ class SlideController extends Controller
             'notes'             => $slide->notes,
             'text_description'  => $slide->text_description,
             'link'              => $slide->link,
+            'video_playback_mode' => $slide->video_playback_mode,
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
             'thumbnail_url'     => $slide->thumbnail_url,

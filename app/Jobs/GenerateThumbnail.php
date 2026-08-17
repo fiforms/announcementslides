@@ -6,6 +6,7 @@ use App\Models\SlideMedia;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Storage;
+use Symfony\Component\Process\Process;
 
 class GenerateThumbnail implements ShouldQueue
 {
@@ -27,8 +28,9 @@ class GenerateThumbnail implements ShouldQueue
 
         if ($this->media->isImage()) {
             $this->generateImageThumbnail($sourcePath, $thumbFullPath);
+        } elseif ($this->media->isVideo()) {
+            $this->generateVideoThumbnail($sourcePath, $thumbFullPath);
         }
-        // Video thumbnail via ffmpeg can be added here later
 
         if (file_exists($thumbFullPath)) {
             $this->media->update(['thumbnail_path' => $thumbRelPath]);
@@ -64,5 +66,35 @@ class GenerateThumbnail implements ShouldQueue
         imagejpeg($thumb, $dest, 85);
         imagedestroy($thumb);
         imagedestroy($src);
+    }
+
+    private function generateVideoThumbnail(string $source, string $dest): void
+    {
+        $dir = dirname($dest);
+        if (! is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        // Grab a frame 1s in (skips a possible black opening frame); short
+        // clips under 1s fall back to the very first frame.
+        if (! $this->extractFrame($source, $dest, 1)) {
+            $this->extractFrame($source, $dest, 0);
+        }
+    }
+
+    private function extractFrame(string $source, string $dest, int $seekSeconds): bool
+    {
+        $process = new Process([
+            'ffmpeg', '-y',
+            '-ss', (string) $seekSeconds,
+            '-i', $source,
+            '-vframes', '1',
+            '-vf', 'scale=600:-2',
+            $dest,
+        ]);
+        $process->setTimeout(30);
+        $process->run();
+
+        return file_exists($dest);
     }
 }

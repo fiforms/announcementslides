@@ -13,7 +13,7 @@ class Slide extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'title', 'notes', 'text_description', 'link', 'publish_at', 'expires_at',
+        'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
         'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
         'share_nearby',
     ];

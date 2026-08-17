@@ -84,16 +84,17 @@ class LocalSlideController extends Controller
         abort_unless($slide->entity_id === $entityId, 404);
 
         $request->validate([
-            'title'            => 'required|string|max:255',
-            'notes'            => 'nullable|string',
-            'text_description' => 'nullable|string',
-            'link'             => 'nullable|url|max:2048',
-            'language_id'      => 'nullable|integer|exists:languages,id',
-            'publish_at'       => 'nullable|date',
-            'expires_at'       => 'nullable|date|after_or_equal:publish_at',
+            'title'               => 'required|string|max:255',
+            'notes'               => 'nullable|string',
+            'text_description'    => 'nullable|string',
+            'link'                => 'nullable|url|max:2048',
+            'video_playback_mode' => 'nullable|in:play_through,hold_last_frame,loop',
+            'language_id'         => 'nullable|integer|exists:languages,id',
+            'publish_at'          => 'nullable|date',
+            'expires_at'          => 'nullable|date|after_or_equal:publish_at',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'text_description', 'link', 'language_id', 'publish_at', 'expires_at'));
+        $slide->update($request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at'));
 
         return redirect()->route('local-slides.index', ['entity_id' => $entityId])->with('success', 'Slide updated.');
     }
@@ -233,6 +234,7 @@ class LocalSlideController extends Controller
             'notes'             => $slide->notes,
             'text_description'  => $slide->text_description,
             'link'              => $slide->link,
+            'video_playback_mode' => $slide->video_playback_mode,
             'language_id'       => $slide->language_id,
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
