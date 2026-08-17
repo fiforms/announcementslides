@@ -90,6 +90,11 @@ class SlideAnnouncerPairingController extends Controller
         return response()->json([
             'slide_announcer_id' => $device->id,
             'entity_id' => $device->entity_id,
+            // So the pairing screen can show which church/school this
+            // device just joined immediately, without waiting on the first
+            // heartbeat — see heartbeat's own entity_name for how a later
+            // move to a different entity (re-pair) keeps this in sync.
+            'entity_name' => $device->entity->name,
             'token' => $token->plainTextToken,
         ], 201);
     }

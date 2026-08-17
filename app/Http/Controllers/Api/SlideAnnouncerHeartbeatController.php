@@ -56,6 +56,16 @@ class SlideAnnouncerHeartbeatController extends Controller
 
         return response()->json([
             'ok' => true,
+            // Server is authoritative for the device's name — an entity
+            // admin can rename it from the fleet UI (EntitySlideAnnouncerController::update),
+            // and this is how that rename reaches the device itself, since
+            // there's no separate push channel: local-app/backend/heartbeat.py
+            // folds this into its local device-name cache on every heartbeat.
+            'device_name' => $device->name,
+            // Same rationale as device_name above — also covers a device
+            // moving to a different entity via re-pair, which changes
+            // entity_id without touching device_name at all.
+            'entity_name' => $device->entity->name,
             'latest_app_version' => $activeAppRelease?->version,
             'app_update_available' => $appUpdateAvailable,
             'app_download_url' => $appUpdateAvailable ? $activeAppRelease->url() : null,
