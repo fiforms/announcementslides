@@ -2,7 +2,7 @@
 
 A web-based announcement slide distribution system designed for Seventh-day Adventist churches. Administrators and authorized contributors can push slides to any church in the system; registered users can submit slides for review; and church leader users can configure slides specific to their local congregation.
 
-> For a tour of the project layout, data model, and where the implementation lives, see [ARCHITECTURE.md](ARCHITECTURE.md).
+> For a tour of the project layout, data model, and where the implementation lives, see [ARCHITECTURE.md](ARCHITECTURE.md). For production deployment specifics (queue worker, ffmpeg), see [INSTALLING.md](INSTALLING.md).
 
 ## Features
 
@@ -18,6 +18,7 @@ A web-based announcement slide distribution system designed for Seventh-day Adve
 - Composer
 - Node.js / npm
 - SQLite (default) or a supported relational database
+- `ffmpeg` (for video slide thumbnails) — see [INSTALLING.md](INSTALLING.md) for production setup, including the queue worker required for thumbnails to actually generate
 
 ## Installation
 
