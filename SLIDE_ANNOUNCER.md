@@ -682,6 +682,21 @@ server, not this repo).
   time — since they must exist before the very first boot's overlay mount
   *and* after a factory reset reformats `/data` at runtime, one boot-time
   mechanism covers both instead of a build-time seed a reset would bypass).
+- **`slideadmin`'s home, bind-mounted onto `/data`** (added 2026-08-16):
+  the `slideadmin` console/SSH account (see "First-boot / network setup
+  flow" below for why it exists) had the same problem as `/etc` — plain
+  root is `ro`, so bash history and anything else written under
+  `/home/slideadmin` reset on every reboot, and OTA replaces it outright.
+  Fixed the same way as `/etc`, just with a bind mount instead of an
+  overlay (nothing here needs to fall back to reading rootfs's original
+  skeleton once `/data` is populated, so the simpler primitive is enough):
+  `slide-announcer-home-dirs.service` creates and seeds (from `/etc/skel`,
+  once) `/data/home/slideadmin` before `/home/slideadmin` mounts onto it,
+  `nofail` so a `/data` mount failure falls back to rootfs's own original
+  home rather than an emergency shell. This is also what makes SSH key
+  rotation config-driven instead of build-time-baked — see
+  "First-boot / network setup flow" below, `slideannouncer.yaml`'s
+  `ssh_authorized_keys` field.
 - **Fixed (2026-08-10): swap's file half was on tmpfs, not disk.** Current
   Raspberry Pi OS doesn't use `dphys-swapfile` (this section's original
   draft assumed it did, and even briefly misdiagnosed the fix around it —
@@ -813,6 +828,9 @@ before).
   network settings:
   ```yaml
   default_language: en
+  ssh_enabled: true
+  ssh_authorized_keys: |
+    ssh-ed25519 AAAA...
   device_uuid: "3f29b6d2-....-....-...."
   device_uuid_check: "a1b2c3...(hex)"
   ```
@@ -820,7 +838,21 @@ before).
   very first setup screen — changing the language later from the device's
   own Settings menu has no effect on this file. `device_uuid`/
   `device_uuid_check` should normally be left out entirely; see "Device
-  identity & anti-clone protection" below for why.
+  identity & anti-clone protection" below for why. `ssh_enabled`/
+  `ssh_authorized_keys`, unlike those two, ARE re-read every boot (and,
+  for `ssh_enabled`, on every `ssh.service` start attempt), not just the
+  first: `ssh_authorized_keys` is applied to `slideadmin`'s
+  `~/.ssh/authorized_keys` on every boot
+  (`provisioning/firstboot.py`'s `sync_ssh_authorized_keys()`), and
+  `ssh_enabled` gates whether sshd is even allowed to start at all
+  (`system/ssh/ssh-gate.conf`'s `ExecStartPre=`, checking this field via
+  `system/scripts/ssh-gate.py` — `ssh.service` itself is
+  `systemctl enable`d in every image unconditionally now, so this is the
+  real on/off switch). Editing either and rebooting an already-deployed
+  device turns SSH on/off or rotates/revokes its key, no rebuild/reflash
+  needed — see "`slideadmin`'s home, bind-mounted onto `/data`" above for
+  what makes the key half of that persist at all (the `ssh_enabled` gate
+  itself doesn't need `/data` — it only ever reads the boot partition).
 
 On boot, `provisioning/firstboot.py` polls NetworkManager for an already-
 active connection (i.e. cloud-init's `network-config` already succeeded)
