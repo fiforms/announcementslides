@@ -726,8 +726,9 @@ server, not this repo).
   600` on the pairing token and the identity secret, synced slide media,
   sync-status file) lives on the persistent ext4 `/data` slot, never on
   rootfs — rootfs is replaced wholesale on each RAUC install. The
-  exceptions are `slideannouncer.yaml` (declared device identity +
-  initial-setup hints) and `network-config` (WiFi/network settings, via
+  exceptions are `slideannouncer.yaml` (declared device identity, the
+  `server_url` this device talks to, and initial-setup hints) and
+  `network-config` (WiFi/network settings, via
   cloud-init's own NoCloud mechanism), which deliberately live on the
   separate FAT32 boot/firmware partition instead — see "First-boot /
   network setup flow" and "Device identity & anti-clone protection" under
@@ -824,10 +825,11 @@ before).
   format beats inventing and maintaining a parallel one that would only
   ever cover a fraction of it. `image-builder`'s build ships a commented
   example (DHCP and static-IP variants) here by default.
-- **`slideannouncer.yaml`** — identity and initial-setup hints only, never
-  network settings:
+- **`slideannouncer.yaml`** — identity, the server this device talks to,
+  and initial-setup hints only, never network settings:
   ```yaml
   default_language: en
+  server_url: https://your-server.example.org
   ssh_enabled: true
   ssh_authorized_keys: |
     ssh-ed25519 AAAA...
@@ -838,19 +840,31 @@ before).
   very first setup screen — changing the language later from the device's
   own Settings menu has no effect on this file. `device_uuid`/
   `device_uuid_check` should normally be left out entirely; see "Device
-  identity & anti-clone protection" below for why. `ssh_enabled`/
-  `ssh_authorized_keys`, unlike those two, ARE re-read every boot (and,
-  for `ssh_enabled`, on every `ssh.service` start attempt), not just the
-  first: `ssh_authorized_keys` is applied to `slideadmin`'s
+  identity & anti-clone protection" below for why. `server_url`,
+  `ssh_enabled`, and `ssh_authorized_keys`, unlike those two, ARE re-read
+  every boot (and, for `ssh_enabled`, on every `ssh.service` start
+  attempt; for `server_url`, on every pairing/sync/heartbeat/OTA-check
+  request), not just the first: `server_url` is read directly by
+  `local-app/backend/pairing.py`'s `read_server_url()` and
+  `system/scripts/rauc-update.py`'s own copy of the same logic (no
+  build-time file involved — see `image-builder/build.sh`, which only
+  optionally *seeds* a default into this yaml at build time, and fails
+  closed if absent so a half-configured device never silently no-ops);
+  `ssh_authorized_keys` is applied to `slideadmin`'s
   `~/.ssh/authorized_keys` on every boot
   (`provisioning/firstboot.py`'s `sync_ssh_authorized_keys()`), and
   `ssh_enabled` gates whether sshd is even allowed to start at all
   (`system/ssh/ssh-gate.conf`'s `ExecStartPre=`, checking this field via
   `system/scripts/ssh-gate.py` — `ssh.service` itself is
   `systemctl enable`d in every image unconditionally now, so this is the
-  real on/off switch). Editing either and rebooting an already-deployed
-  device turns SSH on/off or rotates/revokes its key, no rebuild/reflash
-  needed — see "`slideadmin`'s home, bind-mounted onto `/data`" above for
+  real on/off switch). Editing any of these and rebooting (or, for
+  `server_url`, just restarting `slide-announcer-backend`) an
+  already-deployed device moves it to a different server, turns SSH
+  on/off, or rotates/revokes its key — no rebuild/reflash needed. This is
+  also what lets a single image/RAUC bundle serve multiple independent
+  servers: build once, then set `server_url` per device by swapping this
+  file instead of rebuilding — see "`slideadmin`'s home, bind-mounted onto
+  `/data`" above for
   what makes the key half of that persist at all (the `ssh_enabled` gate
   itself doesn't need `/data` — it only ever reads the boot partition).
 
