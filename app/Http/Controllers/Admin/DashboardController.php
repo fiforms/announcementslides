@@ -23,7 +23,7 @@ class DashboardController extends Controller
         ];
 
         $pendingSlides = Slide::pendingReview()
-            ->with('uploader:id,name')
+            ->with(['uploader:id,name', 'primaryMedia'])
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
@@ -32,11 +32,13 @@ class DashboardController extends Controller
                 'title'         => $s->title,
                 'thumbnail_url' => $s->thumbnail_url,
                 'file_url'      => $s->file_url,
+                'mime_type'     => $s->mime_type,
                 'uploader'      => $s->uploader?->only('id', 'name'),
                 'created_at'    => $s->created_at->diffForHumans(),
             ]);
 
         $expiringSoon = Slide::current()
+            ->with('primaryMedia')
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now()->addDays(7))
             ->orderBy('expires_at')
@@ -47,12 +49,13 @@ class DashboardController extends Controller
                 'title'         => $s->title,
                 'thumbnail_url' => $s->thumbnail_url,
                 'file_url'      => $s->file_url,
+                'mime_type'     => $s->mime_type,
                 'expires_at'    => $s->expires_at->toIso8601String(),
                 'expires_human' => $s->expires_at->diffForHumans(),
             ]);
 
         $recentlyAdded = Slide::where('status', 'published')
-            ->with('uploader:id,name')
+            ->with(['uploader:id,name', 'primaryMedia'])
             ->orderByDesc('created_at')
             ->limit(5)
             ->get()
@@ -62,6 +65,7 @@ class DashboardController extends Controller
                 'status'        => $s->status,
                 'thumbnail_url' => $s->thumbnail_url,
                 'file_url'      => $s->file_url,
+                'mime_type'     => $s->mime_type,
                 'uploader'      => $s->uploader?->only('id', 'name'),
                 'created_at'    => $s->created_at->diffForHumans(),
             ]);

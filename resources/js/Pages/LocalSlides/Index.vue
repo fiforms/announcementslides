@@ -237,7 +237,7 @@ function updateSortOrder() {
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-3">
                                     <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                                        <img v-if="slide.thumbnail_url || slide.file_url"
+                                        <img v-if="slide.thumbnail_url || (slide.file_url && !slide.mime_type?.startsWith('video/'))"
                                             :src="slide.thumbnail_url || slide.file_url"
                                             class="h-full w-full object-cover" />
                                     </div>
@@ -310,7 +310,7 @@ function updateSortOrder() {
                                 <td class="px-4 py-3">
                                     <div class="flex items-center gap-3">
                                         <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                                            <img v-if="slide.thumbnail_url || slide.file_url"
+                                            <img v-if="slide.thumbnail_url || (slide.file_url && !slide.mime_type?.startsWith('video/'))"
                                                 :src="slide.thumbnail_url || slide.file_url"
                                                 class="h-full w-full object-cover" />
                                         </div>

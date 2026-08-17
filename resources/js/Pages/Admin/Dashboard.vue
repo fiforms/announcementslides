@@ -133,7 +133,7 @@ function expiresClass(isoDate) {
                     <div v-for="slide in pendingSlides" :key="slide.id"
                         class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
                         <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                            <img v-if="slide.thumbnail_url || slide.file_url"
+                            <img v-if="slide.thumbnail_url || (slide.file_url && !slide.mime_type?.startsWith('video/'))"
                                 :src="slide.thumbnail_url || slide.file_url"
                                 class="h-full w-full object-cover" />
                         </div>
@@ -181,7 +181,7 @@ function expiresClass(isoDate) {
                     <div v-for="slide in expiringSoon" :key="slide.id"
                         class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
                         <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                            <img v-if="slide.thumbnail_url || slide.file_url"
+                            <img v-if="slide.thumbnail_url || (slide.file_url && !slide.mime_type?.startsWith('video/'))"
                                 :src="slide.thumbnail_url || slide.file_url"
                                 class="h-full w-full object-cover" />
                         </div>
@@ -217,7 +217,7 @@ function expiresClass(isoDate) {
                     <div v-for="slide in recentlyAdded" :key="slide.id"
                         class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
                         <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                            <img v-if="slide.thumbnail_url || slide.file_url"
+                            <img v-if="slide.thumbnail_url || (slide.file_url && !slide.mime_type?.startsWith('video/'))"
                                 :src="slide.thumbnail_url || slide.file_url"
                                 class="h-full w-full object-cover" />
                         </div>

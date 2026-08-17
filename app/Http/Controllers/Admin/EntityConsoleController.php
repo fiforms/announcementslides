@@ -28,7 +28,7 @@ class EntityConsoleController extends Controller
 
     public function slides(Entity $entity): Response
     {
-        $slides = Slide::with('uploader')
+        $slides = Slide::with(['uploader', 'primaryMedia'])
             ->entityScoped($entity->id)
             ->orderByDesc('created_at')
             ->get()

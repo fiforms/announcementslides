@@ -16,6 +16,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | ffmpeg binary
+    |--------------------------------------------------------------------------
+    |
+    | Used by GenerateThumbnail to extract a frame from video slides. Set
+    | FFMPEG_BINARY to an absolute path if `ffmpeg` isn't on the PATH the
+    | queue worker's process runs with (a common gap between an interactive
+    | shell's PATH and a supervisor/systemd service's PATH).
+    |
+    */
+    'ffmpeg_binary' => env('FFMPEG_BINARY', 'ffmpeg'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Media types
     |--------------------------------------------------------------------------
     |

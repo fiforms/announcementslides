@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\SlideMedia;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\Process\Process;
 
@@ -77,15 +78,28 @@ class GenerateThumbnail implements ShouldQueue
 
         // Grab a frame 1s in (skips a possible black opening frame); short
         // clips under 1s fall back to the very first frame.
-        if (! $this->extractFrame($source, $dest, 1)) {
-            $this->extractFrame($source, $dest, 0);
+        $result = $this->extractFrame($source, $dest, 1);
+        if (! $result['ok']) {
+            $result = $this->extractFrame($source, $dest, 0);
+        }
+
+        if (! $result['ok']) {
+            Log::warning('Video thumbnail generation failed', [
+                'slide_media_id' => $this->media->id,
+                'source' => $source,
+                'ffmpeg_binary' => config('slides.ffmpeg_binary'),
+                'error' => $result['error'],
+            ]);
         }
     }
 
-    private function extractFrame(string $source, string $dest, int $seekSeconds): bool
+    /**
+     * @return array{ok: bool, error: ?string}
+     */
+    private function extractFrame(string $source, string $dest, int $seekSeconds): array
     {
         $process = new Process([
-            'ffmpeg', '-y',
+            config('slides.ffmpeg_binary'), '-y',
             '-ss', (string) $seekSeconds,
             '-i', $source,
             '-vframes', '1',
@@ -95,6 +109,10 @@ class GenerateThumbnail implements ShouldQueue
         $process->setTimeout(30);
         $process->run();
 
-        return file_exists($dest);
+        if (file_exists($dest)) {
+            return ['ok' => true, 'error' => null];
+        }
+
+        return ['ok' => false, 'error' => trim($process->getErrorOutput()) ?: $process->getExitCodeText()];
     }
 }

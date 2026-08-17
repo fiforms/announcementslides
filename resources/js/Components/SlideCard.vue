@@ -26,7 +26,15 @@ const publishLabel = computed(() => {
     return `From ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
 });
 
-const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_url);
+const isVideoSlide = computed(() => !!props.slide.mime_type?.startsWith('video/'));
+
+// A video with no thumbnail yet (generation is queued/async, or failed)
+// must fall through to the placeholder icon rather than pointing an <img>
+// at the raw video bytes, which can't render as an image.
+const previewSrc = computed(() => {
+    if (isVideoSlide.value) return props.slide.thumbnail_url || null;
+    return props.slide.thumbnail_url || props.slide.file_url;
+});
 </script>
 
 <template>
@@ -51,9 +59,18 @@ const previewSrc = computed(() => props.slide.thumbnail_url || props.slide.file_
             <img v-if="previewSrc" :src="previewSrc" :alt="slide.title"
                 class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
             <div v-else class="w-full h-full flex items-center justify-center text-slate-300">
-                <svg class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg v-if="isVideoSlide" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                        d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <svg v-else class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
                         d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01" />
+                </svg>
+            </div>
+            <div v-if="isVideoSlide" class="absolute bottom-2 right-2 rounded bg-black/60 p-1">
+                <svg class="h-3.5 w-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z" />
                 </svg>
             </div>
             <!-- Validation warning badge -->

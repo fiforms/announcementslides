@@ -256,8 +256,12 @@ onUnmounted(() => {
                         </svg>
                     </button>
 
-                    <!-- Image -->
-                    <img :src="lightboxSlide.file_url || lightboxSlide.thumbnail_url"
+                    <!-- Preview -->
+                    <video v-if="lightboxSlide.mime_type?.startsWith('video/')"
+                        :src="lightboxSlide.file_url"
+                        controls autoplay loop
+                        class="max-h-[80vh] max-w-full rounded-lg object-contain shadow-2xl" />
+                    <img v-else :src="lightboxSlide.file_url || lightboxSlide.thumbnail_url"
                         :alt="lightboxSlide.title"
                         class="max-h-[80vh] max-w-full rounded-lg object-contain shadow-2xl" />
 
