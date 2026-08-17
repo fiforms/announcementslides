@@ -78,6 +78,22 @@ const onVideoEnded = () => {
     // on its last frame until scheduleAdvance()'s timeout fires.
 };
 
+// Plays with sound where the browser allows it (opening the slideshow is
+// itself a user click, which is usually enough); falls back to muted
+// playback rather than leaving the slide frozen if a stricter browser
+// blocks unmuted autoplay for a visitor with no prior interaction on the
+// site.
+const playWithSound = async (event) => {
+    const el = event.target;
+    el.muted = false;
+    try {
+        await el.play();
+    } catch {
+        el.muted = true;
+        try { await el.play(); } catch { /* give up silently */ }
+    }
+};
+
 const startSlideshow = () => {
     slideshowInterval.value = getSlideshowInterval();
     scheduleAdvance();
@@ -210,11 +226,10 @@ const handleShow = () => {
                         :key="currentIndex"
                         :src="currentSlide.file_url"
                         :loop="currentSlide.video_playback_mode === 'loop'"
-                        autoplay
-                        muted
                         playsinline
                         class="h-full w-full object-contain"
                         @ended="onVideoEnded"
+                        @loadedmetadata="playWithSound"
                     />
                     <img
                         v-else
