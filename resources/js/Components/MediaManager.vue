@@ -20,6 +20,7 @@ const selectedTypeConfig = computed(() =>
 
 const { isUploading, uploadError, overallProgress, upload } = useChunkedUpload({
     finalizeRoute: props.storeRoute,
+    finalizeRouteParams: { ...props.routeParams, slide: props.slide.id },
     buildFinalizePayload: (completedUploads) => ({
         ...completedUploads[0],
         media_type: selectedType.value,

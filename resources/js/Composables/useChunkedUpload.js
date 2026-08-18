@@ -7,8 +7,9 @@ function csrfToken() {
 }
 
 export function useChunkedUpload(options = {}) {
-    const chunkRoute    = options.chunkRoute ?? 'uploads.chunk';
-    const finalizeRoute = options.finalizeRoute ?? 'uploads.finalize';
+    const chunkRoute          = options.chunkRoute ?? 'uploads.chunk';
+    const finalizeRoute       = options.finalizeRoute ?? 'uploads.finalize';
+    const finalizeRouteParams = options.finalizeRouteParams ?? {};
     // Overrides the default `{ uploads: [...], ...payload }` finalize body —
     // used by callers finalizing against a single-file endpoint instead of
     // the batch uploads.finalize route (see MediaManager.vue).
@@ -76,7 +77,7 @@ export function useChunkedUpload(options = {}) {
             }
 
             const { data } = await window.axios.post(
-                route(finalizeRoute),
+                route(finalizeRoute, finalizeRouteParams),
                 buildFinalizePayload(completedUploads, payload),
                 { headers: { 'X-CSRF-TOKEN': csrfToken() } },
             );
