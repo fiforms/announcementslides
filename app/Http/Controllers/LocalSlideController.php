@@ -89,7 +89,10 @@ class LocalSlideController extends Controller
             Show::syncAutoFillForSlide($slide);
         }
 
-        return redirect()->route('local-slides.index', ['entity_id' => $entityId])->with('success', 'Slide updated.');
+        // back() rather than a fixed redirect so this endpoint also works when
+        // submitted from other pages that embed slide editing inline (e.g.
+        // Shows/Manage's edit modal), not just LocalSlides/Edit.
+        return back()->with('success', 'Slide updated.');
     }
 
     public function storeMedia(Request $request, Slide $slide)

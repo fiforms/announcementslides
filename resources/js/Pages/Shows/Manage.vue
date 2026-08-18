@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
-import { router, Link } from '@inertiajs/vue3';
+import { router, Link, useForm, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
@@ -16,6 +16,74 @@ const props = defineProps({
 });
 
 const { locale } = useI18n();
+
+const user = usePage().props.auth.user;
+
+// A slide's ownership relative to this entity: 'mine' (belongs to this
+// entity), 'global' (entity_id null, visible everywhere), or 'nearby'
+// (belongs to some other entity that's sharing it in). The queries backing
+// showSlides/unusedSlides only ever return slides in one of these three
+// buckets, so entity_id alone is enough to tell them apart client-side.
+function slideScope(slide) {
+    if (slide.entity_id === null) return 'global';
+    if (slide.entity_id === props.entity.id) return 'mine';
+    return 'nearby';
+}
+
+const scopeBadges = {
+    global: { label: 'Global', classes: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
+    nearby: { label: 'Nearby', classes: 'bg-purple-50 text-purple-700', dot: 'bg-purple-500' },
+    mine:   { label: 'Mine',   classes: 'bg-green-50 text-green-700', dot: 'bg-green-500' },
+};
+
+function scopeBadge(slide) {
+    return scopeBadges[slideScope(slide)];
+}
+
+function canEdit(slide) {
+    return slideScope(slide) === 'mine' && props.isAdmin && (user.role === 'admin' || slide.uploader?.id === user.id);
+}
+
+function toLocalDatetime(iso) {
+    if (!iso) return '';
+    return iso.slice(0, 16);
+}
+
+const editingSlide = ref(null);
+const editForm = useForm({
+    title: '',
+    notes: '',
+    text_description: '',
+    link: '',
+    video_playback_mode: 'hold_last_frame',
+    language_id: '',
+    publish_at: '',
+    expires_at: '',
+});
+
+function openEdit(slide) {
+    editingSlide.value = slide;
+    editForm.title = slide.title;
+    editForm.notes = slide.notes ?? '';
+    editForm.text_description = slide.text_description ?? '';
+    editForm.link = slide.link ?? '';
+    editForm.video_playback_mode = slide.video_playback_mode ?? 'hold_last_frame';
+    editForm.language_id = slide.language_id ?? '';
+    editForm.publish_at = toLocalDatetime(slide.publish_at);
+    editForm.expires_at = toLocalDatetime(slide.expires_at);
+    editForm.clearErrors();
+}
+
+function closeEdit() {
+    editingSlide.value = null;
+}
+
+function submitEdit() {
+    editForm.patch(route('local-slides.update', { slide: editingSlide.value.id, entity_id: props.entity.id }), {
+        preserveScroll: true,
+        onSuccess: () => closeEdit(),
+    });
+}
 
 // The interface language's matching `languages` row, if any — used as the
 // default for blank/ephemeral language selectors (never forced onto a
@@ -260,7 +328,19 @@ function persistOrder() {
                             <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
                                 <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
                             </div>
-                            <p class="text-sm font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
+                                <span :class="scopeBadge(slide).classes" class="mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                                    <span :class="scopeBadge(slide).dot" class="h-1.5 w-1.5 rounded-full"></span>
+                                    {{ scopeBadge(slide).label }}
+                                </span>
+                            </div>
+                            <button v-if="canEdit(slide)" @click.stop="openEdit(slide)" title="Edit slide"
+                                class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                                    <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-9 9a2 2 0 0 1-.878.507l-3 .824a.5.5 0 0 1-.615-.615l.824-3a2 2 0 0 1 .507-.878l9-9Z" />
+                                </svg>
+                            </button>
                         </div>
                         <p v-if="!filteredUnused.length" class="text-sm text-gray-400">Nothing unused right now.</p>
                     </div>
@@ -278,7 +358,19 @@ function persistOrder() {
                             <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
                                 <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
                             </div>
-                            <p class="text-sm font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
+                            <div class="min-w-0 flex-1">
+                                <p class="text-sm font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
+                                <span :class="scopeBadge(slide).classes" class="mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                                    <span :class="scopeBadge(slide).dot" class="h-1.5 w-1.5 rounded-full"></span>
+                                    {{ scopeBadge(slide).label }}
+                                </span>
+                            </div>
+                            <button v-if="canEdit(slide)" @click.stop="openEdit(slide)" title="Edit slide"
+                                class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                                    <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-9 9a2 2 0 0 1-.878.507l-3 .824a.5.5 0 0 1-.615-.615l.824-3a2 2 0 0 1 .507-.878l9-9Z" />
+                                </svg>
+                            </button>
                         </div>
                         <p v-if="!inShow.length" class="text-sm text-gray-400">Drag slides here from "Unused slides."</p>
                     </div>
@@ -290,6 +382,90 @@ function persistOrder() {
                     class="text-sm font-medium text-gray-500 hover:text-gray-700">
                     View archived (expired) slides →
                 </Link>
+            </div>
+
+            <div v-if="editingSlide" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                @click.self="closeEdit">
+                <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-gray-900">Edit Slide</h3>
+                        <button @click="closeEdit" class="text-gray-400 hover:text-gray-600">&times;</button>
+                    </div>
+
+                    <form @submit.prevent="submitEdit" class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+                            <input v-model="editForm.title" type="text" required
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="editForm.errors.title" class="mt-1 text-xs text-red-600">{{ editForm.errors.title }}</p>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
+                            <textarea v-model="editForm.notes" rows="2"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                            <textarea v-model="editForm.text_description" rows="2"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                            <input v-model="editForm.link" type="url" placeholder="https://…"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="editForm.errors.link" class="mt-1 text-xs text-red-600">{{ editForm.errors.link }}</p>
+                        </div>
+
+                        <div v-if="editingSlide.mime_type?.startsWith('video/')">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
+                            <select v-model="editForm.video_playback_mode"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="play_through">Play through, then advance immediately</option>
+                                <option value="hold_last_frame">Hold last frame until slide delay</option>
+                                <option value="loop">Loop until slide delay</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                            <select v-model="editForm.language_id"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">No specific language (visible in all)</option>
+                                <option v-for="lang in languages" :key="lang.id" :value="lang.id">
+                                    {{ lang.name }} ({{ lang.native_name }})
+                                </option>
+                            </select>
+                            <p v-if="editForm.errors.language_id" class="mt-1 text-xs text-red-600">{{ editForm.errors.language_id }}</p>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date</label>
+                                <input v-model="editForm.publish_at" type="datetime-local"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
+                                <input v-model="editForm.expires_at" type="datetime-local"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            </div>
+                        </div>
+
+                        <div class="flex gap-3 pt-2">
+                            <button type="submit" :disabled="editForm.processing"
+                                class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                                {{ editForm.processing ? 'Saving…' : 'Save Changes' }}
+                            </button>
+                            <button type="button" @click="closeEdit"
+                                class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                                Cancel
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </AuthenticatedLayout>
