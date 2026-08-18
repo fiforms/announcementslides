@@ -11,13 +11,24 @@ class ChurchLoad extends Command
 {
     protected $signature = 'church:load
                             {--conference= : Conference code (e.g. CRLC)}
-                            {--delay=500 : Milliseconds to wait between requests}
+                            {--delay=2500 : Milliseconds to wait between requests}
+                            {--max-retries=5 : Max retry attempts for a request that gets rate-limited (HTTP 429)}
                             {--fresh : Delete existing records for this conference before loading}
-                            {--debug : Dump parsed data and confirm before each entity page load}';
+                            {--debug : Dump parsed data and confirm before each entity page load}
+                            {--cf-clearance= : cf_clearance cookie value from a browser session that passed the Cloudflare challenge}
+                            {--user-agent= : User-Agent string matching the browser the cf_clearance cookie was issued to}';
 
     protected $description = 'Load Adventist entities for a conference from adventistdirectory.org';
 
     private const BASE_URL = 'https://www.adventistdirectory.org';
+
+    private const DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+    private string $cfClearance;
+
+    private string $userAgent;
+
+    private int $maxRetries;
 
     public function handle(): int
     {
@@ -29,6 +40,17 @@ class ChurchLoad extends Command
         }
 
         $conference = strtoupper(trim($conference));
+
+        $cfClearance = $this->option('cf-clearance') ?? $this->ask('cf_clearance cookie value (from a browser session that passed the Cloudflare challenge)');
+
+        if (! $cfClearance) {
+            $this->error('cf_clearance cookie is required — adventistdirectory.org is behind a Cloudflare challenge.');
+            return self::FAILURE;
+        }
+
+        $this->cfClearance = trim($cfClearance);
+        $this->userAgent   = $this->option('user-agent') ?: self::DEFAULT_USER_AGENT;
+        $this->maxRetries  = (int) $this->option('max-retries');
 
         if ($this->option('fresh')) {
             $deleted = AdventistEntity::where('conference_code', $conference)->delete();
@@ -109,18 +131,45 @@ class ChurchLoad extends Command
         return self::SUCCESS;
     }
 
+    private function requestHeaders(): array
+    {
+        return [
+            'User-Agent' => $this->userAgent,
+            'Cookie'     => 'cf_clearance=' . $this->cfClearance,
+        ];
+    }
+
+    /** GET with retry/backoff on HTTP 429, honoring Retry-After when present. */
+    private function getWithRetry(string $url, array $query = [])
+    {
+        $attempt = 0;
+
+        while (true) {
+            $response = Http::withHeaders($this->requestHeaders())
+                ->timeout(30)
+                ->get($url, $query);
+
+            if ($response->status() !== 429 || $attempt >= $this->maxRetries) {
+                return $response;
+            }
+
+            $attempt++;
+            $wait = (int) ($response->header('Retry-After') ?: min(3 ** $attempt, 30));
+            $this->warn("  Rate limited (429). Waiting {$wait}s before retry {$attempt}/{$this->maxRetries}...");
+            sleep($wait);
+        }
+    }
+
     private function fetchEntityIds(string $conference): array
     {
         $ids      = [];
         $page     = 1;
 
         while (true) {
-            $response = Http::withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; church-loader/1.0)'])
-                ->timeout(30)
-                ->get(self::BASE_URL . '/SearchResults.aspx', [
-                    'AdmFieldID' => $conference,
-                    'PageIndex'  => $page,
-                ]);
+            $response = $this->getWithRetry(self::BASE_URL . '/SearchResults.aspx', [
+                'AdmFieldID' => $conference,
+                'PageIndex'  => $page,
+            ]);
 
             if (! $response->successful()) {
                 $this->error("Failed to fetch search results page {$page} (HTTP {$response->status()}).");
@@ -152,9 +201,7 @@ class ChurchLoad extends Command
 
     private function fetchEntityData(string $entityId, string $conference): ?array
     {
-        $response = Http::withHeaders(['User-Agent' => 'Mozilla/5.0 (compatible; church-loader/1.0)'])
-            ->timeout(30)
-            ->get(self::BASE_URL . '/ViewEntity.aspx', ['EntityID' => $entityId]);
+        $response = $this->getWithRetry(self::BASE_URL . '/ViewEntity.aspx', ['EntityID' => $entityId]);
 
         if (! $response->successful()) {
             $this->warn("  Skipped entity {$entityId} (HTTP {$response->status()})");
