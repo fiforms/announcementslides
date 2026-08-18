@@ -50,7 +50,7 @@ class SlideController extends Controller
             $nearbyIds = $home ? NearbyEntities::within($home, $radius) : [];
         }
 
-        $query = Slide::with('primaryMedia')->current()->language($languageId);
+        $query = Slide::with(['primaryMedia', 'overlayMedia'])->current()->language($languageId);
 
         if ($entityId) {
             // Home entity's slides + global slides, plus opt-in shared slides from
@@ -103,7 +103,7 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $query = Slide::with('primaryMedia')->archived()->language($languageId);
+        $query = Slide::with(['primaryMedia', 'overlayMedia'])->archived()->language($languageId);
 
         if ($entityId) {
             $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
@@ -292,6 +292,8 @@ class SlideController extends Controller
             'mime_type'         => $slide->mime_type,
             'file_url'          => $slide->file_url,
             'thumbnail_url'     => $slide->thumbnail_url,
+            'overlay_url'       => $slide->overlay_url,
+            'overlay_mime_type' => $slide->overlay_mime_type,
             'publish_at'        => $slide->publish_at?->toIso8601String(),
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'original_filename' => $slide->original_filename,

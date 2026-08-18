@@ -66,6 +66,15 @@ class Slide extends Model
         return $this->hasOne(SlideMedia::class)->where('media_type', 'slide')->oldest('sort_order');
     }
 
+    /**
+     * The slide's optional 'slide-overlay' media row — a same-aspect-ratio
+     * graphic composited on top of primaryMedia when present.
+     */
+    public function overlayMedia()
+    {
+        return $this->hasOne(SlideMedia::class)->where('media_type', 'slide-overlay')->oldest('sort_order');
+    }
+
     // ── Scopes ────────────────────────────────────────────────────────────────
 
     public function scopeCurrent(Builder $query): Builder
@@ -147,6 +156,16 @@ class Slide extends Model
     public function getMimeTypeAttribute(): ?string
     {
         return $this->primaryMedia?->mime_type;
+    }
+
+    public function getOverlayUrlAttribute(): ?string
+    {
+        return $this->overlayMedia?->file_url;
+    }
+
+    public function getOverlayMimeTypeAttribute(): ?string
+    {
+        return $this->overlayMedia?->mime_type;
     }
 
     public function getOriginalFilenameAttribute(): ?string

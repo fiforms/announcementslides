@@ -221,23 +221,29 @@ const handleShow = () => {
                     leave-to-class="opacity-0"
                     mode="out-in"
                 >
-                    <video
-                        v-if="isVideoSlide(currentSlide)"
-                        :key="currentIndex"
-                        :src="currentSlide.file_url"
-                        :loop="currentSlide.video_playback_mode === 'loop'"
-                        playsinline
-                        class="h-full w-full object-contain"
-                        @ended="onVideoEnded"
-                        @loadedmetadata="playWithSound"
-                    />
-                    <img
-                        v-else
-                        :key="currentIndex"
-                        :src="currentSlide.file_url"
-                        :alt="currentSlide.title"
-                        class="h-full w-full object-contain"
-                    />
+                    <div :key="currentIndex" class="relative h-full w-full">
+                        <video
+                            v-if="isVideoSlide(currentSlide)"
+                            :src="currentSlide.file_url"
+                            :loop="currentSlide.video_playback_mode === 'loop'"
+                            playsinline
+                            class="absolute inset-0 h-full w-full object-contain"
+                            @ended="onVideoEnded"
+                            @loadedmetadata="playWithSound"
+                        />
+                        <img
+                            v-else
+                            :src="currentSlide.file_url"
+                            :alt="currentSlide.title"
+                            class="absolute inset-0 h-full w-full object-contain"
+                        />
+                        <img
+                            v-if="currentSlide.overlay_url"
+                            :src="currentSlide.overlay_url"
+                            :alt="`${currentSlide.title} overlay`"
+                            class="absolute inset-0 h-full w-full object-contain"
+                        />
+                    </div>
                 </transition>
 
                 <!-- Controls -->
