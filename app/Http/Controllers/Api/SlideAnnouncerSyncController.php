@@ -12,7 +12,15 @@ class SlideAnnouncerSyncController extends Controller
      * Flat full sync every poll, no incremental cursoring — see
      * SLIDE_ANNOUNCER.md, "Sync endpoint." Devices see global + local
      * slides mixed together, exactly like the web slideshow does for a
-     * member of that entity.
+     * member of that entity — including the same ordering
+     * (SlideController::index()'s query and every other slide listing):
+     * entity-specific slides first, then `sort_order`, then newest-first
+     * as the tiebreak for slides sharing a `sort_order` (the common case
+     * for anything not yet manually reordered). Without this exact
+     * ordering, a freshly uploaded slide can land in a different position
+     * on a device than it shows on the web slideshow, since a plain
+     * `orderBy('sort_order')` alone leaves same-`sort_order` ties in
+     * whatever order the database happens to return them.
      */
     public function index(Request $request)
     {
@@ -22,7 +30,9 @@ class SlideAnnouncerSyncController extends Controller
             ->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $device->entity_id))
             ->current()
             ->language($device->language_id)
+            ->orderByRaw('entity_id IS NOT NULL DESC')
             ->orderBy('sort_order')
+            ->orderByDesc('created_at')
             ->get()
             ->map(fn (Slide $slide) => [
                 'id' => $slide->id,
