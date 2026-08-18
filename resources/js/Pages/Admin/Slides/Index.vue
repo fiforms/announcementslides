@@ -14,7 +14,12 @@ const props = defineProps({
     archived:  { type: Array, default: () => [] },
     drafts:    { type: Array, default: () => [] },
     languages: { type: Array, default: () => [] },
+    globalShowTemplates: { type: Array, default: () => [] },
 });
+
+const addToShow = ref('main'); // 'main' | 'separate' | 'none'
+const targetShowId = ref('');
+const newShowName = ref('');
 
 // ── Upload form ────────────────────────────────────────────────────────────────
 
@@ -132,7 +137,7 @@ async function submitUpload() {
             completedUploads.push(assembled);
         }
 
-        await window.axios.post(route('uploads.finalize'), {
+        const payload = {
             uploads:          completedUploads,
             title:            form.title,
             notes:            form.notes,
@@ -142,7 +147,18 @@ async function submitUpload() {
             publish_at:       form.publish_at,
             expires_at:       form.expires_at,
             status:           form.status,
-        }, {
+            add_to_show:      addToShow.value,
+        };
+
+        if (addToShow.value === 'separate') {
+            if (targetShowId.value) {
+                payload.global_template_id = targetShowId.value;
+            } else {
+                payload.new_show_name = newShowName.value;
+            }
+        }
+
+        await window.axios.post(route('uploads.finalize'), payload, {
             headers: { 'X-CSRF-TOKEN': csrfToken() },
         });
 
@@ -152,6 +168,9 @@ async function submitUpload() {
                 selectedFiles.value  = [];
                 filePreviews.value   = [];
                 fileProgress.value   = [];
+                addToShow.value      = 'main';
+                targetShowId.value   = '';
+                newShowName.value    = '';
                 showUploadPanel.value = false;
             },
         });
@@ -448,6 +467,34 @@ function statusBadge(status) {
                             <option value="draft">{{ $t('upload.status_draft') }}</option>
                         </select>
                     </div>
+                </div>
+
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Add to show</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="addToShow" type="radio" value="main"
+                            class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        Add to every site's Main Show (default)
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="addToShow" type="radio" value="separate"
+                            class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        Distribute as a separate one-off show (e.g. a special promo video)
+                    </label>
+                    <div v-if="addToShow === 'separate'" class="ml-6 flex flex-wrap items-center gap-2">
+                        <select v-model="targetShowId"
+                            class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">+ Create new show…</option>
+                            <option v-for="t in globalShowTemplates" :key="t.id" :value="t.id">{{ t.name }}</option>
+                        </select>
+                        <input v-if="!targetShowId" v-model="newShowName" type="text" placeholder="Show name"
+                            class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="addToShow" type="radio" value="none"
+                            class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        Do not add to any show
+                    </label>
                 </div>
 
                 <div v-if="uploadError" class="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">

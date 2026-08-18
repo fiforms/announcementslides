@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Models\Entity;
 use App\Models\Language;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use Illuminate\Http\Request;
@@ -22,17 +23,18 @@ class EntitySlideController extends Controller
 
         $slides = Slide::with(['uploader', 'primaryMedia'])
             ->entityScoped($entity->id)
-            ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+        $shows = Show::where('entity_id', $entity->id)->where('is_main', false)->get(['id', 'name']);
 
         return Inertia::render('Entity/Slides', [
             'entity' => ['id' => $entity->id, 'name' => $entity->name],
             'slides' => $slides,
             'languages' => $languages,
+            'shows' => $shows,
         ]);
     }
 
@@ -125,7 +127,6 @@ class EntitySlideController extends Controller
             'publish_at'        => $slide->publish_at?->toIso8601String(),
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'status'            => $slide->status,
-            'sort_order'        => $slide->sort_order,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
             'validation_issues' => $slide->validation_issues,

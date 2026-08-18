@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
+use App\Models\GlobalShowTemplate;
 use App\Models\Language;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -17,7 +20,7 @@ class MySlideController extends Controller
     public function index(Request $request): Response
     {
         // Group by effective status (published → draft → archived), then fall back
-        // to the global slide sort order. Archived is a derived state, so the
+        // to the Global Board's order. Archived is a derived state, so the
         // ranking has to happen in PHP rather than a SQL ORDER BY.
         $statusRank = [
             'published' => 0,
@@ -28,23 +31,28 @@ class MySlideController extends Controller
             'archived'  => 5,
         ];
 
+        $globalOrder = DB::table('show_slides')
+            ->where('show_id', Show::globalBoard()->id)
+            ->pluck('sort_order', 'slide_id');
+
         $slides = Slide::with(['entity', 'primaryMedia'])
             ->where('uploaded_by', $request->user()->id)
             ->whereNull('entity_id')
             ->get()
             ->sortBy(fn ($s) => [
                 $statusRank[$s->display_status] ?? 99,
-                $s->sort_order,
+                $globalOrder[$s->id] ?? PHP_INT_MAX,
                 -$s->created_at->getTimestamp(),
             ])
             ->values()
             ->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+        $globalShowTemplates = GlobalShowTemplate::orderBy('name')->get(['id', 'name']);
 
         $canSetStatus = $request->user()->isContributor();
 
-        return Inertia::render('MySlides/Index', compact('slides', 'languages', 'canSetStatus'));
+        return Inertia::render('MySlides/Index', compact('slides', 'languages', 'canSetStatus', 'globalShowTemplates'));
     }
 
     public function edit(Request $request, Slide $slide): Response

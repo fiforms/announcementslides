@@ -4,8 +4,12 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\ShowController;
 use App\Jobs\GenerateThumbnail;
+use App\Jobs\SyncShowAutoFillForSlide;
+use App\Models\GlobalShowTemplate;
 use App\Models\Language;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use Illuminate\Http\Request;
@@ -22,16 +26,18 @@ class SlideController extends Controller
     {
         $with     = ['uploader', 'entity', 'primaryMedia'];
         // Entity-scoped (local) slides are managed under Entity Slides; only show
-        // global slides here.
-        $current  = Slide::with($with)->unscoped()->current()->orderBy('sort_order')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
+        // global slides here, ordered by the Global Board (the master
+        // ordering fanned out to every entity's Main show by default).
+        $current  = Slide::with($with)->unscoped()->current()->orderedInShow(Show::globalBoard()->id)->get()->map(fn ($s) => $this->slideResource($s));
         $pending  = Slide::with($with)->unscoped()->pendingReview()->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
         $upcoming = Slide::with($with)->unscoped()->upcoming()->orderBy('publish_at')->get()->map(fn ($s) => $this->slideResource($s));
         $archived = Slide::with($with)->unscoped()->archived()->orderByDesc('expires_at')->limit(20)->get()->map(fn ($s) => $this->slideResource($s));
         $drafts   = Slide::with($with)->unscoped()->where('status', 'draft')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+        $globalShowTemplates = GlobalShowTemplate::orderBy('name')->get(['id', 'name']);
 
-        return Inertia::render('Admin/Slides/Index', compact('current', 'pending', 'upcoming', 'archived', 'drafts', 'languages'));
+        return Inertia::render('Admin/Slides/Index', compact('current', 'pending', 'upcoming', 'archived', 'drafts', 'languages', 'globalShowTemplates'));
     }
 
     public function store(Request $request)
@@ -112,12 +118,20 @@ class SlideController extends Controller
             'publish_at'          => 'nullable|date',
             'expires_at'          => 'nullable|date',
             'status'              => 'required|in:draft,pending,published,rejected',
-            'sort_order'          => 'integer|min:0',
             'entity_id'           => 'nullable|integer|exists:entities,id',
             'share_nearby'        => 'boolean',
         ]);
 
-        $slide->update($request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'sort_order', 'entity_id', 'share_nearby'));
+        $newLanguageId = $request->filled('language_id') ? (int) $request->input('language_id') : null;
+        $languageChanged = $slide->language_id !== $newLanguageId;
+
+        $slide->update($request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'entity_id', 'share_nearby'));
+
+        // Re-run auto-fill fan-out so language-gated shows pick up/drop this
+        // slide to match its new tag — never touches a leader's manual keep.
+        if ($languageChanged && $slide->entity_id === null) {
+            SyncShowAutoFillForSlide::dispatch($slide->id);
+        }
 
         return redirect()->route('admin.slides.index')
             ->with('success', 'Slide updated.');
@@ -163,9 +177,7 @@ class SlideController extends Controller
     {
         $request->validate(['order' => 'required|array', 'order.*' => 'integer']);
 
-        foreach ($request->order as $position => $id) {
-            Slide::where('id', $id)->update(['sort_order' => $position]);
-        }
+        ShowController::persistOrder(Show::globalBoard(), $request->order);
 
         return response()->json(['ok' => true]);
     }
@@ -208,7 +220,6 @@ class SlideController extends Controller
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'status'            => $slide->status,
             'share_nearby'      => $slide->share_nearby,
-            'sort_order'        => $slide->sort_order,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
             'validation_issues' => $slide->validation_issues,

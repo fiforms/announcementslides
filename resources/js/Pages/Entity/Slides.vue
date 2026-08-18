@@ -8,6 +8,7 @@ const props = defineProps({
     entity: { type: Object, required: true },
     slides: { type: Array, default: () => [] },
     languages: { type: Array, default: () => [] },
+    shows: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -63,6 +64,7 @@ function statusBadge(status) {
                 :redirect-params="{ entity: entity.id }"
                 :entity-id="entity.id"
                 :languages="languages"
+                :shows="shows"
                 @success="showUploadPanel = false"
             />
 

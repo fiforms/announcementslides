@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Entity;
+use App\Models\GlobalShowTemplate;
 use App\Models\Language;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Support\NearbyEntities;
 use Illuminate\Http\Request;
@@ -40,36 +42,47 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $nearby = $request->boolean('nearby');
-        $nearbyIds = [];
-
-        if ($entityId && $nearby) {
-            $radius = (float) ($request->user()?->setting('nearby_radius_miles')
-                ?? config('slides.nearby_radius_miles'));
-            $home = Entity::find($entityId);
-            $nearbyIds = $home ? NearbyEntities::within($home, $radius) : [];
-        }
-
-        $query = Slide::with(['primaryMedia', 'overlayMedia'])->current()->language($languageId);
+        // Slide membership/order now lives entirely in show_slides: an entity
+        // request plays that entity's Main show by default (or another of
+        // its shows via ?show_id=, to preview it) and a request with no
+        // entity plays the Global Board by default (or a globally-pushed
+        // one-off show via ?show_id=). Nearby-shared slides get into a show
+        // via auto-add or a leader manually dragging them in — no separate
+        // live union needed.
+        $availableShows = [];
 
         if ($entityId) {
-            // Home entity's slides + global slides, plus opt-in shared slides from
-            // nearby entities (the share_nearby flag only gates the borrowed bucket).
-            $query->where(function ($q) use ($entityId, $nearbyIds) {
-                $q->whereNull('entity_id')->orWhere('entity_id', $entityId);
-                if (! empty($nearbyIds)) {
-                    $q->orWhere(fn ($n) => $n->whereIn('entity_id', $nearbyIds)->shareNearby());
-                }
-            });
+            $entity = Entity::findOrFail($entityId);
+            $entityShows = Show::where('entity_id', $entityId)->orderByDesc('is_main')->orderBy('name')->get();
+            $showId = $request->query('show_id')
+                ? (int) $request->query('show_id')
+                : $entity->mainShow()->id;
+            $availableShows = $entityShows->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->all();
         } else {
-            $query->visibleToUser($request->user());
+            $globalBoard = Show::globalBoard();
+            $showId = $request->query('show_id') ? (int) $request->query('show_id') : $globalBoard->id;
+
+            // One-off distributed shows (e.g. a special promo video) don't have
+            // a single show row — each entity got its own copy — so pick one
+            // representative copy per template purely so an anonymous/global
+            // viewer can preview the same content.
+            $availableShows = collect([['id' => $globalBoard->id, 'name' => 'Announcements']])
+                ->concat(
+                    GlobalShowTemplate::has('shows')->get()->map(fn ($t) => [
+                        'id' => $t->shows()->first()->id,
+                        'name' => $t->name,
+                    ])
+                )->all();
         }
 
-        $slides = $query->orderByRaw('entity_id IS NOT NULL DESC')
-            ->orderBy('sort_order')
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(fn ($s) => $this->slideResource($s));
+        // Language filtering only applies in Global View: an entity's shows
+        // already encode their own preferred language (see Show::$language_id),
+        // so filtering again on top would fight the leader's own curation.
+        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia'])->orderedInShow($showId)->current();
+        if (!$entityId) {
+            $slidesQuery->language($languageId);
+        }
+        $slides = $slidesQuery->get()->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
@@ -78,7 +91,8 @@ class SlideController extends Controller
             'languages' => $languages,
             'selectedLanguage' => $languageCode,
             'entityId' => $entityId,
-            'nearbyEnabled' => $entityId ? $nearby : false,
+            'showId' => $showId,
+            'availableShows' => $availableShows,
         ]);
     }
 
@@ -145,27 +159,7 @@ class SlideController extends Controller
 
     public function downloadZip(Request $request)
     {
-        $ids = $request->query('ids');
-        $languageCode = $request->query('language');
-        $languageId = null;
-
-        if ($languageCode) {
-            $language = Language::where('abbreviation', $languageCode)->first();
-            $languageId = $language?->id;
-        }
-
-        $query = Slide::with('primaryMedia')
-            ->current()
-            ->visibleToUser($request->user())
-            ->language($languageId)
-            ->orderByRaw('entity_id IS NOT NULL DESC')
-            ->orderBy('sort_order');
-
-        if ($ids) {
-            $query->whereIn('id', explode(',', $ids));
-        }
-
-        $slides = $query->get();
+        $slides = $this->resolveDownloadSlides($request);
 
         if ($slides->isEmpty()) {
             abort(404);
@@ -199,27 +193,7 @@ class SlideController extends Controller
 
     public function downloadPowerPoint(Request $request)
     {
-        $ids = $request->query('ids');
-        $languageCode = $request->query('language');
-        $languageId = null;
-
-        if ($languageCode) {
-            $language = Language::where('abbreviation', $languageCode)->first();
-            $languageId = $language?->id;
-        }
-
-        $query = Slide::with('primaryMedia')
-            ->current()
-            ->visibleToUser($request->user())
-            ->language($languageId)
-            ->orderByRaw('entity_id IS NOT NULL DESC')
-            ->orderBy('sort_order');
-
-        if ($ids) {
-            $query->whereIn('id', explode(',', $ids));
-        }
-
-        $slides = $query->get();
+        $slides = $this->resolveDownloadSlides($request);
 
         if ($slides->isEmpty()) {
             abort(404);
@@ -278,6 +252,41 @@ class SlideController extends Controller
         return response()->download($tmpFile, 'announcement-slides.pptx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
         ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * A show's exact slide set/order (?show_id=, the primary download path),
+     * or the legacy ad-hoc-selection path (?ids=, used from the global
+     * Slides/Index.vue browsing page, which has no single show concept).
+     */
+    private function resolveDownloadSlides(Request $request)
+    {
+        $showId = $request->query('show_id');
+
+        if ($showId) {
+            return Slide::with('primaryMedia')->orderedInShow((int) $showId)->current()->get();
+        }
+
+        $ids = $request->query('ids');
+        $languageCode = $request->query('language');
+        $languageId = null;
+
+        if ($languageCode) {
+            $language = Language::where('abbreviation', $languageCode)->first();
+            $languageId = $language?->id;
+        }
+
+        $query = Slide::with('primaryMedia')
+            ->current()
+            ->visibleToUser($request->user())
+            ->language($languageId)
+            ->orderByDesc('created_at');
+
+        if ($ids) {
+            $query->whereIn('id', explode(',', $ids));
+        }
+
+        return $query->get();
     }
 
     private function slideResource(Slide $slide): array

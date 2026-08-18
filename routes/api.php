@@ -11,4 +11,5 @@ Route::post('/slide-announcers/pair', [SlideAnnouncerPairingController::class, '
 Route::middleware(['auth:sanctum', 'slide-announcer.auth'])->group(function () {
     Route::post('/slide-announcers/heartbeat', [SlideAnnouncerHeartbeatController::class, 'store']);
     Route::get('/slide-announcers/slides', [SlideAnnouncerSyncController::class, 'index']);
+    Route::get('/slide-announcers/shows', [SlideAnnouncerSyncController::class, 'shows']);
 });

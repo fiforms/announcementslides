@@ -14,18 +14,19 @@ const props = defineProps({
     languages: { type: Array, default: () => [] },
     selectedLanguage: { type: String, default: null },
     entityId: { type: Number, default: null },
-    nearbyEnabled: { type: Boolean, default: false },
+    showId: { type: Number, default: null },
+    availableShows: { type: Array, default: () => [] },
 });
 
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
 
-// Reload the dashboard preserving the current entity / language / nearby state,
+// Reload the dashboard preserving the current entity / language / show state,
 // overriding whichever value changed.
 function reloadWith(overrides = {}) {
     const params = {
         language: currentLanguageCode.value,
         ...(props.entityId ? { entity_id: props.entityId } : {}),
-        ...(props.nearbyEnabled ? { nearby: 1 } : {}),
+        ...(props.showId ? { show_id: props.showId } : {}),
         ...overrides,
     };
     router.get(route('slides.index'), params, { preserveScroll: true });
@@ -35,8 +36,8 @@ function changeLanguage(code) {
     reloadWith({ language: code });
 }
 
-function toggleNearby(enabled) {
-    reloadWith(enabled ? { nearby: 1 } : { nearby: undefined });
+function changeShow(showId) {
+    reloadWith({ show_id: showId });
 }
 
 const selectedIds = ref(new Set());
@@ -72,6 +73,7 @@ function downloadSelected() {
 function downloadAll() {
     const params = new URLSearchParams();
     if (props.selectedLanguage) params.append('language', props.selectedLanguage);
+    if (props.showId) params.append('show_id', props.showId);
     window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
@@ -86,6 +88,7 @@ function downloadPowerPointSelected() {
 function downloadPowerPointAll() {
     const params = new URLSearchParams();
     if (props.selectedLanguage) params.append('language', props.selectedLanguage);
+    if (props.showId) params.append('show_id', props.showId);
     window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
 }
 
@@ -137,18 +140,17 @@ onUnmounted(() => {
             </div>
 
             <div class="flex flex-col sm:flex-row flex-wrap gap-3 items-start sm:items-center">
-                <select :value="currentLanguageCode" @change="changeLanguage($event.target.value)"
+                <select v-if="!entityId" :value="currentLanguageCode" @change="changeLanguage($event.target.value)"
                     class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right">
                     <option v-for="lang in languages" :key="lang.abbreviation" :value="lang.abbreviation">
                         {{ lang.name }} ({{ lang.native_name }})
                     </option>
                 </select>
 
-                <label v-if="entityId" class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 shadow-sm cursor-pointer select-none">
-                    <input type="checkbox" :checked="nearbyEnabled" @change="toggleNearby($event.target.checked)"
-                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                    Include nearby
-                </label>
+                <select v-if="availableShows.length > 1" :value="showId" @change="changeShow($event.target.value)"
+                    class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right">
+                    <option v-for="show in availableShows" :key="show.id" :value="show.id">{{ show.name }}</option>
+                </select>
 
                 <div class="flex flex-wrap gap-2">
                 <template v-if="hasSelection">

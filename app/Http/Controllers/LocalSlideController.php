@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesEntityAccess;
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Models\Entity;
 use App\Models\Language;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use Illuminate\Http\Request;
@@ -14,47 +16,37 @@ use Inertia\Response;
 class LocalSlideController extends Controller
 {
     use ManagesSlideMedia;
+    use AuthorizesEntityAccess;
 
     public function index(Request $request): Response
     {
+        $entityId = $this->authorizedEntityId($request, requireAdmin: false);
         $user = $request->user();
-        $entityId = (int) $request->query('entity_id');
-
-        abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
-            403
-        );
-
         $entity = Entity::findOrFail($entityId);
         $isAdmin = $user->isAdmin() || $user->isEntityAdmin($entityId);
 
         $slides = Slide::with(['uploader', 'primaryMedia'])
             ->entityScoped($entityId)
-            ->orderBy('sort_order')
             ->orderByDesc('created_at')
             ->get()
             ->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+        $shows = Show::where('entity_id', $entityId)->where('is_main', false)->get(['id', 'name']);
 
         return Inertia::render('LocalSlides/Index', [
             'entity'  => ['id' => $entity->id, 'name' => $entity->name],
             'slides'  => $slides,
             'languages' => $languages,
             'isAdmin' => $isAdmin,
+            'shows' => $shows,
         ]);
     }
 
     public function edit(Request $request, Slide $slide): Response
     {
+        $entityId = $this->authorizedEntityId($request);
         $user = $request->user();
-        $entityId = (int) $request->query('entity_id');
-
-        abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
-            403
-        );
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
         abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
         abort_unless($slide->entity_id === $entityId, 404);
 
@@ -72,14 +64,8 @@ class LocalSlideController extends Controller
 
     public function update(Request $request, Slide $slide)
     {
+        $entityId = $this->authorizedEntityId($request);
         $user = $request->user();
-        $entityId = (int) $request->query('entity_id');
-
-        abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
-            403
-        );
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
         abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
         abort_unless($slide->entity_id === $entityId, 404);
 
@@ -94,14 +80,21 @@ class LocalSlideController extends Controller
             'expires_at'          => 'nullable|date|after_or_equal:publish_at',
         ]);
 
+        $newLanguageId = $request->filled('language_id') ? (int) $request->input('language_id') : null;
+        $languageChanged = $slide->language_id !== $newLanguageId;
+
         $slide->update($request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at'));
+
+        if ($languageChanged && $slide->share_nearby) {
+            Show::syncAutoFillForSlide($slide);
+        }
 
         return redirect()->route('local-slides.index', ['entity_id' => $entityId])->with('success', 'Slide updated.');
     }
 
     public function storeMedia(Request $request, Slide $slide)
     {
-        $entityId = $this->authorizeSlideAction($request, $slide);
+        $this->authorizeSlideAction($request, $slide);
         $this->storeMediaForSlide($request, $slide);
 
         return back()->with('success', 'Media added.');
@@ -117,16 +110,7 @@ class LocalSlideController extends Controller
 
     public function archive(Request $request, Slide $slide)
     {
-        $user = $request->user();
-        $entityId = (int) $request->query('entity_id');
-
-        abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
-            403
-        );
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entityId, 404);
+        $entityId = $this->authorizeSlideAction($request, $slide);
 
         $slide->update(['expires_at' => now()]);
 
@@ -135,16 +119,7 @@ class LocalSlideController extends Controller
 
     public function unarchive(Request $request, Slide $slide)
     {
-        $user = $request->user();
-        $entityId = (int) $request->query('entity_id');
-
-        abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
-            403
-        );
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entityId, 404);
+        $this->authorizeSlideAction($request, $slide);
 
         $slide->update(['expires_at' => null]);
 
@@ -164,6 +139,7 @@ class LocalSlideController extends Controller
         }
 
         $slide->update(['share_nearby' => true]);
+        Show::syncAutoFillForSlide($slide);
 
         return back()->with('success', 'Slide is now shared with nearby churches.');
     }
@@ -173,57 +149,25 @@ class LocalSlideController extends Controller
         $this->authorizeSlideAction($request, $slide);
 
         $slide->update(['share_nearby' => false]);
+        Show::removeAutoAddedLinksElsewhere($slide, exceptEntityId: $slide->entity_id);
 
         return back()->with('success', 'Slide is no longer shared with nearby churches.');
     }
 
     /**
-     * Shared permission gate for entity-admin slide actions: the user must be a
-     * member of the entity, an admin of it (or site admin), and own the slide
-     * (unless site admin), and the slide must belong to that entity.
+     * Shared permission gate for entity-admin slide actions: the user must be
+     * an admin of the entity (or site admin) and own the slide (unless site
+     * admin), and the slide must belong to that entity.
      */
     private function authorizeSlideAction(Request $request, Slide $slide): int
     {
+        $entityId = $this->authorizedEntityId($request);
         $user = $request->user();
-        $entityId = (int) $request->query('entity_id');
 
-        abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
-            403
-        );
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
         abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
         abort_unless($slide->entity_id === $entityId, 404);
 
         return $entityId;
-    }
-
-    public function reorder(Request $request)
-    {
-        $user = $request->user();
-        $entityId = (int) $request->query('entity_id');
-
-        abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
-            403
-        );
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
-
-        $request->validate([
-            'slides' => 'required|array',
-            'slides.*' => 'integer|exists:slides,id',
-        ]);
-
-        $slides = Slide::entityScoped($entityId)->whereIn('id', $request->input('slides'))->get();
-
-        foreach ($request->input('slides') as $index => $slideId) {
-            $slide = $slides->find($slideId);
-            if ($slide) {
-                $slide->update(['sort_order' => $index]);
-            }
-        }
-
-        return response()->json(['success' => true]);
     }
 
     private function slideResource(Slide $slide, bool $withMedia = false): array
@@ -243,7 +187,6 @@ class LocalSlideController extends Controller
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'status'            => $slide->status,
             'share_nearby'      => $slide->share_nearby,
-            'sort_order'        => $slide->sort_order,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
             'validation_issues' => $slide->validation_issues,

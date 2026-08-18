@@ -31,7 +31,6 @@ const form = useForm({
     publish_at:          toLocalDatetime(props.slide.publish_at),
     expires_at:          toLocalDatetime(props.slide.expires_at),
     status:              props.slide.status,
-    sort_order:          props.slide.sort_order,
     share_nearby:        props.slide.share_nearby ?? false,
 });
 
@@ -139,11 +138,6 @@ function submit() {
                             <option value="published">{{ $t('admin.published') }}</option>
                             <option value="rejected">{{ $t('admin.rejected') }}</option>
                         </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.sort_order') }}</label>
-                        <input v-model.number="form.sort_order" type="number" min="0"
-                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     </div>
                 </div>
 

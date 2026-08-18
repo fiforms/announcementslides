@@ -8,6 +8,7 @@ const props = defineProps({
     slides: { type: Array, default: () => [] },
     languages: { type: Array, default: () => [] },
     canSetStatus: { type: Boolean, default: false },
+    globalShowTemplates: { type: Array, default: () => [] },
 });
 
 const showUploadPanel = ref(false);
@@ -61,6 +62,7 @@ function formatBytes(bytes) {
                 v-if="showUploadPanel"
                 :languages="languages"
                 :show-status-select="canSetStatus"
+                :shows="globalShowTemplates"
                 redirect-route="my-slides.index"
                 @success="showUploadPanel = false"
             />

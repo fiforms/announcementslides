@@ -9,6 +9,7 @@ const props = defineProps({
     slides: { type: Array, default: () => [] },
     languages: { type: Array, default: () => [] },
     isAdmin: { type: Boolean, default: false },
+    shows: { type: Array, default: () => [] },
 });
 
 const page = usePage();
@@ -16,9 +17,6 @@ const user = page.props.auth.user;
 
 const showUploadPanel = ref(false);
 const showArchived = ref(false);
-const draggedSlide = ref(null);
-const dragOverSlide = ref(null);
-const dropPosition = ref(null); // 'before' | 'after'
 const orderedSlides = ref([...props.slides]);
 
 // Re-sync the local working copy whenever the server returns updated slides
@@ -89,80 +87,6 @@ function statusBadge(status) {
     return map[status] ?? 'bg-gray-100 text-gray-700';
 }
 
-function handleDragStart(e, slide) {
-    draggedSlide.value = slide;
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-function handleDragOver(e, slide) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-
-    // Don't show an indicator on the row being dragged.
-    if (!draggedSlide.value || draggedSlide.value.id === slide.id) {
-        dragOverSlide.value = null;
-        return;
-    }
-
-    // Decide before/after from the cursor's position within the row so the
-    // indicator edge matches exactly where the item will be inserted.
-    const rect = e.currentTarget.getBoundingClientRect();
-    const midpoint = rect.top + rect.height / 2;
-    dropPosition.value = e.clientY < midpoint ? 'before' : 'after';
-    dragOverSlide.value = slide;
-}
-
-function handleTableDragLeave(e) {
-    if (e.target.tagName === 'TBODY') {
-        dragOverSlide.value = null;
-        dropPosition.value = null;
-    }
-}
-
-function handleDrop(e, targetSlide) {
-    e.preventDefault();
-    const dragged = draggedSlide.value;
-    const position = dropPosition.value;
-    if (!dragged || dragged.id === targetSlide.id) {
-        return handleDragEnd();
-    }
-
-    const active = [...activeSlides.value];
-    const fromIndex = active.findIndex(s => s.id === dragged.id);
-    if (fromIndex === -1 || !active.some(s => s.id === targetSlide.id)) {
-        return handleDragEnd();
-    }
-
-    // Remove the dragged item first, then locate the target so the insertion
-    // index already accounts for the shift caused by removal.
-    active.splice(fromIndex, 1);
-    let insertIndex = active.findIndex(s => s.id === targetSlide.id);
-    if (position === 'after') insertIndex += 1;
-    active.splice(insertIndex, 0, dragged);
-
-    // Rebuild ordered list; archived slides keep their own (re-sorted) section.
-    orderedSlides.value = [...active, ...orderedSlides.value.filter(isSlideArchived)];
-    updateSortOrder();
-    handleDragEnd();
-}
-
-function handleDragEnd() {
-    draggedSlide.value = null;
-    dragOverSlide.value = null;
-    dropPosition.value = null;
-}
-
-function updateSortOrder() {
-    const slideIds = activeSlides.value.map(s => s.id);
-    fetch(route('local-slides.reorder', { entity_id: props.entity.id }), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
-        },
-        body: JSON.stringify({ slides: slideIds }),
-    }).catch(err => console.error('Failed to update sort order:', err));
-}
 </script>
 
 <template>
@@ -170,6 +94,10 @@ function updateSortOrder() {
         <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
             <!-- Upload Panel Toggle Button -->
             <div v-if="isAdmin" class="flex justify-end gap-3">
+                <Link :href="route('shows.index', { entity_id: entity.id })"
+                    class="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                    Manage Shows
+                </Link>
                 <Link :href="route('entity.slide-announcers.index', { entity: entity.id })"
                     class="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                     Slide Announcer Devices
@@ -197,6 +125,7 @@ function updateSortOrder() {
                 :redirect-params="{ entity_id: entity.id }"
                 :entity-id="entity.id"
                 :languages="languages"
+                :shows="shows"
                 @success="showUploadPanel = false"
             />
 
@@ -205,7 +134,6 @@ function updateSortOrder() {
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th v-if="isAdmin" class="px-4 py-3 text-left font-medium text-gray-500 w-8"></th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500">Slide</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">Status</th>
                             <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Dates</th>
@@ -213,27 +141,8 @@ function updateSortOrder() {
                             <th v-if="isAdmin" class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100" @dragleave="handleTableDragLeave" @dragend="handleDragEnd">
-                        <tr v-for="slide in activeSlides" :key="slide.id"
-                            class="hover:bg-gray-50 transition-colors"
-                            :class="{
-                                'opacity-50': draggedSlide?.id === slide.id,
-                            }"
-                            :style="dragOverSlide?.id === slide.id ? {
-                                boxShadow: dropPosition === 'before'
-                                    ? 'inset 0 3px 0 0 rgb(99, 102, 241)'
-                                    : 'inset 0 -3px 0 0 rgb(99, 102, 241)',
-                                backgroundColor: 'rgb(239, 246, 255)'
-                            } : {}"
-                            draggable="true"
-                            @dragstart="handleDragStart($event, slide)"
-                            @dragover="handleDragOver($event, slide)"
-                            @drop="handleDrop($event, slide)">
-                            <td v-if="isAdmin" class="px-3 py-3 text-center cursor-grab active:cursor-grabbing">
-                                <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                                    <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2z" />
-                                </svg>
-                            </td>
+                    <tbody class="divide-y divide-gray-100">
+                        <tr v-for="slide in activeSlides" :key="slide.id" class="hover:bg-gray-50 transition-colors">
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-3">
                                     <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">

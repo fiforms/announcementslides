@@ -14,7 +14,7 @@ class Slide extends Model
 
     protected $fillable = [
         'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
-        'status', 'sort_order', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
+        'status', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
         'share_nearby',
     ];
 
@@ -24,7 +24,6 @@ class Slide extends Model
             'publish_at'  => 'datetime',
             'expires_at'  => 'datetime',
             'reviewed_at' => 'datetime',
-            'sort_order'  => 'integer',
             'share_nearby' => 'boolean',
         ];
     }
@@ -54,6 +53,13 @@ class Slide extends Model
     public function media()
     {
         return $this->hasMany(SlideMedia::class);
+    }
+
+    public function shows()
+    {
+        return $this->belongsToMany(Show::class, 'show_slides')
+            ->withPivot('sort_order')
+            ->withTimestamps();
     }
 
     /**
@@ -133,6 +139,21 @@ class Slide extends Model
             return $query;
         }
         return $query->where(fn ($q) => $q->whereNull('language_id')->orWhere('language_id', $languageId));
+    }
+
+    /**
+     * Order slides by their position within a specific show. This is the
+     * single ordering path for every slide listing in the app — the Global
+     * Board, every entity's Main show, and any extra shows — replacing the
+     * old slides.sort_order column plus the per-feature "entity_id IS NOT
+     * NULL DESC" union that used to keep globals separate.
+     */
+    public function scopeOrderedInShow(Builder $query, int $showId): Builder
+    {
+        return $query->join('show_slides', 'show_slides.slide_id', '=', 'slides.id')
+            ->where('show_slides.show_id', $showId)
+            ->select('slides.*', 'show_slides.sort_order as show_sort_order')
+            ->orderBy('show_sort_order');
     }
 
     // ── Accessors ─────────────────────────────────────────────────────────────

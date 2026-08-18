@@ -13,6 +13,7 @@ use App\Http\Controllers\EntitySlideController;
 use App\Http\Controllers\LocalSlideController;
 use App\Http\Controllers\MySlideController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ShowController;
 use App\Http\Controllers\SlideController;
 use App\Http\Controllers\SubmitSlideController;
 use App\Http\Middleware\EnsureAdmin;
@@ -65,9 +66,19 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{slide}/unarchive', [LocalSlideController::class, 'unarchive'])->name('unarchive');
         Route::post('/{slide}/share-nearby', [LocalSlideController::class, 'shareNearby'])->name('share-nearby');
         Route::post('/{slide}/unshare-nearby', [LocalSlideController::class, 'unshareNearby'])->name('unshare-nearby');
-        Route::post('/reorder', [LocalSlideController::class, 'reorder'])->name('reorder');
         Route::post('/{slide}/media', [LocalSlideController::class, 'storeMedia'])->name('media.store');
         Route::delete('/{slide}/media/{media}', [LocalSlideController::class, 'destroyMedia'])->name('media.destroy');
+    });
+
+    // ── Entity leader: manage per-site "shows" (playlists) ──────────────────
+    Route::prefix('shows')->name('shows.')->group(function () {
+        Route::get('/', [ShowController::class, 'index'])->name('index');
+        Route::post('/', [ShowController::class, 'store'])->name('store');
+        Route::patch('/{show}', [ShowController::class, 'update'])->name('update');
+        Route::delete('/{show}', [ShowController::class, 'destroy'])->name('destroy');
+        Route::post('/{show}/slides', [ShowController::class, 'attach'])->name('slides.attach');
+        Route::delete('/{show}/slides/{slide}', [ShowController::class, 'detach'])->name('slides.detach');
+        Route::post('/{show}/reorder', [ShowController::class, 'reorder'])->name('reorder');
     });
 
     // ── Entity leader: entity-scoped slide management ──────────────────────

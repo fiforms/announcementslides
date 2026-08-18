@@ -13,6 +13,9 @@ const props = defineProps({
     languages:         { type: Array, default: () => [] },
     pendingMessage:    { type: String, default: null },
     showStatusSelect:  { type: Boolean, default: false },
+    // Entity uploads: that entity's non-main shows ({id, name}). Global
+    // uploads: active global "separate show" templates ({id, name}).
+    shows:             { type: Array, default: () => [] },
 });
 
 const emit = defineEmits(['success']);
@@ -32,6 +35,9 @@ const publishAt     = ref('');
 const expiresAt     = ref('');
 const status        = ref('published');
 const shareNearby   = ref(false);
+const addToShow     = ref('main'); // 'main' | 'separate' | 'none'
+const targetShowId  = ref('');
+const newShowName   = ref('');
 
 const canSubmit = computed(() => selectedFiles.value.length > 0 && title.value.trim());
 
@@ -83,6 +89,19 @@ async function submit() {
         payload.share_nearby = shareNearby.value;
     }
 
+    payload.add_to_show = addToShow.value;
+    if (addToShow.value === 'separate') {
+        if (targetShowId.value) {
+            if (props.entityId) {
+                payload.show_id = targetShowId.value;
+            } else {
+                payload.global_template_id = targetShowId.value;
+            }
+        } else {
+            payload.new_show_name = newShowName.value;
+        }
+    }
+
     const result = await upload(selectedFiles.value, payload);
 
     if (result) {
@@ -98,6 +117,9 @@ async function submit() {
                 publishAt.value     = '';
                 expiresAt.value     = '';
                 shareNearby.value   = false;
+                addToShow.value     = 'main';
+                targetShowId.value  = '';
+                newShowName.value   = '';
                 emit('success');
             },
         });
@@ -225,6 +247,34 @@ async function submit() {
                         <option value="pending">Pending (submit for review)</option>
                         <option value="draft">Draft (not visible)</option>
                     </select>
+                </div>
+
+                <div class="sm:col-span-2 space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Add to show</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="addToShow" type="radio" value="main"
+                            class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        Add to Main Show (default)
+                    </label>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="addToShow" type="radio" value="separate"
+                            class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        Add to a different show
+                    </label>
+                    <div v-if="addToShow === 'separate'" class="ml-6 flex flex-wrap items-center gap-2">
+                        <select v-model="targetShowId"
+                            class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">+ Create new show…</option>
+                            <option v-for="s in shows" :key="s.id" :value="s.id">{{ s.name }}</option>
+                        </select>
+                        <input v-if="!targetShowId" v-model="newShowName" type="text" placeholder="New show name"
+                            class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    </div>
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="addToShow" type="radio" value="none"
+                            class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        Do not add to any show
+                    </label>
                 </div>
 
                 <div v-if="entityId" class="sm:col-span-2">
