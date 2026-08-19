@@ -8,6 +8,7 @@ const props = defineProps({
     selectable: { type: Boolean, default: false },
     selected: { type: Boolean, default: false },
     showExpiry: { type: Boolean, default: true },
+    showValidationWarning: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['toggle-select', 'open']);
@@ -75,7 +76,7 @@ const previewSrc = computed(() => {
                 </svg>
             </div>
             <!-- Validation warning badge -->
-            <div v-if="slide.validation_issues?.length" class="absolute top-2 right-2">
+            <div v-if="slide.validation_issues?.length && showValidationWarning" class="absolute top-2 right-2">
                 <button @click.stop="showValidationDetails = !showValidationDetails"
                     class="relative group">
                     <svg class="h-6 w-6 text-yellow-400 drop-shadow-md" fill="currentColor" viewBox="0 0 20 20">

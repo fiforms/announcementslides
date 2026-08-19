@@ -63,14 +63,15 @@ class ImageValidationService
     private function checkResolution(int $width, int $height): array
     {
         $megapixels = ($width * $height) / 1_000_000;
+        $displayMp = round($megapixels, 1);
         $issues = [];
 
         if ($megapixels < self::MIN_RESOLUTION_MP) {
-            $issues[] = "Low resolution ({$megapixels}MP) — image may appear pixelated";
+            $issues[] = "Low resolution ({$displayMp}MP) — image may appear pixelated";
         }
 
         if ($megapixels > self::MAX_RESOLUTION_MP) {
-            $issues[] = "High resolution ({$megapixels}MP) — may degrade slideshow performance";
+            $issues[] = "High resolution ({$displayMp}MP) — may degrade slideshow performance";
         }
 
         return $issues;

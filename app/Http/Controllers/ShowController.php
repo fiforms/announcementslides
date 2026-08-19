@@ -299,6 +299,7 @@ class ShowController extends Controller
             'publish_at' => $slide->publish_at?->toIso8601String(),
             'expires_at' => $slide->expires_at?->toIso8601String(),
             'uploader' => $slide->uploader?->only('id', 'name'),
+            'validation_issues' => $slide->validation_issues,
             'zone' => isset($slide->show_sort_order) ? SortZones::zoneFor((int) $slide->show_sort_order) : null,
         ];
     }
