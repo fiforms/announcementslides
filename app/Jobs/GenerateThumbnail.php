@@ -35,6 +35,7 @@ class GenerateThumbnail implements ShouldQueue
 
         if (file_exists($thumbFullPath)) {
             $this->media->update(['thumbnail_path' => $thumbRelPath]);
+            SyncOverlayThumbnail::dispatch($this->media->slide_id);
         }
     }
 

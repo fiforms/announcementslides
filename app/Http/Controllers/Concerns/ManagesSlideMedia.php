@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Concerns;
 
 use App\Jobs\GenerateThumbnail;
+use App\Jobs\SyncOverlayThumbnail;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use Illuminate\Http\Request;
@@ -71,6 +72,8 @@ trait ManagesSlideMedia
 
         Storage::disk('public')->delete(array_filter([$media->disk_path, $media->thumbnail_path]));
         $media->delete();
+
+        SyncOverlayThumbnail::dispatch($slide->id);
     }
 
     /**

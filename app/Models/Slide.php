@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use App\Models\Entity;
 use App\Models\User;
 
@@ -16,7 +17,7 @@ class Slide extends Model
     protected $fillable = [
         'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
         'status', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
-        'share_nearby', 'fanout_sort_order',
+        'share_nearby', 'fanout_sort_order', 'overlay_thumbnail_path',
     ];
 
     protected function casts(): array
@@ -170,8 +171,18 @@ class Slide extends Model
         return $this->primaryMedia?->file_url;
     }
 
+    /**
+     * The primary media's thumbnail, unless SyncOverlayThumbnail has flattened
+     * an overlay on top of it — every card/row/listing that just renders this
+     * one attribute therefore shows the slide+overlay combo automatically,
+     * with no per-consumer changes needed.
+     */
     public function getThumbnailUrlAttribute(): ?string
     {
+        if ($this->overlay_thumbnail_path) {
+            return Storage::disk('public')->url($this->overlay_thumbnail_path);
+        }
+
         return $this->primaryMedia?->thumbnail_url;
     }
 

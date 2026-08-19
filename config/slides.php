@@ -29,6 +29,21 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | rsvg-convert binary
+    |--------------------------------------------------------------------------
+    |
+    | Used by SyncOverlayThumbnail to rasterize an SVG overlay before
+    | compositing it with GD, which can't decode SVG itself. From the
+    | librsvg2-bin package on Debian/Ubuntu (librsvg via Homebrew on macOS).
+    | Optional — if the binary isn't installed, SVG overlays are simply
+    | skipped (the slide's thumbnail falls back to the primary alone) rather
+    | than failing; every other overlay format (PNG/WebP) is unaffected.
+    |
+    */
+    'rsvg_binary' => env('RSVG_BINARY', 'rsvg-convert'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Media types
     |--------------------------------------------------------------------------
     |
