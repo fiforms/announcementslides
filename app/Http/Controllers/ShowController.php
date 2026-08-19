@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesEntityAccess;
+use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Models\Entity;
 use App\Models\Language;
 use App\Models\Show;
@@ -17,6 +18,7 @@ use Inertia\Response;
 class ShowController extends Controller
 {
     use AuthorizesEntityAccess;
+    use ManagesSlideMedia;
 
     public function index(Request $request): Response
     {
@@ -29,7 +31,7 @@ class ShowController extends Controller
         $selectedShowId = (int) ($request->query('show_id') ?: $mainShow->id);
         $selectedShow = $shows->firstWhere('id', $selectedShowId) ?? $mainShow;
 
-        $showSlides = Slide::with(['primaryMedia', 'uploader'])
+        $showSlides = Slide::with(['primaryMedia', 'overlayMedia', 'media', 'uploader'])
             ->orderedInShow($selectedShow->id)
             ->get();
 
@@ -50,6 +52,7 @@ class ShowController extends Controller
             'unusedSlides' => $unusedSlides->map(fn ($s) => $this->slideResource($s)),
             'isAdmin' => $isAdmin,
             'languages' => $languages,
+            'mediaTypes' => $this->mediaTypesForFrontend(),
         ]);
     }
 
@@ -269,7 +272,7 @@ class ShowController extends Controller
         $radius = (float) config('slides.nearby_radius_miles');
         $nearbyIds = NearbyEntities::within($entity, $radius);
 
-        return Slide::with(['primaryMedia', 'uploader'])
+        return Slide::with(['primaryMedia', 'overlayMedia', 'media', 'uploader'])
             ->current()
             ->where(function ($q) use ($entity, $nearbyIds) {
                 $q->whereNull('entity_id')->orWhere('entity_id', $entity->id);
@@ -294,12 +297,15 @@ class ShowController extends Controller
             'mime_type' => $slide->mime_type,
             'file_url' => $slide->file_url,
             'thumbnail_url' => $slide->thumbnail_url,
+            'overlay_url' => $slide->overlay_url,
+            'overlay_mime_type' => $slide->overlay_mime_type,
             'status' => $slide->status,
             'share_nearby' => $slide->share_nearby,
             'publish_at' => $slide->publish_at?->toIso8601String(),
             'expires_at' => $slide->expires_at?->toIso8601String(),
             'uploader' => $slide->uploader?->only('id', 'name'),
             'validation_issues' => $slide->validation_issues,
+            'media' => $this->mediaResource($slide),
             'zone' => isset($slide->show_sort_order) ? SortZones::zoneFor((int) $slide->show_sort_order) : null,
         ];
     }

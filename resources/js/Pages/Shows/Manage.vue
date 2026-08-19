@@ -6,6 +6,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
 import ShowSlideRow from '@/Components/ShowSlideRow.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
+import MediaManager from '@/Components/MediaManager.vue';
 import { useLightbox } from '@/Composables/useLightbox.js';
 
 const props = defineProps({
@@ -16,6 +17,7 @@ const props = defineProps({
     unusedSlides: { type: Array, default: () => [] },
     isAdmin: { type: Boolean, default: false },
     languages: { type: Array, default: () => [] },
+    mediaTypes: { type: Array, default: () => [] },
 });
 
 const { locale } = useI18n();
@@ -484,10 +486,17 @@ function persistLeaderOrder() {
 
             <div v-if="editingSlide" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
                 @click.self="closeEdit">
-                <div class="w-full max-w-lg rounded-xl bg-white p-6 shadow-lg space-y-4">
+                <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg space-y-4">
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-semibold text-gray-900">Edit Slide</h3>
                         <button @click="closeEdit" class="text-gray-400 hover:text-gray-600">&times;</button>
+                    </div>
+
+                    <div class="aspect-video w-full max-w-sm overflow-hidden rounded-lg bg-slate-100">
+                        <img v-if="editingSlide.thumbnail_url || editingSlide.file_url"
+                            :src="editingSlide.thumbnail_url || editingSlide.file_url"
+                            :alt="editingSlide.title"
+                            class="h-full w-full object-contain" />
                     </div>
 
                     <form @submit.prevent="submitEdit" class="space-y-4">
@@ -563,6 +572,10 @@ function persistLeaderOrder() {
                             </button>
                         </div>
                     </form>
+
+                    <MediaManager :slide="editingSlide" :media-types="mediaTypes"
+                        store-route="local-slides.media.store" destroy-route="local-slides.media.destroy"
+                        :route-params="{ entity_id: entity.id }" :reload-only="['showSlides', 'unusedSlides']" />
                 </div>
             </div>
         </div>

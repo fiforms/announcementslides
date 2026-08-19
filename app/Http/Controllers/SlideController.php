@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Models\Entity;
 use App\Models\GlobalShowTemplate;
 use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Models\SlideMedia;
 use App\Support\NearbyEntities;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +23,8 @@ use ZipArchive;
 
 class SlideController extends Controller
 {
+    use ManagesSlideMedia;
+
     public function index(Request $request): Response
     {
         $languageCode = $request->query('language');
@@ -78,7 +82,7 @@ class SlideController extends Controller
         // Language filtering only applies in Global View: an entity's shows
         // already encode their own preferred language (see Show::$language_id),
         // so filtering again on top would fight the leader's own curation.
-        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia'])->orderedInShow($showId)->current();
+        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->orderedInShow($showId)->current();
         if (!$entityId) {
             $slidesQuery->language($languageId);
         }
@@ -117,7 +121,7 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        $query = Slide::with(['primaryMedia', 'overlayMedia'])->archived()->language($languageId);
+        $query = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->archived()->language($languageId);
 
         if ($entityId) {
             $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
@@ -154,7 +158,21 @@ class SlideController extends Controller
         $media = $slide->primaryMedia;
         abort_unless($media, 404);
 
-        return Storage::download($media->disk_path, $media->original_filename);
+        return Storage::disk('public')->download($media->disk_path, $media->original_filename);
+    }
+
+    /**
+     * Download any of a slide's attached media (overlay, flyer PDF, social
+     * image, ...), not just the primary file — used by the lightbox's
+     * per-attachment download buttons. Gated the same way any other
+     * public-facing slide content is: the slide must be current.
+     */
+    public function downloadMedia(Slide $slide, SlideMedia $media)
+    {
+        abort_unless($media->slide_id === $slide->id, 404);
+        abort_unless(Slide::current()->whereKey($slide->id)->exists(), 404);
+
+        return Storage::disk('public')->download($media->disk_path, $media->original_filename);
     }
 
     public function downloadZip(Request $request)
@@ -309,6 +327,7 @@ class SlideController extends Controller
             'validation_issues' => $slide->validation_issues,
             'validation_status' => $slide->validation_status,
             'entity_id'         => $slide->entity_id,
+            'media'             => $this->mediaResource($slide),
         ];
     }
 }

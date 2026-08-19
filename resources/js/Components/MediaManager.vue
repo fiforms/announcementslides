@@ -9,6 +9,7 @@ const props = defineProps({
     storeRoute: { type: String, required: true },
     destroyRoute: { type: String, required: true },
     routeParams: { type: Object, default: () => ({}) },
+    reloadOnly: { type: Array, default: () => ['slide'] },
 });
 
 const selectedType = ref(props.mediaTypes[0]?.value ?? 'slide-overlay');
@@ -50,7 +51,7 @@ async function onFileSelected(event) {
 
     const result = await upload([file], { media_type: selectedType.value });
     if (result) {
-        router.reload({ only: ['slide'] });
+        router.reload({ only: props.reloadOnly });
     }
     if (fileInput.value) fileInput.value.value = '';
 }
@@ -59,6 +60,8 @@ function removeMedia(media) {
     if (!confirm(`Remove this ${labelFor(media.media_type)} file?`)) return;
     router.delete(route(props.destroyRoute, { ...props.routeParams, slide: props.slide.id, media: media.id }), {
         preserveScroll: true,
+        preserveState: true,
+        only: props.reloadOnly,
     });
 }
 </script>
