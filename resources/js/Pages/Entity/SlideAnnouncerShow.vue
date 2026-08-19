@@ -1,6 +1,7 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useForm, router, Link } from '@inertiajs/vue3';
+import QRCode from 'qrcode';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
@@ -22,6 +23,7 @@ const form = useForm({
     language_id: props.device.language_id ?? '',
     update_channel: props.device.update_channel,
     auto_update_enabled: props.device.auto_update_enabled,
+    srt_sink_enabled: props.device.srt_sink_enabled,
     interval_seconds: interval_seconds ?? 10,
     settings_pin: settings_pin ?? '',
     settings_text: JSON.stringify(otherSettings, null, 2),
@@ -59,6 +61,7 @@ function submit() {
         language_id: data.language_id || null,
         update_channel: data.update_channel,
         auto_update_enabled: data.auto_update_enabled,
+        srt_sink_enabled: data.srt_sink_enabled,
         settings: {
             ...settings,
             interval_seconds: Number(data.interval_seconds),
@@ -77,6 +80,28 @@ function unpair() {
 
 function formatDate(iso) {
     return iso ? new Date(iso).toLocaleString() : 'Never';
+}
+
+function copyPassphrase() {
+    if (props.device.srt_sink_passphrase) navigator.clipboard?.writeText(props.device.srt_sink_passphrase);
+}
+
+// Mirrors slideannouncer/local-app/backend/srt_sink.py's connect_url() —
+// same port/mode/latency, built here instead of round-tripping to the
+// device, since the server already has both hostname and passphrase from
+// the device's own heartbeat reports.
+const connectUrl = computed(() => {
+    if (!props.device.hostname || !props.device.srt_sink_passphrase) return null;
+    return `srt://${props.device.hostname}.local:7002?mode=caller&latency=120000&passphrase=${encodeURIComponent(props.device.srt_sink_passphrase)}`;
+});
+
+const qrDataUrl = ref(null);
+watch(connectUrl, async (url) => {
+    qrDataUrl.value = url ? await QRCode.toDataURL(url, { width: 180, margin: 1 }) : null;
+}, { immediate: true });
+
+function copyConnectUrl() {
+    if (connectUrl.value) navigator.clipboard?.writeText(connectUrl.value);
 }
 </script>
 
@@ -193,6 +218,37 @@ function formatDate(iso) {
                     <input v-model.number="form.interval_seconds" type="number" min="1" step="1" required
                         class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     <p class="mt-1 text-xs text-gray-500">How long each slide stays on screen before switching to the next.</p>
+                </div>
+
+                <div class="rounded-lg border border-gray-200 p-4 space-y-2">
+                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                        <input v-model="form.srt_sink_enabled" type="checkbox"
+                            class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                        Allow SRT video sink
+                    </label>
+                    <p class="text-xs text-gray-500">
+                        Lets a video-switcher on this church's network push a live video feed directly to this device
+                        over SRT (still requires the device's own on-device Settings toggle to also be on).
+                        Unchecking this force-disables it fleet-wide, overriding the device's own toggle.
+                    </p>
+                    <div v-if="device.srt_sink_passphrase" class="flex items-center gap-2 pt-1">
+                        <span class="text-xs text-gray-500">Passphrase:</span>
+                        <code class="rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-800">{{ device.srt_sink_passphrase }}</code>
+                        <button type="button" @click="copyPassphrase" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                            Copy
+                        </button>
+                    </div>
+                    <p v-else class="text-xs text-gray-400">
+                        Not generated yet — the device creates this itself the first time SRT Sink is enabled there.
+                    </p>
+                    <div v-if="connectUrl" class="flex items-start gap-2 pt-1">
+                        <span class="text-xs text-gray-500 whitespace-nowrap pt-1">Connect With:</span>
+                        <code class="flex-1 min-w-0 break-all rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-800">{{ connectUrl }}</code>
+                        <button type="button" @click="copyConnectUrl" class="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800">
+                            Copy
+                        </button>
+                    </div>
+                    <img v-if="qrDataUrl" :src="qrDataUrl" alt="Connect With QR code" class="mt-2 rounded border border-gray-200" width="180" height="180" />
                 </div>
 
                 <div>

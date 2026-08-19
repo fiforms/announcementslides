@@ -152,6 +152,10 @@ class EntitySlideAnnouncerController extends Controller
             'language_id' => 'sometimes|nullable|exists:languages,id',
             'update_channel' => 'sometimes|in:stable,testing,developer',
             'auto_update_enabled' => 'sometimes|boolean',
+            // Fleet-wide force-disable for SRT Sink — the passphrase itself
+            // is never admin-settable here, only device-reported (see
+            // SlideAnnouncerHeartbeatController::store()).
+            'srt_sink_enabled' => 'sometimes|boolean',
             'settings' => 'sometimes|array',
         ]);
 
@@ -198,6 +202,9 @@ class EntitySlideAnnouncerController extends Controller
             'architecture' => $device->architecture,
             'update_channel' => $device->update_channel,
             'auto_update_enabled' => $device->auto_update_enabled,
+            'srt_sink_enabled' => $device->srt_sink_enabled,
+            'srt_sink_passphrase' => $device->srt_sink_passphrase,
+            'hostname' => $device->hostname,
             'settings' => $device->settings,
             'last_seen_at' => $device->last_seen_at?->toIso8601String(),
             'last_ip' => $device->last_ip,

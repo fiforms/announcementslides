@@ -26,6 +26,19 @@ class SlideAnnouncerHeartbeatController extends Controller
             'os_version' => 'nullable|string|max:255',
             'architecture' => 'nullable|string|max:64',
             'cpu_temp_c' => 'nullable|numeric',
+            // Device-generated (never operator-typed — see
+            // slideannouncer/local-app/backend/srt_sink.py), reported here
+            // purely so an admin can read it off the fleet dashboard to
+            // configure their SRT sender. Only present once the device has
+            // enabled SRT Sink locally at least once; absent otherwise, in
+            // which case the previously-stored value (if any) is left alone.
+            'srt_sink_passphrase' => 'nullable|string|max:255',
+            // The device's own mDNS name (e.g. slideannouncer-123456, or a
+            // slideannouncer.yaml override — see firstboot.py's
+            // set_hostname()), reported every heartbeat so the fleet
+            // dashboard can build the same "Connect With" srt:// URL the
+            // device's own Settings > Video Receiver screen shows.
+            'hostname' => 'nullable|string|max:255',
         ]);
 
         $device = $request->user();
@@ -38,6 +51,8 @@ class SlideAnnouncerHeartbeatController extends Controller
             'last_ip' => $ip,
             'last_cpu_temp_c' => $data['cpu_temp_c'] ?? $device->last_cpu_temp_c,
             'last_seen_at' => now(),
+            'srt_sink_passphrase' => $data['srt_sink_passphrase'] ?? $device->srt_sink_passphrase,
+            'hostname' => $data['hostname'] ?? $device->hostname,
         ]);
 
         SlideAnnouncerHeartbeat::create([
@@ -85,6 +100,11 @@ class SlideAnnouncerHeartbeatController extends Controller
             // dance) without guessing from the URL/filename.
             'os_release_type' => $osUpdateAvailable ? $activeOsRelease->release_type : null,
             'os_auto_update_enabled' => $device->auto_update_enabled,
+            // Fleet-wide force-disable for SRT Sink (EntitySlideAnnouncerController::update) —
+            // an explicit false here always overrides the device's own local
+            // Settings toggle; see slideannouncer/local-app/backend/srt_sink.py's
+            // effective_enabled() for how the device folds this in.
+            'srt_sink_enabled' => $device->srt_sink_enabled,
         ]);
     }
 

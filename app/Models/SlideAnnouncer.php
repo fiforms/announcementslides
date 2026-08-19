@@ -20,6 +20,9 @@ class SlideAnnouncer extends Model
         'architecture',
         'update_channel',
         'auto_update_enabled',
+        'srt_sink_enabled',
+        'srt_sink_passphrase',
+        'hostname',
         'settings',
         'last_seen_at',
         'last_ip',
@@ -31,6 +34,7 @@ class SlideAnnouncer extends Model
 
     protected $casts = [
         'auto_update_enabled' => 'boolean',
+        'srt_sink_enabled' => 'boolean',
         'settings' => 'array',
         'last_seen_at' => 'datetime',
         'paired_at' => 'datetime',
