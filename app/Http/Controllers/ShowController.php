@@ -180,6 +180,24 @@ class ShowController extends Controller
         return back()->with('success', 'Slide removed from show.');
     }
 
+    /**
+     * Bulk-detach every slide in this show that's currently expired — the
+     * one-click cleanup for the show editor's collapsible "expired" pane.
+     * Expiry never detaches a slide on its own (it's a query-time filter
+     * everywhere else), so this is the explicit action that actually removes
+     * the pivot rows once someone decides they're done sitting there.
+     */
+    public function detachExpired(Request $request, Show $show)
+    {
+        $entityId = $this->authorizedEntityId($request);
+        abort_unless($show->entity_id === $entityId, 404);
+
+        $expiredIds = $show->slides()->archived()->pluck('slides.id');
+        $show->slides()->detach($expiredIds);
+
+        return back()->with('success', 'Expired slides removed from show.');
+    }
+
     public function reorder(Request $request, Show $show)
     {
         $entityId = $this->authorizedEntityId($request);

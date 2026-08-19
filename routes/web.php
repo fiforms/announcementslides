@@ -78,6 +78,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::delete('/{show}', [ShowController::class, 'destroy'])->name('destroy');
         Route::post('/{show}/slides', [ShowController::class, 'attach'])->name('slides.attach');
         Route::delete('/{show}/slides/{slide}', [ShowController::class, 'detach'])->name('slides.detach');
+        Route::post('/{show}/slides/detach-expired', [ShowController::class, 'detachExpired'])->name('slides.detachExpired');
         Route::post('/{show}/reorder', [ShowController::class, 'reorder'])->name('reorder');
     });
 

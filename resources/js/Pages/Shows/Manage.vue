@@ -85,6 +85,25 @@ function submitEdit() {
     });
 }
 
+// A slide "expires out" of a show the same way it expires out of the real
+// rotation: it stays attached (nothing detaches it automatically), it just
+// stops being current. This mirrors that in the editor by splitting the
+// "In this show" list into what's actually current and what's expired.
+function isExpired(slide) {
+    return !!slide.expires_at && new Date(slide.expires_at).getTime() <= Date.now();
+}
+
+const activeInShow = computed(() => inShow.value.filter(s => !isExpired(s)));
+const expiredInShow = computed(() => inShow.value.filter(s => isExpired(s)));
+const showExpiredPane = ref(false);
+
+function detachAllExpired() {
+    if (!expiredInShow.value.length) return;
+    if (!confirm(`Remove ${expiredInShow.value.length} expired slide(s) from "${selectedShow.value.name}"?`)) return;
+    router.post(route('shows.slides.detachExpired', { show: props.selectedShowId, entity_id: props.entity.id }),
+        {}, { preserveScroll: true });
+}
+
 // The interface language's matching `languages` row, if any — used as the
 // default for blank/ephemeral language selectors (never forced onto a
 // show's actual persisted setting, which may genuinely be "any language").
@@ -351,7 +370,7 @@ function persistOrder() {
                     @dragover.prevent @drop="dropOnShow()">
                     <h2 class="mb-3 text-sm font-semibold text-gray-700">In "{{ selectedShow?.name }}"</h2>
                     <div class="space-y-2 min-h-[8rem]">
-                        <div v-for="slide in inShow" :key="slide.id" draggable="true"
+                        <div v-for="slide in activeInShow" :key="slide.id" draggable="true"
                             @dragstart="dragStart(slide, 'show')" @dragend="dragEnd"
                             @dragover.prevent.stop @drop.stop="dropOnShow(slide)"
                             class="flex items-center gap-3 rounded-lg border border-gray-200 p-2 cursor-grab active:cursor-grabbing hover:bg-gray-50">
@@ -372,7 +391,48 @@ function persistOrder() {
                                 </svg>
                             </button>
                         </div>
-                        <p v-if="!inShow.length" class="text-sm text-gray-400">Drag slides here from "Unused slides."</p>
+                        <p v-if="!activeInShow.length" class="text-sm text-gray-400">Drag slides here from "Unused slides."</p>
+                    </div>
+
+                    <div v-if="expiredInShow.length" class="mt-4 border-t border-gray-100 pt-3">
+                        <button type="button" @click="showExpiredPane = !showExpiredPane"
+                            class="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700">
+                            <span>{{ showExpiredPane ? '▾' : '▸' }} Expired in this show ({{ expiredInShow.length }})</span>
+                        </button>
+
+                        <div v-if="showExpiredPane" class="mt-2 space-y-2">
+                            <div class="flex justify-end">
+                                <button type="button" @click="detachAllExpired"
+                                    class="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50">
+                                    Archive all
+                                </button>
+                            </div>
+                            <div v-for="slide in expiredInShow" :key="slide.id"
+                                class="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-2 opacity-75">
+                                <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
+                                    <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-medium text-gray-700 line-clamp-1">{{ slide.title }}</p>
+                                    <span :class="scopeBadge(slide).classes" class="mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+                                        <span :class="scopeBadge(slide).dot" class="h-1.5 w-1.5 rounded-full"></span>
+                                        {{ scopeBadge(slide).label }}
+                                    </span>
+                                </div>
+                                <button v-if="canEdit(slide)" @click.stop="openEdit(slide)" title="Edit slide"
+                                    class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                                        <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-9 9a2 2 0 0 1-.878.507l-3 .824a.5.5 0 0 1-.615-.615l.824-3a2 2 0 0 1 .507-.878l9-9Z" />
+                                    </svg>
+                                </button>
+                                <button type="button" @click.stop="detachSlide(slide.id)" title="Remove from show"
+                                    class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                                        <path fill-rule="evenodd" d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -380,7 +440,7 @@ function persistOrder() {
             <div class="text-center">
                 <Link :href="route('slides.archive', { entity_id: entity.id })"
                     class="text-sm font-medium text-gray-500 hover:text-gray-700">
-                    View archived (expired) slides →
+                    All archived (expired) slides →
                 </Link>
             </div>
 
