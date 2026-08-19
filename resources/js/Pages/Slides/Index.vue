@@ -219,6 +219,7 @@ onUnmounted(() => {
                 :slide="slide"
                 :selectable="true"
                 :selected="selectedIds.has(slide.id)"
+                :show-expiry="false"
                 @toggle-select="toggleSelect"
                 @open="openLightbox"
             />

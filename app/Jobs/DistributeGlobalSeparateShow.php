@@ -43,8 +43,8 @@ class DistributeGlobalSeparateShow implements ShouldQueue
                     ['name' => $template->name, 'is_main' => false, 'auto_delete_when_empty' => true]
                 );
 
-                $nextOrder = (int) ($show->slides()->max('show_slides.sort_order') ?? -1) + 1;
-                $show->slides()->syncWithoutDetaching([$slide->id => ['sort_order' => $nextOrder]]);
+                $sortOrder = $slide->assignFanoutSortOrderIfNeeded();
+                $show->slides()->syncWithoutDetaching([$slide->id => ['sort_order' => $sortOrder, 'auto_added' => true]]);
             }
         });
     }

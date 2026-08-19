@@ -118,7 +118,6 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/slides/{slide}/reject', [AdminSlideController::class, 'reject'])->name('slides.reject');
     Route::post('/slides/{slide}/archive', [AdminSlideController::class, 'archive'])->name('slides.archive');
     Route::post('/slides/{slide}/unarchive', [AdminSlideController::class, 'unarchive'])->name('slides.unarchive');
-    Route::post('/slides/reorder', [AdminSlideController::class, 'reorder'])->name('slides.reorder');
     Route::post('/slides/{slide}/media', [AdminSlideController::class, 'storeMedia'])->name('slides.media.store');
     Route::delete('/slides/{slide}/media/{media}', [AdminSlideController::class, 'destroyMedia'])->name('slides.media.destroy');
 

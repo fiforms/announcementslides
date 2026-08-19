@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use App\Models\Entity;
 use App\Models\User;
 
@@ -15,7 +16,7 @@ class Slide extends Model
     protected $fillable = [
         'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
         'status', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
-        'share_nearby',
+        'share_nearby', 'fanout_sort_order',
     ];
 
     protected function casts(): array
@@ -239,5 +240,32 @@ class Slide extends Model
     public function isVideo(): bool
     {
         return (bool) $this->primaryMedia?->isVideo();
+    }
+
+    /**
+     * The slide's stable position within its automatic sort zone (global or
+     * nearby) — assigned once, the first time it becomes eligible for that
+     * kind of fan-out, by atomically decrementing the matching SortCounter.
+     * Reused as-is for every show it's fanned into afterward, which is what
+     * makes a slide's relative order identical and predictable across shows.
+     * Never reassigned once set, even if the slide temporarily stops being
+     * eligible (e.g. share_nearby toggled off and back on).
+     */
+    public function assignFanoutSortOrderIfNeeded(): int
+    {
+        if ($this->fanout_sort_order !== null) {
+            return $this->fanout_sort_order;
+        }
+
+        $key = $this->entity_id === null ? 'global' : 'nearby';
+
+        return DB::transaction(function () use ($key) {
+            $counter = SortCounter::where('key', $key)->lockForUpdate()->first();
+            $counter->decrement('value');
+            $this->fanout_sort_order = $counter->value;
+            $this->save();
+
+            return $this->fanout_sort_order;
+        });
     }
 }

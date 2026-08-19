@@ -8,7 +8,9 @@ use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Support\NearbyEntities;
+use App\Support\SortZones;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -145,7 +147,10 @@ class ShowController extends Controller
         $entityId = $this->authorizedEntityId($request);
         abort_unless($show->entity_id === $entityId, 404);
 
-        $request->validate(['slide_id' => 'required|integer|exists:slides,id']);
+        $request->validate([
+            'slide_id' => 'required|integer|exists:slides,id',
+            'zone' => ['nullable', Rule::in(SortZones::leaderZones())],
+        ]);
 
         $entity = Entity::findOrFail($entityId);
         $radius = (float) config('slides.nearby_radius_miles');
@@ -162,12 +167,26 @@ class ShowController extends Controller
 
         abort_unless($visible, 404);
 
-        $nextOrder = (int) ($show->slides()->max('show_slides.sort_order') ?? -1) + 1;
+        $zone = $request->input('zone', SortZones::LEADER_LATE);
         $show->slides()->syncWithoutDetaching([
-            $request->slide_id => ['sort_order' => $nextOrder, 'auto_added' => false],
+            $request->slide_id => ['sort_order' => static::nextSortOrderInZone($show, $zone), 'auto_added' => false],
         ]);
 
         return back()->with('success', 'Slide added to show.');
+    }
+
+    /**
+     * The sort_order for appending one more slide to the end of $zone within
+     * $show — the zone's own start if it's currently empty, otherwise one
+     * past its current max (clamped to the zone's end, which in practice is
+     * never reached since a zone holds RANGE_SIZE possible positions).
+     */
+    public static function nextSortOrderInZone(Show $show, string $zone): int
+    {
+        [$start, $end] = SortZones::bounds($zone);
+        $max = $show->slides()->wherePivotBetween('sort_order', [$start, $end])->max('show_slides.sort_order');
+
+        return $max === null ? $start : min((int) $max + 1, $end);
     }
 
     public function detach(Request $request, Show $show, Slide $slide)
@@ -204,25 +223,33 @@ class ShowController extends Controller
         abort_unless($show->entity_id === $entityId, 404);
 
         $request->validate([
-            'slides' => 'required|array',
-            'slides.*' => 'integer|exists:slides,id',
+            'zones' => 'required|array',
+            'zones.*' => 'array',
+            'zones.*.*' => 'integer|exists:slides,id',
         ]);
 
-        static::persistOrder($show, $request->input('slides'));
+        static::persistLeaderOrder($show, $request->input('zones'));
 
         return response()->json(['success' => true]);
     }
 
     /**
-     * Given an ordered list of slide IDs, persist that order into a show's
-     * show_slides pivot. Shared with Admin\SlideController::reorder(), which
-     * uses this same mechanism against the Global Board.
+     * Given ordered slide-id arrays keyed by leader zone (leader_early,
+     * leader_mid, leader_late), rewrite each listed slide's pivot sort_order
+     * to its position within that zone and mark it manually placed
+     * (auto_added = false) — including a slide that was previously sitting
+     * in the global/nearby zone, since a leader dragging it into a leader
+     * zone *is* the manual override (see SortZones docblock). A slide not
+     * present in any of the three arrays is left untouched.
      */
-    public static function persistOrder(Show $show, array $orderedSlideIds): void
+    public static function persistLeaderOrder(Show $show, array $zones): void
     {
         $sync = [];
-        foreach ($orderedSlideIds as $index => $slideId) {
-            $sync[$slideId] = ['sort_order' => $index];
+        foreach (SortZones::leaderZones() as $zone) {
+            [$start] = SortZones::bounds($zone);
+            foreach (($zones[$zone] ?? []) as $index => $slideId) {
+                $sync[$slideId] = ['sort_order' => $start + $index, 'auto_added' => false];
+            }
         }
 
         $show->slides()->syncWithoutDetaching($sync);
@@ -272,6 +299,7 @@ class ShowController extends Controller
             'publish_at' => $slide->publish_at?->toIso8601String(),
             'expires_at' => $slide->expires_at?->toIso8601String(),
             'uploader' => $slide->uploader?->only('id', 'name'),
+            'zone' => isset($slide->show_sort_order) ? SortZones::zoneFor((int) $slide->show_sort_order) : null,
         ];
     }
 }

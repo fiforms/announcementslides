@@ -10,6 +10,7 @@ use App\Models\GlobalShowTemplate;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Services\ImageValidationService;
+use App\Support\SortZones;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -246,9 +247,12 @@ class ChunkedUploadController extends Controller
             };
 
             if ($show) {
-                $nextOrder = (int) ($show->slides()->max('show_slides.sort_order') ?? -1) + 1;
+                [, $end] = SortZones::bounds(SortZones::LEADER_LATE);
+                $nextOrder = ShowController::nextSortOrderInZone($show, SortZones::LEADER_LATE);
                 foreach ($slides as $i => $slide) {
-                    $show->slides()->syncWithoutDetaching([$slide->id => ['sort_order' => $nextOrder + $i]]);
+                    $show->slides()->syncWithoutDetaching([
+                        $slide->id => ['sort_order' => min($nextOrder + $i, $end), 'auto_added' => false],
+                    ]);
                 }
             }
 
@@ -274,10 +278,13 @@ class ChunkedUploadController extends Controller
         }
 
         // 'main' (default) and 'none' both land on the Global Board — 'none'
-        // just skips the fan-out to every entity's Main show below.
-        $nextOrder = (int) ($globalBoard->slides()->max('show_slides.sort_order') ?? -1) + 1;
-        foreach ($slides as $i => $slide) {
-            $globalBoard->slides()->syncWithoutDetaching([$slide->id => ['sort_order' => $nextOrder + $i]]);
+        // just skips the fan-out to every entity's Main show below. The
+        // Global Board's own order is automatic too: every global slide gets
+        // the same shared fanout counter value it'll carry into every other
+        // show, so it always bubbles to the same relative spot everywhere.
+        foreach ($slides as $slide) {
+            $sortOrder = $slide->assignFanoutSortOrderIfNeeded();
+            $globalBoard->slides()->syncWithoutDetaching([$slide->id => ['sort_order' => $sortOrder, 'auto_added' => true]]);
 
             if ($addToShow !== 'none') {
                 SyncShowAutoFillForSlide::dispatch($slide->id);

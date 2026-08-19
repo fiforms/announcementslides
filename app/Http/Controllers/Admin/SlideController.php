@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\ShowController;
 use App\Jobs\GenerateThumbnail;
 use App\Jobs\SyncShowAutoFillForSlide;
 use App\Models\GlobalShowTemplate;
@@ -171,15 +170,6 @@ class SlideController extends Controller
         ]);
 
         return back()->with('success', 'Slide rejected.');
-    }
-
-    public function reorder(Request $request)
-    {
-        $request->validate(['order' => 'required|array', 'order.*' => 'integer']);
-
-        ShowController::persistOrder(Show::globalBoard(), $request->order);
-
-        return response()->json(['ok' => true]);
     }
 
     public function archive(Slide $slide)

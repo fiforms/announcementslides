@@ -7,6 +7,7 @@ const props = defineProps({
     showDownload: { type: Boolean, default: true },
     selectable: { type: Boolean, default: false },
     selected: { type: Boolean, default: false },
+    showExpiry: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(['toggle-select', 'open']);
@@ -93,7 +94,7 @@ const previewSrc = computed(() => {
                 <span v-if="publishLabel" class="inline-flex text-xs text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
                     {{ publishLabel }}
                 </span>
-                <span v-if="expiresLabel" class="inline-flex text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
+                <span v-if="expiresLabel && showExpiry" class="inline-flex text-xs text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded">
                     {{ expiresLabel }}
                 </span>
             </div>

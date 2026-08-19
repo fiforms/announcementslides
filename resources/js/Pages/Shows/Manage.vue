@@ -4,6 +4,7 @@ import { router, Link, useForm, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
+import ShowSlideRow from '@/Components/ShowSlideRow.vue';
 
 const props = defineProps({
     entity: { type: Object, required: true },
@@ -93,6 +94,13 @@ function isExpired(slide) {
     return !!slide.expires_at && new Date(slide.expires_at).getTime() <= Date.now();
 }
 
+function expiresLabel(slide) {
+    if (!slide.expires_at) return null;
+    const d = new Date(slide.expires_at);
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return isExpired(slide) ? `Expired ${dateStr}` : `Expires ${dateStr}`;
+}
+
 const activeInShow = computed(() => inShow.value.filter(s => !isExpired(s)));
 const expiredInShow = computed(() => inShow.value.filter(s => isExpired(s)));
 const showExpiredPane = ref(false);
@@ -103,6 +111,34 @@ function detachAllExpired() {
     router.post(route('shows.slides.detachExpired', { show: props.selectedShowId, entity_id: props.entity.id }),
         {}, { preserveScroll: true });
 }
+
+// ── Sort zones ───────────────────────────────────────────────────────────────
+// Mirrors App\Support\SortZones: a show's slides fall into 5 fixed regions,
+// alternating leader-assigned (manually placed/reordered) with automatic
+// (positioned by the global/nearby fan-out counter, never a drop target —
+// see the backend docblock for why). The 2 automatic zones each render a
+// placeholder marking exactly where the next new slide of that kind lands.
+const ZONE_ORDER = ['leader_early', 'global', 'leader_mid', 'nearby', 'leader_late'];
+const LEADER_ZONES = ['leader_early', 'leader_mid', 'leader_late'];
+const ZONE_LABELS = {
+    leader_early: 'Before global slides',
+    global: 'Global slides',
+    leader_mid: 'Between global & nearby',
+    nearby: 'Nearby slides',
+    leader_late: 'After nearby slides',
+};
+
+function zoneOf(slide) {
+    return ZONE_ORDER.includes(slide.zone) ? slide.zone : 'leader_late';
+}
+
+const zoneGroups = computed(() => {
+    const groups = { leader_early: [], global: [], leader_mid: [], nearby: [], leader_late: [] };
+    for (const slide of activeInShow.value) {
+        groups[zoneOf(slide)].push(slide);
+    }
+    return groups;
+});
 
 // The interface language's matching `languages` row, if any — used as the
 // default for blank/ephemeral language selectors (never forced onto a
@@ -171,8 +207,12 @@ function deleteShow() {
     }
 }
 
-// ── Drag and drop: both within "In this show" (reorder) and between the two
-// panes (attach/detach). Optimistic local update, then persist to the server.
+// ── Drag and drop: both within "In this show" (reorder across the 3 leader
+// zones) and between the two panes (attach/detach). A slide currently in the
+// global/nearby zone can still be dragged OUT — dropping it into a leader
+// zone is itself the manual override (see SortZones docblock) — but those
+// two zones are never valid drop targets themselves; only the 3 leader zones
+// accept drops. Optimistic local update, then persist to the server.
 const draggedSlide = ref(null);
 const draggedFrom = ref(null); // 'unused' | 'show'
 
@@ -186,22 +226,35 @@ function dragEnd() {
     draggedFrom.value = null;
 }
 
-function dropOnShow(targetSlide = null) {
+function dropOnZone(zone, targetSlide = null) {
     const slide = draggedSlide.value;
     if (!slide) return;
 
     if (draggedFrom.value === 'unused') {
         unused.value = unused.value.filter(s => s.id !== slide.id);
+        slide.zone = zone;
         inShow.value = [...inShow.value, slide];
-        attachSlide(slide.id);
-    } else if (targetSlide && targetSlide.id !== slide.id) {
+        attachSlide(slide.id, zone);
+    } else if (draggedFrom.value === 'show') {
         const list = [...inShow.value];
         const fromIndex = list.findIndex(s => s.id === slide.id);
+        if (fromIndex === -1) return dragEnd();
         list.splice(fromIndex, 1);
-        const toIndex = list.findIndex(s => s.id === targetSlide.id);
-        list.splice(toIndex, 0, slide);
+        slide.zone = zone;
+
+        if (targetSlide && targetSlide.id !== slide.id) {
+            const toIndex = list.findIndex(s => s.id === targetSlide.id);
+            list.splice(toIndex, 0, slide);
+        } else {
+            // No specific target row — append to the end of this zone.
+            let insertAt = list.length;
+            for (let i = list.length - 1; i >= 0; i--) {
+                if (zoneOf(list[i]) === zone) { insertAt = i + 1; break; }
+            }
+            list.splice(insertAt, 0, slide);
+        }
         inShow.value = list;
-        persistOrder();
+        persistLeaderOrder();
     }
 
     dragEnd();
@@ -218,9 +271,9 @@ function dropOnUnused() {
     dragEnd();
 }
 
-function attachSlide(slideId) {
+function attachSlide(slideId, zone) {
     router.post(route('shows.slides.attach', { show: props.selectedShowId, entity_id: props.entity.id }),
-        { slide_id: slideId }, { preserveScroll: true, preserveState: true });
+        { slide_id: slideId, zone }, { preserveScroll: true, preserveState: true });
 }
 
 function detachSlide(slideId) {
@@ -228,14 +281,19 @@ function detachSlide(slideId) {
         { preserveScroll: true, preserveState: true });
 }
 
-function persistOrder() {
+function persistLeaderOrder() {
+    const zones = {};
+    for (const zone of LEADER_ZONES) {
+        zones[zone] = zoneGroups.value[zone].map(s => s.id);
+    }
+
     fetch(route('shows.reorder', { show: props.selectedShowId, entity_id: props.entity.id }), {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
             'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]')?.content || '',
         },
-        body: JSON.stringify({ slides: inShow.value.map(s => s.id) }),
+        body: JSON.stringify({ zones }),
     }).catch(err => console.error('Failed to reorder show:', err));
 }
 </script>
@@ -341,56 +399,42 @@ function persistOrder() {
                         </select>
                     </div>
                     <div class="space-y-2 min-h-[8rem]">
-                        <div v-for="slide in filteredUnused" :key="slide.id" draggable="true"
-                            @dragstart="dragStart(slide, 'unused')" @dragend="dragEnd"
-                            class="flex items-center gap-3 rounded-lg border border-gray-200 p-2 cursor-grab active:cursor-grabbing hover:bg-gray-50">
-                            <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                                <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
-                            </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
-                                <span :class="scopeBadge(slide).classes" class="mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                                    <span :class="scopeBadge(slide).dot" class="h-1.5 w-1.5 rounded-full"></span>
-                                    {{ scopeBadge(slide).label }}
-                                </span>
-                            </div>
-                            <button v-if="canEdit(slide)" @click.stop="openEdit(slide)" title="Edit slide"
-                                class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                                    <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-9 9a2 2 0 0 1-.878.507l-3 .824a.5.5 0 0 1-.615-.615l.824-3a2 2 0 0 1 .507-.878l9-9Z" />
-                                </svg>
-                            </button>
-                        </div>
+                        <ShowSlideRow v-for="slide in filteredUnused" :key="slide.id"
+                            :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
+                            :show-edit="canEdit(slide)"
+                            @dragstart="dragStart(slide, 'unused')" @dragend="dragEnd" @edit="openEdit(slide)" />
                         <p v-if="!filteredUnused.length" class="text-sm text-gray-400">Nothing unused right now.</p>
                     </div>
                 </div>
 
                 <!-- In this show -->
-                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
-                    @dragover.prevent @drop="dropOnShow()">
+                <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <h2 class="mb-3 text-sm font-semibold text-gray-700">In "{{ selectedShow?.name }}"</h2>
-                    <div class="space-y-2 min-h-[8rem]">
-                        <div v-for="slide in activeInShow" :key="slide.id" draggable="true"
-                            @dragstart="dragStart(slide, 'show')" @dragend="dragEnd"
-                            @dragover.prevent.stop @drop.stop="dropOnShow(slide)"
-                            class="flex items-center gap-3 rounded-lg border border-gray-200 p-2 cursor-grab active:cursor-grabbing hover:bg-gray-50">
-                            <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                                <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
+
+                    <div class="space-y-3">
+                        <template v-for="zone in ZONE_ORDER" :key="zone">
+                            <div v-if="LEADER_ZONES.includes(zone)"
+                                class="space-y-2 rounded-lg border border-dashed border-gray-200 p-2 min-h-[3rem]"
+                                @dragover.prevent @drop="dropOnZone(zone)">
+                                <p class="px-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">{{ ZONE_LABELS[zone] }}</p>
+                                <ShowSlideRow v-for="slide in zoneGroups[zone]" :key="slide.id"
+                                    :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
+                                    :show-edit="canEdit(slide)"
+                                    @dragstart="dragStart(slide, 'show')" @dragend="dragEnd"
+                                    @dragover.prevent.stop @drop.stop="dropOnZone(zone, slide)"
+                                    @edit="openEdit(slide)" />
                             </div>
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-medium text-gray-900 line-clamp-1">{{ slide.title }}</p>
-                                <span :class="scopeBadge(slide).classes" class="mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                                    <span :class="scopeBadge(slide).dot" class="h-1.5 w-1.5 rounded-full"></span>
-                                    {{ scopeBadge(slide).label }}
-                                </span>
+
+                            <div v-else class="space-y-2">
+                                <p class="px-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">{{ ZONE_LABELS[zone] }}</p>
+                                <div class="h-2 mx-1 rounded bg-slate-800/70" title="New auto-added slides insert here"></div>
+                                <ShowSlideRow v-for="slide in zoneGroups[zone]" :key="slide.id"
+                                    :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
+                                    :draggable="true" :auto-tag="true" :show-edit="canEdit(slide)"
+                                    @dragstart="dragStart(slide, 'show')" @dragend="dragEnd" @edit="openEdit(slide)" />
                             </div>
-                            <button v-if="canEdit(slide)" @click.stop="openEdit(slide)" title="Edit slide"
-                                class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                                    <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-9 9a2 2 0 0 1-.878.507l-3 .824a.5.5 0 0 1-.615-.615l.824-3a2 2 0 0 1 .507-.878l9-9Z" />
-                                </svg>
-                            </button>
-                        </div>
+                        </template>
+
                         <p v-if="!activeInShow.length" class="text-sm text-gray-400">Drag slides here from "Unused slides."</p>
                     </div>
 
@@ -407,31 +451,19 @@ function persistOrder() {
                                     Archive all
                                 </button>
                             </div>
-                            <div v-for="slide in expiredInShow" :key="slide.id"
-                                class="flex items-center gap-3 rounded-lg border border-gray-100 bg-gray-50 p-2 opacity-75">
-                                <div class="h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
-                                    <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <p class="text-sm font-medium text-gray-700 line-clamp-1">{{ slide.title }}</p>
-                                    <span :class="scopeBadge(slide).classes" class="mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium">
-                                        <span :class="scopeBadge(slide).dot" class="h-1.5 w-1.5 rounded-full"></span>
-                                        {{ scopeBadge(slide).label }}
-                                    </span>
-                                </div>
-                                <button v-if="canEdit(slide)" @click.stop="openEdit(slide)" title="Edit slide"
-                                    class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                                        <path d="M13.586 3.586a2 2 0 1 1 2.828 2.828l-9 9a2 2 0 0 1-.878.507l-3 .824a.5.5 0 0 1-.615-.615l.824-3a2 2 0 0 1 .507-.878l9-9Z" />
-                                    </svg>
-                                </button>
-                                <button type="button" @click.stop="detachSlide(slide.id)" title="Remove from show"
-                                    class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
-                                        <path fill-rule="evenodd" d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z" clip-rule="evenodd" />
-                                    </svg>
-                                </button>
-                            </div>
+                            <ShowSlideRow v-for="slide in expiredInShow" :key="slide.id"
+                                :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
+                                :draggable="false" :dimmed="true" :show-edit="canEdit(slide)"
+                                @edit="openEdit(slide)">
+                                <template #extra>
+                                    <button type="button" @click.stop="detachSlide(slide.id)" title="Remove from show"
+                                        class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+                                            <path fill-rule="evenodd" d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z" clip-rule="evenodd" />
+                                        </svg>
+                                    </button>
+                                </template>
+                            </ShowSlideRow>
                         </div>
                     </div>
                 </div>

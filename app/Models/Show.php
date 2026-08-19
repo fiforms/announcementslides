@@ -185,8 +185,8 @@ class Show extends Model
         $pivot = $show->slides()->where('slides.id', $slide->id)->first()?->pivot;
 
         if ($matches && !$pivot) {
-            $nextOrder = (int) ($show->slides()->max('show_slides.sort_order') ?? -1) + 1;
-            $show->slides()->attach($slide->id, ['sort_order' => $nextOrder, 'auto_added' => true]);
+            $sortOrder = $slide->assignFanoutSortOrderIfNeeded();
+            $show->slides()->attach($slide->id, ['sort_order' => $sortOrder, 'auto_added' => true]);
         } elseif (!$matches && $pivot && $pivot->auto_added) {
             $show->slides()->detach($slide->id);
         }

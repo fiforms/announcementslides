@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue';
+import { ref, computed } from 'vue';
 import { useForm, router, Link } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
@@ -223,95 +223,9 @@ const tabs = computed(() => [
 
 const activeTab = ref('current');
 
-// ── Drag-and-drop reordering (live tab only) ────────────────────────────────────
-// Only the "current" tab is ordered by sort_order; the other tabs sort by date,
-// so reordering is scoped to it.
-const orderedCurrent = ref([...props.current]);
-const draggedSlide   = ref(null);
-const dragOverSlide  = ref(null);
-const dropPosition   = ref(null); // 'before' | 'after'
-
-const isReorderable = computed(() => activeTab.value === 'current');
-const activeSlides  = computed(() =>
-    activeTab.value === 'current' ? orderedCurrent.value : props[activeTab.value]
-);
-
-// Keep the local ordered copy in sync when the server data changes.
-watch(() => props.current, (val) => { orderedCurrent.value = [...val]; });
-
-function handleDragStart(e, slide) {
-    draggedSlide.value = slide;
-    e.dataTransfer.effectAllowed = 'move';
-}
-
-function handleDragOver(e, slide) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-
-    // Don't show an indicator on the row being dragged.
-    if (!draggedSlide.value || draggedSlide.value.id === slide.id) {
-        dragOverSlide.value = null;
-        return;
-    }
-
-    // Decide before/after from the cursor's position within the row so the
-    // indicator edge matches exactly where the slide will be inserted.
-    const rect = e.currentTarget.getBoundingClientRect();
-    const midpoint = rect.top + rect.height / 2;
-    dropPosition.value = e.clientY < midpoint ? 'before' : 'after';
-    dragOverSlide.value = slide;
-}
-
-function handleTableDragLeave(e) {
-    if (e.target.tagName === 'TBODY') {
-        dragOverSlide.value = null;
-        dropPosition.value = null;
-    }
-}
-
-function handleDrop(e, targetSlide) {
-    e.preventDefault();
-    const dragged = draggedSlide.value;
-    const position = dropPosition.value;
-    if (!dragged || dragged.id === targetSlide.id) {
-        return handleDragEnd();
-    }
-
-    const list = [...orderedCurrent.value];
-    const fromIndex = list.findIndex(s => s.id === dragged.id);
-    if (fromIndex === -1 || !list.some(s => s.id === targetSlide.id)) {
-        return handleDragEnd();
-    }
-
-    // Remove the dragged slide first, then locate the target so the insertion
-    // index already accounts for the shift caused by removal.
-    list.splice(fromIndex, 1);
-    let insertIndex = list.findIndex(s => s.id === targetSlide.id);
-    if (position === 'after') insertIndex += 1;
-    list.splice(insertIndex, 0, dragged);
-
-    orderedCurrent.value = list;
-    updateSortOrder();
-    handleDragEnd();
-}
-
-function handleDragEnd() {
-    draggedSlide.value = null;
-    dragOverSlide.value = null;
-    dropPosition.value = null;
-}
-
-function updateSortOrder() {
-    const order = orderedCurrent.value.map(s => s.id);
-    fetch(route('admin.slides.reorder'), {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': csrfToken(),
-        },
-        body: JSON.stringify({ order }),
-    }).catch(err => console.error('Failed to update sort order:', err));
-}
+// The "current" tab is ordered by the Global Board's automatic fan-out
+// order (see App\Support\SortZones) — no manual reordering here anymore.
+const activeSlides = computed(() => props[activeTab.value]);
 
 function displayStatus(slide) {
     // Archived slides keep their DB status (usually "published"); show the
@@ -537,7 +451,6 @@ function statusBadge(status) {
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th v-if="isReorderable" class="px-4 py-3 text-left font-medium text-gray-500 w-8"></th>
                         <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin.col_slide') }}</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">{{ $t('admin.status') }}</th>
                         <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">{{ $t('admin.col_dates') }}</th>
@@ -545,25 +458,8 @@ function statusBadge(status) {
                         <th class="px-4 py-3 text-right font-medium text-gray-500">{{ $t('admin.col_actions') }}</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-gray-100" @dragleave="handleTableDragLeave" @dragend="handleDragEnd">
-                    <tr v-for="slide in activeSlides" :key="slide.id"
-                        class="hover:bg-gray-50 transition-colors"
-                        :class="{ 'opacity-50': draggedSlide?.id === slide.id }"
-                        :style="isReorderable && dragOverSlide?.id === slide.id ? {
-                            boxShadow: dropPosition === 'before'
-                                ? 'inset 0 3px 0 0 rgb(99, 102, 241)'
-                                : 'inset 0 -3px 0 0 rgb(99, 102, 241)',
-                            backgroundColor: 'rgb(239, 246, 255)'
-                        } : {}"
-                        :draggable="isReorderable"
-                        @dragstart="handleDragStart($event, slide)"
-                        @dragover="handleDragOver($event, slide)"
-                        @drop="handleDrop($event, slide)">
-                        <td v-if="isReorderable" class="px-3 py-3 text-center cursor-grab active:cursor-grabbing">
-                            <svg class="h-5 w-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M9 3h2v2H9V3zm0 4h2v2H9V7zm0 4h2v2H9v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2zm4-8h2v2h-2V3zm0 4h2v2h-2V7zm0 4h2v2h-2v-2z" />
-                            </svg>
-                        </td>
+                <tbody class="divide-y divide-gray-100">
+                    <tr v-for="slide in activeSlides" :key="slide.id" class="hover:bg-gray-50 transition-colors">
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
                                 <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">
