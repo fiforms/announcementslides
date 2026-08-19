@@ -12,7 +12,7 @@ const props = defineProps({
     showEdit: { type: Boolean, default: false },
 });
 
-defineEmits(['dragstart', 'dragend', 'edit']);
+defineEmits(['dragstart', 'dragend', 'edit', 'open']);
 
 const showValidationDetails = ref(false);
 </script>
@@ -21,8 +21,9 @@ const showValidationDetails = ref(false);
     <div>
         <div :draggable="draggable"
             @dragstart="draggable && $emit('dragstart')" @dragend="$emit('dragend')"
+            @click="$emit('open', slide)"
             class="flex items-center gap-3 rounded-lg border p-2 hover:bg-gray-50"
-            :class="[dimmed ? 'border-gray-100 bg-gray-50 opacity-75' : 'border-gray-200', draggable ? 'cursor-grab active:cursor-grabbing' : '']">
+            :class="[dimmed ? 'border-gray-100 bg-gray-50 opacity-75' : 'border-gray-200', draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer']">
             <div class="relative h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
                 <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
                 <button v-if="slide.validation_issues?.length" @click.stop="showValidationDetails = !showValidationDetails"

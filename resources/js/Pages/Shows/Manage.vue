@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
 import ShowSlideRow from '@/Components/ShowSlideRow.vue';
+import SlideLightbox from '@/Components/SlideLightbox.vue';
+import { useLightbox } from '@/Composables/useLightbox.js';
 
 const props = defineProps({
     entity: { type: Object, required: true },
@@ -49,6 +51,8 @@ function toLocalDatetime(iso) {
     if (!iso) return '';
     return iso.slice(0, 16);
 }
+
+const { lightboxSlide, openLightbox, closeLightbox } = useLightbox();
 
 const editingSlide = ref(null);
 const editForm = useForm({
@@ -402,7 +406,7 @@ function persistLeaderOrder() {
                         <ShowSlideRow v-for="slide in filteredUnused" :key="slide.id"
                             :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
                             :show-edit="canEdit(slide)"
-                            @dragstart="dragStart(slide, 'unused')" @dragend="dragEnd" @edit="openEdit(slide)" />
+                            @dragstart="dragStart(slide, 'unused')" @dragend="dragEnd" @edit="openEdit(slide)" @open="openLightbox" />
                         <p v-if="!filteredUnused.length" class="text-sm text-gray-400">Nothing unused right now.</p>
                     </div>
                 </div>
@@ -422,7 +426,7 @@ function persistLeaderOrder() {
                                     :show-edit="canEdit(slide)"
                                     @dragstart="dragStart(slide, 'show')" @dragend="dragEnd"
                                     @dragover.prevent.stop @drop.stop="dropOnZone(zone, slide)"
-                                    @edit="openEdit(slide)" />
+                                    @edit="openEdit(slide)" @open="openLightbox" />
                             </div>
 
                             <div v-else class="space-y-2">
@@ -431,7 +435,7 @@ function persistLeaderOrder() {
                                 <ShowSlideRow v-for="slide in zoneGroups[zone]" :key="slide.id"
                                     :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
                                     :draggable="true" :auto-tag="true" :show-edit="canEdit(slide)"
-                                    @dragstart="dragStart(slide, 'show')" @dragend="dragEnd" @edit="openEdit(slide)" />
+                                    @dragstart="dragStart(slide, 'show')" @dragend="dragEnd" @edit="openEdit(slide)" @open="openLightbox" />
                             </div>
                         </template>
 
@@ -454,7 +458,7 @@ function persistLeaderOrder() {
                             <ShowSlideRow v-for="slide in expiredInShow" :key="slide.id"
                                 :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
                                 :draggable="false" :dimmed="true" :show-edit="canEdit(slide)"
-                                @edit="openEdit(slide)">
+                                @edit="openEdit(slide)" @open="openLightbox">
                                 <template #extra>
                                     <button type="button" @click.stop="detachSlide(slide.id)" title="Remove from show"
                                         class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600">
@@ -475,6 +479,8 @@ function persistLeaderOrder() {
                     All archived (expired) slides →
                 </Link>
             </div>
+
+            <SlideLightbox :slide="lightboxSlide" @close="closeLightbox" />
 
             <div v-if="editingSlide" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
                 @click.self="closeEdit">
