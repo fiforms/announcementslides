@@ -21,6 +21,27 @@ class ImageValidationService
 
         [$width, $height] = $this->getImageDimensions($filePath);
 
+        $result = $this->validateDimensions($width, $height, $fileSize);
+
+        return [
+            'issues' => $result['issues'],
+            'width' => $width,
+            'height' => $height,
+            'status' => $result['status'],
+        ];
+    }
+
+    /**
+     * The dimension/file-size checks alone, for recomputing issue text
+     * against already-known values (image_width/image_height/file_size
+     * stored on slide_media) without re-reading the file from disk. Used to
+     * refresh previously-generated issue strings after a wording/formatting
+     * change to the checks below.
+     */
+    public function validateDimensions(?int $width, ?int $height, int $fileSize): array
+    {
+        $issues = [];
+
         if ($width && $height) {
             $issues = array_merge(
                 $issues,
@@ -31,18 +52,11 @@ class ImageValidationService
             $issues[] = 'Unreadable or corrupted image — dimensions could not be determined';
         }
 
-        $issues = array_merge(
-            $issues,
-            $this->checkFileSize($fileSize)
-        );
-
-        $status = empty($issues) ? 'ok' : 'warning';
+        $issues = array_merge($issues, $this->checkFileSize($fileSize));
 
         return [
             'issues' => $issues,
-            'width' => $width,
-            'height' => $height,
-            'status' => $status,
+            'status' => empty($issues) ? 'ok' : 'warning',
         ];
     }
 
