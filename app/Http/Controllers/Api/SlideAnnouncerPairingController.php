@@ -53,7 +53,7 @@ class SlideAnnouncerPairingController extends Controller
             ? Language::where('abbreviation', $data['language'])->value('id')
             : null;
 
-        [$device, $token] = DB::transaction(function () use ($pairingCode, $data, $hintedLanguageId) {
+        [$device, $token, $siblingHostnames] = DB::transaction(function () use ($pairingCode, $data, $hintedLanguageId) {
             // Re-pairing: a device_uuid already on file means this is the
             // same physical device moving sites (or re-pairing after an
             // unpair/revoke), not a new fleet entry — see SLIDE_ANNOUNCER.md
@@ -98,7 +98,22 @@ class SlideAnnouncerPairingController extends Controller
 
             $token = $device->createToken('slide-announcer', ['slide-announcer']);
 
-            return [$device, $token];
+            // Other devices already on file for this entity, so the
+            // pairing device can pick a hostname that doesn't collide with
+            // a sibling on the same local network — see slideannouncer's
+            // pairing.py, which derives its hostname from the typed device
+            // name and appends a numeric suffix against this list until it
+            // finds one that's free. Each device's `hostname` here is
+            // whatever it last reported on a heartbeat (SlideAnnouncerHeartbeatController),
+            // so a device that has never heartbeated yet simply isn't
+            // checked against — an acceptable gap for a same-boot double
+            // pairing, not worth an extra live-network probe to close.
+            $siblingHostnames = SlideAnnouncer::where('entity_id', $device->entity_id)
+                ->whereKeyNot($device->id)
+                ->whereNotNull('hostname')
+                ->pluck('hostname');
+
+            return [$device, $token, $siblingHostnames];
         });
 
         return response()->json([
@@ -110,6 +125,7 @@ class SlideAnnouncerPairingController extends Controller
             // move to a different entity (re-pair) keeps this in sync.
             'entity_name' => $device->entity->name,
             'token' => $token->plainTextToken,
+            'sibling_hostnames' => $siblingHostnames,
         ], 201);
     }
 }
