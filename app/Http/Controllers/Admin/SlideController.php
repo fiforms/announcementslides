@@ -129,6 +129,7 @@ class SlideController extends Controller
 
         $newLanguageId = $request->filled('language_id') ? (int) $request->input('language_id') : null;
         $languageChanged = $slide->language_id !== $newLanguageId;
+        $statusChanged = $slide->status !== $request->input('status');
 
         $data = $request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'entity_id', 'share_nearby');
 
@@ -143,8 +144,10 @@ class SlideController extends Controller
         $slide->update($data);
 
         // Re-run auto-fill fan-out so language-gated shows pick up/drop this
-        // slide to match its new tag — never touches a leader's manual keep.
-        if ($languageChanged && $slide->entity_id === null) {
+        // slide to match its new tag, and so it fans into (once published) or
+        // out of (once un-published) every eligible show's rotation — never
+        // touches a leader's manual keep (see Show::reconcilePair).
+        if (($languageChanged || $statusChanged) && $slide->entity_id === null) {
             SyncShowAutoFillForSlide::dispatch($slide->id);
         }
 
@@ -174,6 +177,12 @@ class SlideController extends Controller
             'reviewed_at' => now(),
         ]);
 
+        // Fans it into every eligible show's rotation now that it's published
+        // (see Show::reconcilePair) — never touches a leader's manual keep.
+        if ($slide->entity_id === null) {
+            SyncShowAutoFillForSlide::dispatch($slide->id);
+        }
+
         return back()->with('success', 'Slide approved and published.');
     }
 
@@ -184,6 +193,12 @@ class SlideController extends Controller
             'reviewed_by' => auth()->id(),
             'reviewed_at' => now(),
         ]);
+
+        // Fans it back out of every show it was auto-added to, since it's no
+        // longer published — never touches a leader's manual keep.
+        if ($slide->entity_id === null) {
+            SyncShowAutoFillForSlide::dispatch($slide->id);
+        }
 
         return back()->with('success', 'Slide rejected.');
     }

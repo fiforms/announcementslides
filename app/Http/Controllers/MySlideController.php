@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
+use App\Jobs\SyncShowAutoFillForSlide;
 use App\Models\GlobalShowTemplate;
 use App\Models\Language;
 use App\Models\Show;
@@ -89,11 +90,20 @@ class MySlideController extends Controller
         $fields = $request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at');
 
         // Only contributors may change the workflow status of their slide.
+        $statusChanged = false;
         if ($request->filled('status') && $request->user()->isContributor()) {
             $fields['status'] = $request->status;
+            $statusChanged = $slide->status !== $request->status;
         }
 
         $slide->update($fields);
+
+        // Fans it into/out of every eligible show's rotation now that it's
+        // published/un-published (see Show::reconcilePair) — never touches a
+        // leader's manual keep.
+        if ($statusChanged) {
+            SyncShowAutoFillForSlide::dispatch($slide->id);
+        }
 
         return redirect()->route('my-slides.index')->with('success', 'Slide updated.');
     }

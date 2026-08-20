@@ -22,9 +22,10 @@ use Illuminate\Support\Collection;
  * slides) and `auto_fill_nearby` (nearby-shared slides). Only a show with the
  * relevant flag on participates in that kind of automatic distribution — see
  * syncAutoFillForSlide() and syncAutoFillFromCandidates(). A leader can
- * always manually attach any slide to any show regardless of language; the
- * language tag only gates *automatic* fan-out and filters the Show Editor's
- * "Unused slides" list.
+ * always manually attach any slide to any show regardless of language or
+ * status; language and `status === 'published'` only gate *automatic*
+ * fan-out (and language alone filters the Show Editor's "Unused slides"
+ * list).
  */
 class Show extends Model
 {
@@ -179,15 +180,27 @@ class Show extends Model
         $candidates->each(fn (Slide $slide) => static::reconcilePair($this, $slide));
     }
 
+    /**
+     * Eligibility is gated on language and `status` — a slide that isn't
+     * published has no business auto-appearing anywhere yet/anymore — but
+     * deliberately NOT on publish_at/expires_at: once a slide is fanned in,
+     * it stays attached through its own publish window the same way it stays
+     * attached past expiry (query-time filtering handles both; see
+     * Slide::scopeCurrent() and the Show Editor's "expired in this show"
+     * pane). That keeps a slide's sort position stable across its own
+     * schedule, while still reacting immediately to an admin's
+     * approve/reject or draft/publish toggle.
+     */
     private static function reconcilePair(self $show, Slide $slide): void
     {
-        $matches = $show->language_id === null || $show->language_id === $slide->language_id;
+        $languageMatches = $show->language_id === null || $show->language_id === $slide->language_id;
+        $eligible = $languageMatches && $slide->status === 'published';
         $pivot = $show->slides()->where('slides.id', $slide->id)->first()?->pivot;
 
-        if ($matches && !$pivot) {
+        if ($eligible && !$pivot) {
             $sortOrder = $slide->assignFanoutSortOrderIfNeeded();
             $show->slides()->attach($slide->id, ['sort_order' => $sortOrder, 'auto_added' => true]);
-        } elseif (!$matches && $pivot && $pivot->auto_added) {
+        } elseif (!$eligible && $pivot && $pivot->auto_added) {
             $show->slides()->detach($slide->id);
         }
     }
