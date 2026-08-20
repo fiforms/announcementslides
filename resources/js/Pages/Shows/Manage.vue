@@ -175,8 +175,17 @@ const showingNewShowForm = ref(false);
 // server or saved onto the show. Defaults to the interface language but a
 // slide with no language tag always stays visible (it's meant for everyone).
 const unusedLanguageFilter = ref(uiLanguageId.value);
+
+// "This Show" vs "All Shows" scope for the left panel — also client-only.
+// The server already excludes membership in *this* show from `unused`, and
+// tags each remaining slide with whether it's linked into some other show
+// of this entity (`linked_elsewhere`); "All Shows" just narrows that down to
+// slides linked into nothing at all, so a slide can end up attached to more
+// than one show without a second round trip to change scope.
+const unusedScope = ref('all');
 const filteredUnused = computed(() => unused.value.filter(s =>
-    !unusedLanguageFilter.value || s.language_id === null || s.language_id === unusedLanguageFilter.value
+    (!unusedLanguageFilter.value || s.language_id === null || s.language_id === unusedLanguageFilter.value)
+    && (unusedScope.value === 'this' || !s.linked_elsewhere)
 ));
 
 watch(() => [props.showSlides, props.unusedSlides], () => {
@@ -405,7 +414,9 @@ function persistLeaderOrder() {
                 <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm"
                     @dragover.prevent @drop="dropOnUnused">
                     <div class="mb-3 flex items-center justify-between gap-2">
-                        <h2 class="text-sm font-semibold text-gray-700">Unused slides</h2>
+                        <h2 class="text-sm font-semibold text-gray-700">
+                            {{ unusedScope === 'this' ? 'Available slides' : 'Unused slides' }}
+                        </h2>
                         <select v-model.number="unusedLanguageFilter"
                             title="Temporarily filter this list — doesn't change the show's settings"
                             class="rounded-lg border-gray-300 text-xs">
@@ -413,12 +424,30 @@ function persistLeaderOrder() {
                             <option v-for="lang in languages" :key="lang.id" :value="lang.id">{{ lang.name }}</option>
                         </select>
                     </div>
+                    <div class="mb-3 flex items-center gap-4 text-xs text-gray-600">
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" value="this" v-model="unusedScope" class="text-indigo-600 focus:ring-indigo-500" />
+                            This Show
+                        </label>
+                        <label class="flex items-center gap-1.5 cursor-pointer">
+                            <input type="radio" value="all" v-model="unusedScope" class="text-indigo-600 focus:ring-indigo-500" />
+                            All Shows
+                        </label>
+                    </div>
                     <div class="space-y-2 min-h-[8rem]">
                         <ShowSlideRow v-for="slide in filteredUnused" :key="slide.id"
                             :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
                             :show-edit="canEdit(slide)"
-                            @dragstart="dragStart(slide, 'unused')" @dragend="dragEnd" @edit="openEdit(slide)" @open="openLightbox" />
-                        <p v-if="!filteredUnused.length" class="text-sm text-gray-400">Nothing unused right now.</p>
+                            @dragstart="dragStart(slide, 'unused')" @dragend="dragEnd" @edit="openEdit(slide)" @open="openLightbox">
+                            <template v-if="slide.linked_elsewhere" #extra>
+                                <span class="flex-shrink-0 text-[10px] text-gray-400" title="Already attached to another show">
+                                    In another show
+                                </span>
+                            </template>
+                        </ShowSlideRow>
+                        <p v-if="!filteredUnused.length" class="text-sm text-gray-400">
+                            {{ unusedScope === 'this' ? 'Nothing else available right now.' : 'Nothing unused right now.' }}
+                        </p>
                     </div>
                 </div>
 

@@ -12,6 +12,7 @@ use App\Support\NearbyEntities;
 use App\Support\SortZones;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -40,7 +41,7 @@ class ShowController extends Controller
             ->orderedInShow($selectedShow->id)
             ->get();
 
-        $unusedSlides = $this->unusedSlidesQuery($entity)->get();
+        $unusedSlides = $this->unusedSlidesQuery($entity, $selectedShow, $shows->pluck('id'))->get();
 
         $isAdmin = $request->user()->isAdmin() || $request->user()->isEntityAdmin($entityId);
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
@@ -265,17 +266,18 @@ class ShowController extends Controller
 
     /**
      * Slides visible to this entity (its own, nearby-shared, or global) that
-     * have no show_slides link into any show this entity owns. Not filtered
-     * by language server-side — the Show Editor applies its own temporary,
-     * client-side language filter to this list (see Shows/Manage.vue), fully
-     * independent of the show's own settings.
+     * aren't currently linked into $selectedShow — the "This Show" scope in
+     * Shows/Manage.vue's radio toggle. Each result also carries whether it's
+     * linked into some *other* show of this entity, so the client can narrow
+     * that down further to "All Shows" (linked into nothing at all) purely
+     * client-side, the same way it already does its temporary language
+     * filter, without a second round trip.
      */
-    private function unusedSlidesQuery(Entity $entity)
+    private function unusedSlidesQuery(Entity $entity, Show $selectedShow, Collection $entityShowIds)
     {
-        $showIds = Show::where('entity_id', $entity->id)->pluck('id');
-
         $radius = (float) config('slides.nearby_radius_miles');
         $nearbyIds = NearbyEntities::within($entity, $radius);
+        $otherShowIds = $entityShowIds->reject(fn ($id) => $id === $selectedShow->id)->values();
 
         return Slide::with(['primaryMedia', 'overlayMedia', 'media', 'uploader'])
             ->current()
@@ -285,7 +287,8 @@ class ShowController extends Controller
                     $q->orWhere(fn ($n) => $n->whereIn('entity_id', $nearbyIds)->shareNearby());
                 }
             })
-            ->whereDoesntHave('shows', fn ($q) => $q->whereIn('shows.id', $showIds));
+            ->whereDoesntHave('shows', fn ($q) => $q->where('shows.id', $selectedShow->id))
+            ->withExists(['shows as linked_elsewhere' => fn ($q) => $q->whereIn('shows.id', $otherShowIds)]);
     }
 
     private function slideResource(Slide $slide): array
@@ -312,6 +315,7 @@ class ShowController extends Controller
             'validation_issues' => $slide->validation_issues,
             'media' => $this->mediaResource($slide),
             'zone' => isset($slide->show_sort_order) ? SortZones::zoneFor((int) $slide->show_sort_order) : null,
+            'linked_elsewhere' => (bool) ($slide->linked_elsewhere ?? false),
         ];
     }
 }
