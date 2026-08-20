@@ -51,6 +51,13 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             Show Editor
                         </Link>
 
+                        <!-- SlideAnnouncers link (no meaning in Global View) -->
+                        <Link v-if="auth?.user && hasEntities && currentEntityId" :href="route('entity.slide-announcers.index', currentEntityId)"
+                            class="text-sm text-indigo-200 hover:text-white transition-colors"
+                            :class="{ 'text-white font-semibold': route().current('entity.slide-announcers.*') }">
+                            SlideAnnouncers
+                        </Link>
+
                         <!-- Entity switcher: click to see available entities; shows the active one when closed -->
                         <Dropdown v-if="auth?.user && hasEntities" align="right" width="48" contentClasses="py-1 bg-white">
                             <template #trigger>
