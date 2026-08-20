@@ -67,13 +67,13 @@ function submit() {
             interval_seconds: Number(data.interval_seconds),
             settings_pin: data.settings_pin || null,
         },
-    })).patch(route('entity.slide-announcers.update', { entity: props.entity.id, slideAnnouncer: props.device.id }));
+    })).patch(route('slide-announcers.update', { slideAnnouncer: props.device.id, entity_id: props.entity.id }));
 }
 
 function unpair() {
     if (confirm(`Unpair "${props.device.name}"? It will need a fresh pairing code to reconnect.`)) {
-        router.delete(route('entity.slide-announcers.destroy', { entity: props.entity.id, slideAnnouncer: props.device.id }), {
-            onSuccess: () => router.visit(route('entity.slide-announcers.index', { entity: props.entity.id })),
+        router.delete(route('slide-announcers.destroy', { slideAnnouncer: props.device.id, entity_id: props.entity.id }), {
+            onSuccess: () => router.visit(route('slide-announcers.index', { entity_id: props.entity.id })),
         });
     }
 }
@@ -108,7 +108,7 @@ function copyConnectUrl() {
 <template>
     <AuthenticatedLayout>
         <div class="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
-            <Link :href="route('entity.slide-announcers.index', { entity: entity.id })" class="text-sm text-indigo-600 hover:text-indigo-800">
+            <Link :href="route('slide-announcers.index', { entity_id: entity.id })" class="text-sm text-indigo-600 hover:text-indigo-800">
                 &larr; Back to devices
             </Link>
 

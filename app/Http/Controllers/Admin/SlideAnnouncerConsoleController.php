@@ -16,7 +16,7 @@ class SlideAnnouncerConsoleController extends Controller
      * EntityConsoleController — no per-method check needed here.
      *
      * Deliberately doesn't duplicate a device-detail page: each row links
-     * straight into entity.slide-announcers.show, which already grants a
+     * straight into slide-announcers.show, which already grants a
      * platform admin access via its own `$user->isAdmin() || ...` guard.
      */
     public function index(): Response

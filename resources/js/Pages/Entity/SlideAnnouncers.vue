@@ -14,14 +14,14 @@ const generating = ref(false);
 
 function generateCode() {
     generating.value = true;
-    router.post(route('entity.slide-announcers.pairing-codes.store', { entity: props.entity.id }), {}, {
+    router.post(route('slide-announcers.pairing-codes.store', { entity_id: props.entity.id }), {}, {
         onFinish: () => { generating.value = false; },
     });
 }
 
 function unpair(device) {
     if (confirm(`Unpair "${device.name}"? It will need a fresh pairing code to reconnect.`)) {
-        router.delete(route('entity.slide-announcers.destroy', { entity: props.entity.id, slideAnnouncer: device.id }));
+        router.delete(route('slide-announcers.destroy', { slideAnnouncer: device.id, entity_id: props.entity.id }));
     }
 }
 
@@ -118,7 +118,7 @@ function formatBytes(bytes) {
                     <tbody class="divide-y divide-gray-100">
                         <tr v-for="device in devices" :key="device.id" class="hover:bg-gray-50">
                             <td class="px-4 py-3">
-                                <Link :href="route('entity.slide-announcers.show', { entity: entity.id, slideAnnouncer: device.id })"
+                                <Link :href="route('slide-announcers.show', { slideAnnouncer: device.id, entity_id: entity.id })"
                                     class="font-medium text-indigo-600 hover:text-indigo-800">
                                     {{ device.name }}
                                 </Link>

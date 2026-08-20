@@ -94,7 +94,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     });
 
     // ── Entity leader: paired Slide Announcer devices ───────────────────────
-    Route::prefix('entity/{entity}/slide-announcers')->name('entity.slide-announcers.')->group(function () {
+    Route::prefix('slide-announcers')->name('slide-announcers.')->group(function () {
         Route::get('/', [EntitySlideAnnouncerController::class, 'index'])->name('index');
         Route::post('/pairing-codes', [EntitySlideAnnouncerController::class, 'storePairingCode'])->name('pairing-codes.store');
         Route::get('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'show'])->name('show');

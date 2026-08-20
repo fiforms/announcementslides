@@ -59,7 +59,7 @@ function formatSeen(device) {
                     <tr v-for="device in filtered" :key="device.id" class="hover:bg-gray-50">
                         <td class="px-4 py-3">
                             <Link v-if="device.entity"
-                                :href="route('entity.slide-announcers.show', { entity: device.entity.id, slideAnnouncer: device.id })"
+                                :href="route('slide-announcers.show', { slideAnnouncer: device.id, entity_id: device.entity.id })"
                                 class="font-medium text-indigo-600 hover:text-indigo-800">
                                 {{ device.name }}
                             </Link>

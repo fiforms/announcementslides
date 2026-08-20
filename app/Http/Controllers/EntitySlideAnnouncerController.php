@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Controllers\Concerns\AuthorizesEntityAccess;
 use App\Models\Entity;
 use App\Models\Language;
 use App\Models\SlideAnnouncer;
@@ -15,10 +16,11 @@ use Inertia\Response;
 
 class EntitySlideAnnouncerController extends Controller
 {
-    public function index(Request $request, Entity $entity): Response
+    use AuthorizesEntityAccess;
+
+    public function index(Request $request): Response
     {
-        $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
+        $entity = Entity::findOrFail($this->authorizedEntityId($request));
 
         $devices = $entity->slideAnnouncers()
             ->whereNull('revoked_at')
@@ -100,11 +102,11 @@ class EntitySlideAnnouncerController extends Controller
      * Admin/SlideAnnouncerConsoleController's fleet list linking straight
      * into this route rather than duplicating a detail page.
      */
-    public function show(Request $request, Entity $entity, SlideAnnouncer $slideAnnouncer): Response
+    public function show(Request $request, SlideAnnouncer $slideAnnouncer): Response
     {
         $user = $request->user();
+        $entity = $slideAnnouncer->entity;
         abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($slideAnnouncer->entity_id === $entity->id, 404);
 
         $heartbeats = $slideAnnouncer->heartbeats()
             ->orderByDesc('created_at')
@@ -126,26 +128,24 @@ class EntitySlideAnnouncerController extends Controller
         ]);
     }
 
-    public function storePairingCode(Request $request, Entity $entity)
+    public function storePairingCode(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
+        $entityId = $this->authorizedEntityId($request);
 
         SlideAnnouncerPairingCode::create([
             'code' => $this->generateUnusedCode(),
-            'entity_id' => $entity->id,
-            'created_by' => $user->id,
+            'entity_id' => $entityId,
+            'created_by' => $request->user()->id,
             'expires_at' => now()->addMinutes(config('slide_announcer.pairing_code_ttl_minutes')),
         ]);
 
         return back();
     }
 
-    public function update(Request $request, Entity $entity, SlideAnnouncer $slideAnnouncer)
+    public function update(Request $request, SlideAnnouncer $slideAnnouncer)
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($slideAnnouncer->entity_id === $entity->id, 404);
+        abort_unless($user->isAdmin() || $user->isEntityAdmin($slideAnnouncer->entity_id), 403);
 
         $data = $request->validate([
             'name' => 'sometimes|string|max:255',
@@ -164,11 +164,10 @@ class EntitySlideAnnouncerController extends Controller
         return back()->with('success', 'Device updated.');
     }
 
-    public function destroy(Request $request, Entity $entity, SlideAnnouncer $slideAnnouncer)
+    public function destroy(Request $request, SlideAnnouncer $slideAnnouncer)
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($slideAnnouncer->entity_id === $entity->id, 404);
+        abort_unless($user->isAdmin() || $user->isEntityAdmin($slideAnnouncer->entity_id), 403);
 
         // Revoke, don't hard-delete — keeps history for the "needs
         // attention" UI, matching how Slide already soft-deletes. See

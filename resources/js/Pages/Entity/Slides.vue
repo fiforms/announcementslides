@@ -42,7 +42,7 @@ function statusBadge(status) {
         <div class="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
             <!-- Upload Panel Toggle Button -->
             <div class="flex justify-end gap-3">
-                <Link :href="route('entity.slide-announcers.index', { entity: entity.id })"
+                <Link :href="route('slide-announcers.index', { entity_id: entity.id })"
                     class="flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                     Slide Announcer Devices
                 </Link>

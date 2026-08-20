@@ -63,9 +63,9 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             </Link>
 
                             <!-- SlideAnnouncers link (no meaning in Global View) -->
-                            <Link v-if="hasEntities && currentEntityId" :href="route('entity.slide-announcers.index', currentEntityId)"
+                            <Link v-if="hasEntities && currentEntityId" :href="route('slide-announcers.index', { entity_id: currentEntityId })"
                                 class="text-sm text-indigo-200 hover:text-white transition-colors"
-                                :class="{ 'text-white font-semibold': route().current('entity.slide-announcers.*') }">
+                                :class="{ 'text-white font-semibold': route().current('slide-announcers.*') }">
                                 SlideAnnouncers
                             </Link>
 
@@ -175,8 +175,8 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             </ResponsiveNavLink>
                             <ResponsiveNavLink
                                 v-if="currentEntityId"
-                                :href="route('entity.slide-announcers.index', currentEntityId)"
-                                :active="route().current('entity.slide-announcers.*')"
+                                :href="route('slide-announcers.index', { entity_id: currentEntityId })"
+                                :active="route().current('slide-announcers.*')"
                             >
                                 SlideAnnouncers
                             </ResponsiveNavLink>
