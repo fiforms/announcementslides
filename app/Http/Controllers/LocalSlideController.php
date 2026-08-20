@@ -9,6 +9,7 @@ use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -18,9 +19,13 @@ class LocalSlideController extends Controller
     use ManagesSlideMedia;
     use AuthorizesEntityAccess;
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         $entityId = $this->authorizedEntityId($request, requireAdmin: false);
+        if ($redirect = $this->redirectToEntityUrl($request, 'local-slides.index', $entityId)) {
+            return $redirect;
+        }
+
         $user = $request->user();
         $entity = Entity::findOrFail($entityId);
         $isAdmin = $user->isAdmin() || $user->isEntityAdmin($entityId);

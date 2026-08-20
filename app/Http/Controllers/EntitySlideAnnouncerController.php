@@ -9,6 +9,7 @@ use App\Models\SlideAnnouncer;
 use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerPairingCode;
 use App\Models\SlideAnnouncerRelease;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
@@ -18,9 +19,14 @@ class EntitySlideAnnouncerController extends Controller
 {
     use AuthorizesEntityAccess;
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
-        $entity = Entity::findOrFail($this->authorizedEntityId($request));
+        $entityId = $this->authorizedEntityId($request);
+        if ($redirect = $this->redirectToEntityUrl($request, 'slide-announcers.index', $entityId)) {
+            return $redirect;
+        }
+
+        $entity = Entity::findOrFail($entityId);
 
         $devices = $entity->slideAnnouncers()
             ->whereNull('revoked_at')

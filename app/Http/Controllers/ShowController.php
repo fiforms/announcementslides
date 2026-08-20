@@ -10,6 +10,7 @@ use App\Models\Show;
 use App\Models\Slide;
 use App\Support\NearbyEntities;
 use App\Support\SortZones;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -20,9 +21,13 @@ class ShowController extends Controller
     use AuthorizesEntityAccess;
     use ManagesSlideMedia;
 
-    public function index(Request $request): Response
+    public function index(Request $request): Response|RedirectResponse
     {
         $entityId = $this->authorizedEntityId($request, requireAdmin: false);
+        if ($redirect = $this->redirectToEntityUrl($request, 'shows.index', $entityId)) {
+            return $redirect;
+        }
+
         $entity = Entity::findOrFail($entityId);
         $entity->mainShow();
 
