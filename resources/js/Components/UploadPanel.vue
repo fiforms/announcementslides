@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import DropZone from '@/Components/DropZone.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
+import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
 import { useImageValidation } from '@/Composables/useImageValidation.js';
 
@@ -227,15 +228,13 @@ async function submit() {
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date <span class="text-gray-400 font-normal">(optional)</span></label>
-                    <input v-model="publishAt" type="datetime-local"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    <DateTimeLocalInput v-model="publishAt" />
                     <p class="mt-1 text-xs text-gray-500">Don't show before this date/time</p>
                 </div>
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date <span class="text-gray-400 font-normal">(optional)</span></label>
-                    <input v-model="expiresAt" type="datetime-local"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    <DateTimeLocalInput v-model="expiresAt" />
                     <p class="mt-1 text-xs text-gray-500">Hide after this date/time</p>
                 </div>
 

@@ -3,6 +3,7 @@ import { computed } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import MediaManager from '@/Components/MediaManager.vue';
+import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 
 const props = defineProps({
     entity: { type: Object, required: true },
@@ -82,13 +83,11 @@ function submit() {
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date</label>
-                        <input v-model="form.publish_at" type="datetime-local"
-                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <DateTimeLocalInput v-model="form.publish_at" />
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
-                        <input v-model="form.expires_at" type="datetime-local"
-                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <DateTimeLocalInput v-model="form.expires_at" />
                     </div>
                 </div>
 

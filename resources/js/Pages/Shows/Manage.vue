@@ -7,6 +7,7 @@ import UploadPanel from '@/Components/UploadPanel.vue';
 import ShowSlideRow from '@/Components/ShowSlideRow.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
 import MediaManager from '@/Components/MediaManager.vue';
+import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useLightbox } from '@/Composables/useLightbox.js';
 
 const props = defineProps({
@@ -559,13 +560,11 @@ function persistLeaderOrder() {
                         <div class="grid grid-cols-2 gap-4">
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date</label>
-                                <input v-model="editForm.publish_at" type="datetime-local"
-                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                <DateTimeLocalInput v-model="editForm.publish_at" />
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
-                                <input v-model="editForm.expires_at" type="datetime-local"
-                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                <DateTimeLocalInput v-model="editForm.expires_at" />
                             </div>
                         </div>
 

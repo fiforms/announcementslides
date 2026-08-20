@@ -5,6 +5,7 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
 import DropZone from '@/Components/DropZone.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
+import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useImageValidation } from '@/Composables/useImageValidation.js';
 
 const props = defineProps({
@@ -361,15 +362,13 @@ function statusBadge(status) {
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.publish_date') }} <span class="text-gray-400 font-normal">{{ $t('admin.optional') }}</span></label>
-                        <input v-model="form.publish_at" type="datetime-local"
-                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <DateTimeLocalInput v-model="form.publish_at" />
                         <p class="mt-1 text-xs text-gray-500">{{ $t('upload.publish_hint') }}</p>
                     </div>
 
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.expiration_date') }} <span class="text-gray-400 font-normal">{{ $t('admin.optional') }}</span></label>
-                        <input v-model="form.expires_at" type="datetime-local"
-                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <DateTimeLocalInput v-model="form.expires_at" />
                         <p class="mt-1 text-xs text-gray-500">{{ $t('upload.expiry_hint') }}</p>
                     </div>
 
