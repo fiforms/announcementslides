@@ -92,6 +92,14 @@ function submitEdit() {
     });
 }
 
+function archiveEditingSlide() {
+    if (!confirm(`Archive "${editingSlide.value.title}"? It will stop showing right away — you can restore it later from the archive.`)) return;
+    router.post(route('local-slides.archive', { slide: editingSlide.value.id, entity_id: props.entity.id }), {}, {
+        preserveScroll: true,
+        onSuccess: () => closeEdit(),
+    });
+}
+
 // A slide "expires out" of a show the same way it expires out of the real
 // rotation: it stays attached (nothing detaches it automatically), it just
 // stops being current. This mirrors that in the editor by splitting the
@@ -569,6 +577,10 @@ function persistLeaderOrder() {
                             <button type="button" @click="closeEdit"
                                 class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                 Cancel
+                            </button>
+                            <button v-if="!isExpired(editingSlide)" type="button" @click="archiveEditingSlide"
+                                class="ml-auto rounded-lg border border-red-200 px-5 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors">
+                                Archive
                             </button>
                         </div>
                     </form>
