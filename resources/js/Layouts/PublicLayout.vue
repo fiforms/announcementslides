@@ -1,13 +1,15 @@
 <script setup>
 import { Link, usePage, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import UserMenu from '@/Components/UserMenu.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import { useEntitySelection } from '@/Composables/useEntitySelection.js';
 
 const page = usePage();
 const auth = computed(() => page.props.auth);
 const flash = computed(() => page.props.flash);
+const showingNavigationDropdown = ref(false);
 
 const userEntities = computed(() => page.props.auth?.user_entities || []);
 const hasEntities = computed(() => userEntities.value.length > 0);
@@ -29,7 +31,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         <span class="text-lg font-bold text-white">{{ page.props.appName }}</span>
                     </Link>
 
-                    <div class="flex items-center gap-6">
+                    <div class="hidden nav:flex nav:items-center nav:gap-6">
                         <Link :href="route('slides.index', currentEntityId ? { entity_id: currentEntityId } : {})"
                             class="text-sm text-indigo-200 hover:text-white transition-colors"
                             :class="{ 'text-white font-semibold': route().current('slides.index') }">
@@ -102,6 +104,91 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             </Link>
                         </template>
                     </div>
+
+                    <!-- Mobile: user menu + hamburger (guests just get the Log In link) -->
+                    <div class="flex items-center gap-2 nav:hidden">
+                        <template v-if="auth?.user">
+                            <UserMenu :user="auth.user" />
+                            <button
+                                @click="showingNavigationDropdown = !showingNavigationDropdown"
+                                class="inline-flex items-center justify-center rounded-md p-2 text-indigo-200 transition duration-150 ease-in-out hover:bg-indigo-600 hover:text-white focus:bg-indigo-600 focus:text-white focus:outline-none"
+                            >
+                                <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                                    <path
+                                        :class="{ hidden: showingNavigationDropdown, 'inline-flex': !showingNavigationDropdown }"
+                                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                                    <path
+                                        :class="{ hidden: !showingNavigationDropdown, 'inline-flex': showingNavigationDropdown }"
+                                        stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </template>
+                        <Link v-else :href="route('login')" class="text-sm text-indigo-200 hover:text-white transition-colors">
+                            Log In
+                        </Link>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Responsive Navigation Menu -->
+            <div
+                v-if="auth?.user"
+                :class="{ block: showingNavigationDropdown, hidden: !showingNavigationDropdown }"
+                class="nav:hidden bg-indigo-600"
+            >
+                <div class="space-y-1 pb-3 pt-2">
+                    <ResponsiveNavLink
+                        :href="route('slides.index', currentEntityId ? { entity_id: currentEntityId } : {})"
+                        :active="route().current('slides.index')"
+                    >
+                        Announcements
+                    </ResponsiveNavLink>
+                    <ResponsiveNavLink
+                        v-if="auth.user.role === 'viewer' || auth.user.role === 'contributor'"
+                        :href="route('my-slides.index')"
+                        :active="route().current('my-slides.*')"
+                    >
+                        {{ $t('nav.my_slides') }}
+                    </ResponsiveNavLink>
+                    <template v-if="hasEntities">
+                        <ResponsiveNavLink
+                            v-if="currentEntityId"
+                            :href="route('shows.index', { entity_id: currentEntityId })"
+                            :active="route().current('shows.*')"
+                        >
+                            Show Editor
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="currentEntityId"
+                            :href="route('slide-announcers.index', { entity_id: currentEntityId })"
+                            :active="route().current('slide-announcers.*')"
+                        >
+                            SlideAnnouncers
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            @click.prevent="selectEntity(null)"
+                            href="#"
+                            :active="!currentEntityId"
+                        >
+                            Global View
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-for="entity in userEntities"
+                            :key="entity.id"
+                            @click.prevent="selectEntity(entity.id)"
+                            href="#"
+                            :active="currentEntityId === entity.id"
+                        >
+                            {{ entity.name }}
+                        </ResponsiveNavLink>
+                    </template>
+                    <ResponsiveNavLink
+                        v-if="auth.user.role === 'admin'"
+                        :href="route('admin.dashboard')"
+                        :active="route().current('admin.*')"
+                    >
+                        Admin
+                    </ResponsiveNavLink>
                 </div>
             </div>
         </nav>

@@ -39,7 +39,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
 
                         </div>
 
-                        <div class="hidden sm:ms-6 sm:flex sm:items-center sm:gap-6">
+                        <div class="hidden nav:ms-6 nav:flex nav:items-center nav:gap-6">
                             <!-- Announcements link -->
                             <Link :href="route('slides.index', currentEntityId ? { entity_id: currentEntityId } : {})"
                                 class="text-sm text-indigo-200 hover:text-white transition-colors"
@@ -107,8 +107,9 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             <UserMenu :user="$page.props.auth.user" />
                         </div>
 
-                        <!-- Hamburger -->
-                        <div class="-me-2 flex items-center sm:hidden">
+                        <!-- Mobile: user menu + hamburger -->
+                        <div class="-me-2 flex items-center gap-2 nav:hidden">
+                            <UserMenu :user="$page.props.auth.user" />
                             <button
                                 @click="
                                     showingNavigationDropdown =
@@ -156,10 +157,17 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         block: showingNavigationDropdown,
                         hidden: !showingNavigationDropdown,
                     }"
-                    class="sm:hidden bg-indigo-600"
+                    class="nav:hidden bg-indigo-600"
                 >
                     <div class="space-y-1 pb-3 pt-2">
                         <ResponsiveNavLink
+                            :href="route('slides.index', currentEntityId ? { entity_id: currentEntityId } : {})"
+                            :active="route().current('slides.index')"
+                        >
+                            Announcements
+                        </ResponsiveNavLink>
+                        <ResponsiveNavLink
+                            v-if="$page.props.auth.user?.role === 'viewer' || $page.props.auth.user?.role === 'contributor'"
                             :href="route('my-slides.index')"
                             :active="route().current('my-slides.*')"
                         >
@@ -204,35 +212,13 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         >
                             {{ $t('nav.submit_slide') }}
                         </ResponsiveNavLink>
-                    </div>
-
-                    <!-- Responsive Settings Options -->
-                    <div
-                        class="border-t border-indigo-500 pb-1 pt-4"
-                    >
-                        <div class="px-4">
-                            <div
-                                class="text-base font-medium text-white"
-                            >
-                                {{ $page.props.auth.user.name }}
-                            </div>
-                            <div class="text-sm font-medium text-indigo-200">
-                                {{ $page.props.auth.user.email }}
-                            </div>
-                        </div>
-
-                        <div class="mt-3 space-y-1">
-                            <ResponsiveNavLink :href="route('profile.edit')">
-                                {{ $t('nav.profile') }}
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                :href="route('logout')"
-                                method="post"
-                                as="button"
-                            >
-                                {{ $t('nav.log_out') }}
-                            </ResponsiveNavLink>
-                        </div>
+                        <ResponsiveNavLink
+                            v-if="$page.props.auth.user?.role === 'admin'"
+                            :href="route('admin.dashboard')"
+                            :active="route().current('admin.*')"
+                        >
+                            Admin
+                        </ResponsiveNavLink>
                     </div>
                 </div>
             </nav>

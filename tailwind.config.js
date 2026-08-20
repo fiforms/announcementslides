@@ -15,6 +15,13 @@ export default {
             fontFamily: {
                 sans: ['Figtree', ...defaultTheme.fontFamily.sans],
             },
+            screens: {
+                // Top nav bar collapse point: it carries enough links
+                // (Announcements, My Slides, Show Editor, SlideAnnouncers,
+                // entity switcher, Admin) that the default `sm`/`lg` steps
+                // start clipping well before mobile widths.
+                nav: '1080px',
+            },
         },
     },
 
