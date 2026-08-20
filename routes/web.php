@@ -44,6 +44,9 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::post('/entities/{entity}/subscribe', [EntityController::class, 'subscribe'])->name('entities.subscribe');
     Route::delete('/entities/{entity}/unsubscribe', [EntityController::class, 'unsubscribe'])->name('entities.unsubscribe');
 
+    // ── Entity leader: restore an archived slide from /archive ─────────────
+    Route::post('/archive/{slide}/unarchive', [SlideController::class, 'unarchive'])->name('slides.unarchive');
+
     // ── Chunked uploads (all authenticated users; role determines outcome) ──
     Route::post('/uploads/chunk', [ChunkedUploadController::class, 'chunk'])->name('uploads.chunk');
     Route::post('/uploads/finalize', [ChunkedUploadController::class, 'finalize'])->name('uploads.finalize');

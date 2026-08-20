@@ -136,16 +136,41 @@ class SlideController extends Controller
                 ->orWhere('notes', 'like', "%{$search}%"));
         }
 
-        $slides = $query->paginate(24)->through(fn ($s) => $this->slideResource($s));
+        $slides = $query->paginate(24)->withQueryString()->through(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
+
+        $user = $request->user();
+        $isAdmin = $entityId && $user && ($user->isAdmin() || $user->isEntityAdmin($entityId));
 
         return Inertia::render('Slides/Archive', [
             'slides' => $slides,
             'languages' => $languages,
             'search' => $search,
             'selectedLanguage' => $languageCode,
+            'entityId' => $entityId,
+            'isAdmin' => $isAdmin,
         ]);
+    }
+
+    /**
+     * Restore an archived slide by clearing its expiry — the entity-leader
+     * counterpart to LocalSlideController::unarchive(), reachable from the
+     * /archive page's lightbox rather than a per-entity slide list. Scoped to
+     * the slide's own entity (never a global slide, which is an admin's
+     * call), and to that entity's admins/site admins — same bar as every
+     * other entity-leader slide action.
+     */
+    public function unarchive(Request $request, Slide $slide)
+    {
+        $user = $request->user();
+        $entityId = $slide->entity_id;
+
+        abort_unless($entityId && ($user->isAdmin() || $user->isEntityAdmin($entityId)), 403);
+
+        $slide->update(['expires_at' => null]);
+
+        return back()->with('success', 'Slide restored.');
     }
 
     public function download(Slide $slide)

@@ -3,9 +3,10 @@ import { ref } from 'vue';
 
 defineProps({
     slide: { type: Object, default: null },
+    canUnarchive: { type: Boolean, default: false },
 });
 
-defineEmits(['close']);
+defineEmits(['close', 'unarchive']);
 
 const MEDIA_TYPE_LABELS = {
     slide: 'Slide',
@@ -75,7 +76,17 @@ async function copy(text, field) {
                 <!-- Description / link / attached files -->
                 <div class="w-full max-w-4xl rounded-xl border border-white/10 bg-black/60 p-4 text-white shadow-2xl backdrop-blur-md space-y-3"
                     @click.stop>
-                    <p class="text-lg font-medium">{{ slide.title }}</p>
+                    <div class="flex items-start justify-between gap-3">
+                        <p class="text-lg font-medium">{{ slide.title }}</p>
+                        <button v-if="canUnarchive" @click="$emit('unarchive', slide)"
+                            class="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M4 8l6-6 6 6M10 2v16m-8 4h16" />
+                            </svg>
+                            Un-archive
+                        </button>
+                    </div>
 
                     <div v-if="slide.text_description" class="flex items-start gap-2">
                         <p class="flex-1 text-sm text-white/80 whitespace-pre-line">{{ slide.text_description }}</p>

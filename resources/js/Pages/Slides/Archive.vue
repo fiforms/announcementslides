@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
-import SlideCard from '@/Components/SlideCard.vue';
+import ShowSlideRow from '@/Components/ShowSlideRow.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
 import { useLightbox } from '@/Composables/useLightbox.js';
 import { useI18n } from 'vue-i18n';
@@ -14,17 +14,53 @@ const props = defineProps({
     languages: { type: Array, default: () => [] },
     search: { type: String, default: '' },
     selectedLanguage: { type: String, default: null },
+    entityId: { type: Number, default: null },
+    isAdmin: { type: Boolean, default: false },
 });
 
 const searchQuery = ref(props.search);
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
 let searchTimeout = null;
 
+// Matches Shows/Manage.vue's own scope badge: relative to the entity this
+// page was reached for (props.entityId), not the individual slide's owner.
+const scopeBadges = {
+    global: { label: 'Global', classes: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
+    nearby: { label: 'Nearby', classes: 'bg-purple-50 text-purple-700', dot: 'bg-purple-500' },
+    mine:   { label: 'Mine',   classes: 'bg-green-50 text-green-700', dot: 'bg-green-500' },
+};
+
+function scopeBadge(slide) {
+    if (slide.entity_id === null) return scopeBadges.global;
+    if (slide.entity_id === props.entityId) return scopeBadges.mine;
+    return scopeBadges.nearby;
+}
+
+function expiresLabel(slide) {
+    if (!slide.expires_at) return null;
+    const dateStr = new Date(slide.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return `Expired ${dateStr}`;
+}
+
+// Un-archiving only makes sense for a slide this entity actually owns — a
+// global or nearby-shared slide's archival is someone else's call.
+function canUnarchive(slide) {
+    return props.isAdmin && slide?.entity_id === props.entityId;
+}
+
+function unarchiveSlide(slide) {
+    router.post(route('slides.unarchive', slide.id), {}, {
+        preserveScroll: true,
+        onSuccess: () => closeLightbox(),
+    });
+}
+
 function onSearch() {
     clearTimeout(searchTimeout);
     searchTimeout = setTimeout(() => {
         const params = { search: searchQuery.value || undefined };
         if (currentLanguageCode.value) params.language = currentLanguageCode.value;
+        if (props.entityId) params.entity_id = props.entityId;
         router.get(route('slides.archive'), params, {
             preserveState: true,
             replace: true,
@@ -35,6 +71,7 @@ function onSearch() {
 function changeLanguage(code) {
     const params = { language: code };
     if (searchQuery.value) params.search = searchQuery.value;
+    if (props.entityId) params.entity_id = props.entityId;
     router.get(route('slides.archive'), params, {
         preserveState: true,
         replace: true,
@@ -67,12 +104,14 @@ const { lightboxSlide, openLightbox, closeLightbox } = useLightbox();
             </div>
         </div>
 
-        <div v-if="slides.data.length" class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            <SlideCard
+        <div v-if="slides.data.length" class="mx-auto max-w-3xl space-y-2">
+            <ShowSlideRow
                 v-for="slide in slides.data"
                 :key="slide.id"
                 :slide="slide"
-                :show-download="true"
+                :scope-badge="scopeBadge(slide)"
+                :expires-label="expiresLabel(slide)"
+                :draggable="false"
                 @open="openLightbox"
             />
         </div>
@@ -94,6 +133,7 @@ const { lightboxSlide, openLightbox, closeLightbox } = useLightbox();
             </template>
         </div>
 
-        <SlideLightbox :slide="lightboxSlide" @close="closeLightbox" />
+        <SlideLightbox :slide="lightboxSlide" :can-unarchive="canUnarchive(lightboxSlide)"
+            @close="closeLightbox" @unarchive="unarchiveSlide" />
     </PublicLayout>
 </template>
