@@ -427,11 +427,11 @@ function persistLeaderOrder() {
                     <div class="mb-3 flex items-center gap-4 text-xs text-gray-600">
                         <label class="flex items-center gap-1.5 cursor-pointer">
                             <input type="radio" value="this" v-model="unusedScope" class="text-indigo-600 focus:ring-indigo-500" />
-                            This Show
+                            All Available
                         </label>
                         <label class="flex items-center gap-1.5 cursor-pointer">
                             <input type="radio" value="all" v-model="unusedScope" class="text-indigo-600 focus:ring-indigo-500" />
-                            All Shows
+                            Only Unused
                         </label>
                     </div>
                     <div class="space-y-2 min-h-[8rem]">
