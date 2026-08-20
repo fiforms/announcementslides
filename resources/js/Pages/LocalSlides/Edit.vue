@@ -1,6 +1,6 @@
 <script setup>
 import { computed } from 'vue';
-import { useForm, Link } from '@inertiajs/vue3';
+import { useForm, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import MediaManager from '@/Components/MediaManager.vue';
@@ -18,6 +18,7 @@ function toLocalDatetime(iso) {
 }
 
 const isVideoSlide = computed(() => props.slide.mime_type?.startsWith('video/'));
+const isArchived = computed(() => !!props.slide.expires_at && new Date(props.slide.expires_at).getTime() <= Date.now());
 
 const form = useForm({
     title:               props.slide.title,
@@ -32,6 +33,11 @@ const form = useForm({
 
 function submit() {
     form.patch(route('local-slides.update', { slide: props.slide.id, entity_id: props.entity.id }));
+}
+
+function archive() {
+    if (!confirm(`Archive "${props.slide.title}"? It will stop showing right away — you can restore it later from the archive.`)) return;
+    router.post(route('local-slides.archive', { slide: props.slide.id, entity_id: props.entity.id }));
 }
 </script>
 
@@ -120,6 +126,10 @@ function submit() {
                         class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                         Cancel
                     </Link>
+                    <button v-if="!isArchived" type="button" @click="archive"
+                        class="ml-auto rounded-lg border border-red-200 px-5 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors">
+                        Archive
+                    </button>
                 </div>
             </form>
 
