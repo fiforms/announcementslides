@@ -12,7 +12,7 @@ const props = defineProps({
     current:   { type: Array, default: () => [] },
     pending:   { type: Array, default: () => [] },
     upcoming:  { type: Array, default: () => [] },
-    archived:  { type: Array, default: () => [] },
+    archived:  { type: Object, default: () => ({ data: [], total: 0, last_page: 1, links: [] }) }, // paginated
     drafts:    { type: Array, default: () => [] },
     languages: { type: Array, default: () => [] },
     globalShowTemplates: { type: Array, default: () => [] },
@@ -219,14 +219,16 @@ const tabs = computed(() => [
     { key: 'pending',  label: 'pending',  count: props.pending.length },
     { key: 'upcoming', label: 'upcoming', count: props.upcoming.length },
     { key: 'drafts',   label: 'drafts',   count: props.drafts.length },
-    { key: 'archived', label: 'archived', count: props.archived.length },
+    { key: 'archived', label: 'archived', count: props.archived.total },
 ]);
 
 const activeTab = ref('current');
 
 // The "current" tab is ordered by the Global Board's automatic fan-out
 // order (see App\Support\SortZones) — no manual reordering here anymore.
-const activeSlides = computed(() => props[activeTab.value]);
+// "archived" is server-paginated, so it's the one tab whose list lives at
+// .data rather than being the prop itself.
+const activeSlides = computed(() => activeTab.value === 'archived' ? props.archived.data : props[activeTab.value]);
 
 function displayStatus(slide) {
     // Archived slides keep their DB status (usually "published"); show the
@@ -534,6 +536,17 @@ function statusBadge(status) {
 
         <div v-else class="mt-8 rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
             <p class="text-gray-400">{{ $t('admin.no_slides_in_category') }}</p>
+        </div>
+
+        <!-- Pagination (archived tab only — every other tab is a single unpaginated fetch) -->
+        <div v-if="activeTab === 'archived' && archived.last_page > 1" class="mt-6 flex justify-center gap-1">
+            <template v-for="link in archived.links" :key="link.label">
+                <Link v-if="link.url" :href="link.url" preserve-state preserve-scroll :only="['archived']"
+                    class="px-3 py-1.5 rounded-md text-sm border transition-colors"
+                    :class="link.active ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-gray-300 text-gray-700 hover:bg-gray-50'"
+                    v-html="link.label" />
+                <span v-else class="px-3 py-1.5 rounded-md text-sm border border-gray-200 text-gray-400" v-html="link.label" />
+            </template>
         </div>
     </AdminLayout>
 </template>

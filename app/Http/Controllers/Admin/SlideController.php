@@ -30,7 +30,13 @@ class SlideController extends Controller
         $current  = Slide::with($with)->unscoped()->current()->orderedInShow(Show::globalBoard()->id)->get()->map(fn ($s) => $this->slideResource($s));
         $pending  = Slide::with($with)->unscoped()->pendingReview()->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
         $upcoming = Slide::with($with)->unscoped()->upcoming()->orderBy('publish_at')->get()->map(fn ($s) => $this->slideResource($s));
-        $archived = Slide::with($with)->unscoped()->archived()->orderByDesc('expires_at')->limit(20)->get()->map(fn ($s) => $this->slideResource($s));
+        // Paginated (most-recently-archived first) rather than a flat
+        // most-recent-20, so older archives stay reachable instead of
+        // silently falling off the end.
+        $archived = Slide::with($with)->unscoped()->archived()->orderByDesc('expires_at')
+            ->paginate(20, ['*'], 'archived_page')
+            ->withQueryString()
+            ->through(fn ($s) => $this->slideResource($s));
         $drafts   = Slide::with($with)->unscoped()->where('status', 'draft')->orderByDesc('created_at')->get()->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
@@ -124,7 +130,17 @@ class SlideController extends Controller
         $newLanguageId = $request->filled('language_id') ? (int) $request->input('language_id') : null;
         $languageChanged = $slide->language_id !== $newLanguageId;
 
-        $slide->update($request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'entity_id', 'share_nearby'));
+        $data = $request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'entity_id', 'share_nearby');
+
+        // Share-with-nearby only means anything for an entity-owned slide — a
+        // global slide is already visible everywhere, so never let it persist
+        // as true for one (the edit form hides the checkbox for these too).
+        $resolvedEntityId = array_key_exists('entity_id', $data) ? $data['entity_id'] : $slide->entity_id;
+        if ($resolvedEntityId === null) {
+            $data['share_nearby'] = false;
+        }
+
+        $slide->update($data);
 
         // Re-run auto-fill fan-out so language-gated shows pick up/drop this
         // slide to match its new tag — never touches a leader's manual keep.

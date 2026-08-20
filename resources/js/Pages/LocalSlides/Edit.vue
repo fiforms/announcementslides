@@ -40,6 +40,21 @@ function archive() {
     if (!confirm(`Archive "${props.slide.title}"? It will stop showing right away — you can restore it later from the archive.`)) return;
     router.post(route('local-slides.archive', { slide: props.slide.id, entity_id: props.entity.id }));
 }
+
+function toggleShareNearby() {
+    // Turning sharing ON requires the slide to meet quality requirements, since
+    // it will appear on nearby congregations' dashboards. The server enforces
+    // this too; this is just immediate feedback.
+    if (!props.slide.share_nearby && props.slide.validation_status && props.slide.validation_status !== 'ok') {
+        alert(
+            'This slide can\'t be shared with nearby churches because it doesn\'t meet the quality requirements:\n\n'
+            + (props.slide.validation_issues || []).join('\n')
+        );
+        return;
+    }
+    const routeName = props.slide.share_nearby ? 'local-slides.unshare-nearby' : 'local-slides.share-nearby';
+    router.post(route(routeName, { slide: props.slide.id, entity_id: props.entity.id }), {}, { preserveScroll: true });
+}
 </script>
 
 <template>
@@ -103,6 +118,15 @@ function archive() {
                         </option>
                     </select>
                     <p v-if="form.errors.language_id" class="mt-1 text-xs text-red-600">{{ form.errors.language_id }}</p>
+                </div>
+
+                <div>
+                    <label class="flex items-center gap-2">
+                        <input :checked="slide.share_nearby" @change="toggleShareNearby" type="checkbox"
+                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                        <span class="text-sm font-medium text-gray-700">Share with nearby churches</span>
+                    </label>
+                    <p class="mt-1 text-xs text-gray-500">When on, this slide can appear on nearby churches' dashboards if they enable "include nearby".</p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">

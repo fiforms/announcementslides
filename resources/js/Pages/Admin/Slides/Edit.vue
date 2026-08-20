@@ -140,7 +140,7 @@ function submit() {
                     </div>
                 </div>
 
-                <div>
+                <div v-if="slide.entity">
                     <label class="flex items-center gap-2">
                         <input v-model="form.share_nearby" type="checkbox"
                             class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
