@@ -536,6 +536,41 @@ one show, and the current single-slideshow-per-entity model is simpler to
 reason about everywhere it touches (sync query, admin UI, `Slide` scopes)
 until that need is real.
 
+### Future idea: independent slideshow per monitor (not implemented)
+
+The Pi 4 B hardware `slideannouncer` runs on has two HDMI outputs. The
+Settings → Screens page (see `slideannouncer/DISPLAY_IMPLEMENTATION.md`)
+only controls resolution and always mirrors a second connected output — a
+single Chromium kiosk window shown identically on both. A church might
+instead want, say, a lobby-facing screen and a hallway-facing screen off
+the same Pi each showing a different rotation.
+
+This is a materially bigger change than the multi-slideshow-per-site idea
+above, and unlike that one, **whether it's even feasible on this hardware/
+compositor stack is unverified** — nothing about dual-output has been
+smoke-tested yet, mirrored or otherwise. Sketch of what it would need, if
+someone picks it up later:
+- Two independent rendering surfaces instead of one fullscreen Chromium
+  window — most likely two separate `--kiosk` Chromium instances, each
+  pinned to one output (`--window-position`/labwc output placement), since
+  a single Chromium window can't natively split its content across two
+  displays with different content on each.
+- Each instance would need its own `slide-announcer-kiosk*.service`
+  (`kiosk-start.sh` currently assumes exactly one), and its own notion of
+  "which slideshow" — the `slideshows`/`slideshow_id` schema above would
+  need a *device-and-output* granularity, not just device, since one
+  physical `SlideAnnouncer` row would now drive two independently-assigned
+  shows.
+- Resource cost on a Pi 4 of two concurrent Chromium+video-decode
+  instances is unknown and could plausibly be the reason this doesn't work
+  well in practice even once wired up — worth a rough performance check
+  before investing further design time here.
+
+Deliberately not started: it depends on the multi-slideshow-per-site
+schema above (also not built), and needs real hardware experimentation
+(does labwc even expose two outputs cleanly to two separate Chromium
+instances?) before a concrete plan is worth writing.
+
 ---
 
 ## Part 2 — Device-side architecture ([`slideannouncer`](slideannouncer/) submodule)
