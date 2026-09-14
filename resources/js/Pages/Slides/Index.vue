@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { router } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
@@ -18,6 +18,7 @@ const props = defineProps({
     entityId: { type: Number, default: null },
     showId: { type: Number, default: null },
     availableShows: { type: Array, default: () => [] },
+    initialSlide: { type: Object, default: null },
 });
 
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
@@ -108,7 +109,47 @@ function openSlideshowAll() {
     showSlideshow.value = true;
 }
 
-const { lightboxSlide, openLightbox, closeLightbox } = useLightbox();
+const { lightboxSlide, openLightbox: openLightboxRaw, closeLightbox: closeLightboxRaw } = useLightbox();
+
+// Give every slide a canonical, shareable URL: opening/closing the lightbox
+// pushes/pops history entries (no Inertia visit, no reload) so the address
+// bar always reflects the open slide, and the back/forward buttons work.
+// backgroundUrl remembers the (language/show-filtered) URL to return to on
+// close, since the lightbox URL itself carries no query string.
+let backgroundUrl = null;
+
+function openLightbox(slide) {
+    openLightboxRaw(slide);
+    const slideUrl = route('slides.show', slide.id, false);
+    if (window.location.pathname !== slideUrl) {
+        backgroundUrl ??= window.location.pathname + window.location.search;
+        window.history.pushState({ slideId: slide.id }, '', route('slides.show', slide.id));
+    }
+}
+
+function closeLightbox() {
+    closeLightboxRaw();
+    if (window.history.state?.slideId) {
+        window.history.pushState({}, '', backgroundUrl ?? (route('slides.index') + window.location.search));
+        backgroundUrl = null;
+    }
+}
+
+function onPopState() {
+    const match = window.location.pathname.match(/^\/slides\/(\d+)$/);
+    const slide = match ? props.slides.find(s => s.id === Number(match[1])) : null;
+    if (slide) {
+        openLightboxRaw(slide);
+    } else {
+        closeLightboxRaw();
+    }
+}
+
+onMounted(() => {
+    window.addEventListener('popstate', onPopState);
+    if (props.initialSlide) openLightboxRaw(props.initialSlide);
+});
+onUnmounted(() => window.removeEventListener('popstate', onPopState));
 </script>
 
 <template>

@@ -25,7 +25,7 @@ class SlideController extends Controller
 {
     use ManagesSlideMedia;
 
-    public function index(Request $request): Response
+    public function index(Request $request, ?Slide $slide = null): Response
     {
         $languageCode = $request->query('language');
         $languageId = null;
@@ -90,6 +90,16 @@ class SlideController extends Controller
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
+        // Deep link to a single slide (e.g. /slides/{slide}): render the same
+        // dashboard, plus that slide's data so the frontend can open its
+        // lightbox on load. Only if it's actually visible to this viewer —
+        // it may belong to a different show/entity than the one loaded above.
+        $initialSlide = null;
+        if ($slide && Slide::visibleToUser($request->user())->whereKey($slide->id)->exists()) {
+            $slide->load(['primaryMedia', 'overlayMedia', 'media']);
+            $initialSlide = $this->slideResource($slide);
+        }
+
         return Inertia::render('Slides/Index', [
             'slides' => $slides,
             'languages' => $languages,
@@ -97,6 +107,7 @@ class SlideController extends Controller
             'entityId' => $entityId,
             'showId' => $showId,
             'availableShows' => $availableShows,
+            'initialSlide' => $initialSlide,
         ]);
     }
 
