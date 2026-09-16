@@ -6,6 +6,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Collection;
 
 class User extends Authenticatable
 {
@@ -53,9 +54,36 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    /**
+     * This user's entity memberships as entity_id => pivot role, resolved
+     * once per instance.
+     *
+     * Every entity-scoped request asks about membership several times over --
+     * AuthorizesEntityAccess checks it to resolve the entity and again to
+     * authorise it, the controller asks whether the user is an admin of it,
+     * and Slide::scopeVisibleToUser() asks for the whole list to build the
+     * query. Each of those used to be its own round trip to user_entities.
+     * One lookup answers all of them.
+     *
+     * Call forgetEntityRoles() after changing this user's memberships within
+     * the same request.
+     */
+    protected ?Collection $entityRoles = null;
+
+    protected function entityRoles(): Collection
+    {
+        return $this->entityRoles ??= $this->entities()
+            ->pluck('user_entities.role', 'entities.id');
+    }
+
+    public function forgetEntityRoles(): void
+    {
+        $this->entityRoles = null;
+    }
+
     public function entityRole(int $entityId): ?string
     {
-        return $this->entities()->find($entityId)?->pivot->role;
+        return $this->entityRoles()->get($entityId);
     }
 
     public function adminEntities()
@@ -70,7 +98,7 @@ class User extends Authenticatable
 
     public function memberEntityIds(): array
     {
-        return $this->entities()->pluck('entities.id')->toArray();
+        return $this->entityRoles()->keys()->all();
     }
 
     public function settings()

@@ -31,6 +31,7 @@ class EntityController extends Controller
         $user->entities()->syncWithoutDetaching([
             $entity->id => ['role' => 'viewer', 'granted_by' => null],
         ]);
+        $user->forgetEntityRoles();
 
         return back()->with('status', 'subscribed');
     }
@@ -38,6 +39,7 @@ class EntityController extends Controller
     public function unsubscribe(Request $request, Entity $entity): RedirectResponse
     {
         $request->user()->entities()->detach($entity->id);
+        $request->user()->forgetEntityRoles();
 
         return back()->with('status', 'unsubscribed');
     }

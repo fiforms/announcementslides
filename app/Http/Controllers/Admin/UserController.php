@@ -84,6 +84,7 @@ class UserController extends Controller
                 'granted_by' => $request->user()->id,
             ],
         ]);
+        $user->forgetEntityRoles();
 
         return back()->with('success', 'Entity relationship added.');
     }
@@ -98,6 +99,7 @@ class UserController extends Controller
             'role'       => $data['role'],
             'granted_by' => $request->user()->id,
         ]);
+        $user->forgetEntityRoles();
 
         return back()->with('success', 'Entity role updated.');
     }
@@ -105,6 +107,7 @@ class UserController extends Controller
     public function detachEntity(User $user, Entity $entity): RedirectResponse
     {
         $user->entities()->detach($entity->id);
+        $user->forgetEntityRoles();
 
         return back()->with('success', 'Entity relationship removed.');
     }

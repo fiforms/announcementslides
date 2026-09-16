@@ -33,6 +33,7 @@ class EntityAssign extends Command
 
         if ($this->option('remove')) {
             $user->entities()->detach($entity->id);
+            $user->forgetEntityRoles();
             $this->info("Removed {$user->email} from entity \"{$entity->name}\".");
             return self::SUCCESS;
         }
@@ -47,9 +48,11 @@ class EntityAssign extends Command
         $user->entities()->syncWithoutDetaching([
             $entity->id => ['role' => $role, 'granted_by' => null],
         ]);
+        $user->forgetEntityRoles();
 
         // If the role changed, update it explicitly
         $user->entities()->updateExistingPivot($entity->id, ['role' => $role]);
+        $user->forgetEntityRoles();
 
         $this->info("Assigned {$user->email} as {$role} for \"{$entity->name}\".");
 
