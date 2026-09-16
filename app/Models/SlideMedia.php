@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 class SlideMedia extends Model
@@ -30,13 +31,13 @@ class SlideMedia extends Model
         ];
     }
 
-    public function slide()
+    public function slide(): BelongsTo
     {
         return $this->belongsTo(Slide::class);
     }
 
     /** Set (with slide_id null) for a show's frame media: show-base / show-overlay. */
-    public function show()
+    public function show(): BelongsTo
     {
         return $this->belongsTo(Show::class);
     }
