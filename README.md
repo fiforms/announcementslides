@@ -53,10 +53,23 @@ npm run build
 
 ```bash
 php artisan user:create
-php artisan user:setrole       # promote the user to admin
+php artisan user:setrole
 ```
 
-`user:setrole` will prompt for an email address and a role (`admin`, `contributor`, or `viewer`).
+Both commands prompt for anything you don't pass. `user:create` asks for name,
+email, password and role; `user:setrole` asks for the email address and the new
+role (`viewer`, `contributor`, `admin` or `banned`).
+
+To skip the prompts, pass the values instead:
+
+```bash
+php artisan user:create --name="Jane Doe" --email=jane@example.org --password=secret123 --role=admin
+php artisan user:setrole jane@example.org admin
+```
+
+Don't paste a trailing `# comment` onto these lines — zsh doesn't treat `#` as a
+comment in an interactive shell, so the words become extra arguments and the
+command fails with "Too many arguments".
 
 ### Load church data
 
