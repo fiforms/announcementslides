@@ -19,7 +19,7 @@ class EntitySlideController extends Controller
     public function index(Request $request, Entity $entity): Response
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
+        $this->authorize('manageAnyForEntity', [Slide::class, $entity]);
 
         $slides = Slide::with(['uploader', 'primaryMedia'])
             ->entityScoped($entity->id)
@@ -52,9 +52,7 @@ class EntitySlideController extends Controller
     public function edit(Request $request, Entity $entity, Slide $slide): Response
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entity->id, 404);
+        $this->authorize('manageForEntity', [$slide, $entity]);
 
         $slide->load('media');
 
@@ -68,9 +66,7 @@ class EntitySlideController extends Controller
     public function update(Request $request, Entity $entity, Slide $slide)
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entity->id, 404);
+        $this->authorize('manageForEntity', [$slide, $entity]);
 
         $request->validate([
             'title'               => 'required|string|max:255',
@@ -90,9 +86,7 @@ class EntitySlideController extends Controller
     public function storeMedia(Request $request, Entity $entity, Slide $slide)
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entity->id, 404);
+        $this->authorize('manageForEntity', [$slide, $entity]);
 
         $this->storeMediaForSlide($request, $slide);
 
@@ -102,9 +96,7 @@ class EntitySlideController extends Controller
     public function destroyMedia(Request $request, Entity $entity, Slide $slide, SlideMedia $media)
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entity->id, 404);
+        $this->authorize('manageForEntity', [$slide, $entity]);
 
         $this->destroyMediaForSlide($slide, $media);
 
@@ -138,9 +130,7 @@ class EntitySlideController extends Controller
     public function archive(Request $request, Entity $entity, Slide $slide)
     {
         $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entity->id, 404);
+        $this->authorize('manageForEntity', [$slide, $entity]);
 
         $slide->update(['expires_at' => now()]);
 
