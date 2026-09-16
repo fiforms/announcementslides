@@ -52,8 +52,7 @@ class LocalSlideController extends Controller
     {
         $entityId = $this->authorizedEntityId($request);
         $user = $request->user();
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entityId, 404);
+        $this->authorize('manageForEntity', [$slide, $entityId]);
 
         $entity = Entity::findOrFail($entityId);
         $slide->load('media');
@@ -71,8 +70,7 @@ class LocalSlideController extends Controller
     {
         $entityId = $this->authorizedEntityId($request);
         $user = $request->user();
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entityId, 404);
+        $this->authorize('manageForEntity', [$slide, $entityId]);
 
         $request->validate([
             'title'               => 'required|string|max:255',
@@ -172,8 +170,7 @@ class LocalSlideController extends Controller
         $entityId = $this->authorizedEntityId($request);
         $user = $request->user();
 
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entityId, 404);
+        $this->authorize('manageForEntity', [$slide, $entityId]);
 
         return $entityId;
     }

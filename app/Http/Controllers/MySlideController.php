@@ -135,15 +135,9 @@ class MySlideController extends Controller
 
     private function authorizeOwnership(Request $request, Slide $slide): void
     {
-        // Ownership alone is not enough: a user demoted to "viewer" may still own
-        // global slides from when they were a contributor, but must not be able to
-        // modify them. Editing/archiving requires current contributor permissions.
-        abort_unless(
-            $request->user()->isContributor()
-                && $slide->uploaded_by === $request->user()->id
-                && $slide->entity_id === null,
-            403
-        );
+        // The rule itself, and why ownership alone is not enough, lives on
+        // SlidePolicy::manageUnscoped().
+        $this->authorize('manageUnscoped', $slide);
     }
 
     private function slideResource(Slide $slide, bool $withMedia = false): array
