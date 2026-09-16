@@ -39,6 +39,13 @@ php artisan storage:link
 ls -l public/storage      # should be a symlink, not a directory
 ```
 
+`APP_URL` has to match the URL the site is actually served on, scheme and
+port included — `config/filesystems.php` builds the `public` disk's URLs from
+it, so every slide image, video and thumbnail is addressed relative to
+whatever it says. Get it wrong and the pages render while every piece of
+media 404s, which looks like a broken upload pipeline rather than a config
+value. Behind a TLS-terminating proxy that means `https://`, not `http://`.
+
 Two deployment notes:
 
 - **It is not idempotent across releases.** A deploy that builds into a fresh

@@ -54,6 +54,20 @@ Uploaded slides, thumbnails and overlays are written to the `public` disk
 the app runs, but no slide image or video renders anywhere — and nothing
 reports an error, so it looks like an empty or broken install.
 
+Point `APP_URL` at the port you actually serve on:
+
+```dotenv
+# .env
+APP_URL=http://localhost:8000
+```
+
+`.env.example` ships `http://localhost`, but `composer dev` serves on port
+8000. Media URLs are built from `APP_URL` (see `config/filesystems.php`'s
+`public` disk), so leaving the port off produces `http://localhost/storage/...`
+— port 80, where nothing is listening. The page loads fine and every image
+is broken, which reads like a failed upload rather than a URL problem. Run
+`php artisan config:clear` after changing it.
+
 Build frontend assets:
 
 ```bash
