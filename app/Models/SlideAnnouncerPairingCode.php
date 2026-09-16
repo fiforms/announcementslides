@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SlideAnnouncerPairingCode extends Model
 {
@@ -20,27 +22,27 @@ class SlideAnnouncerPairingCode extends Model
         'used_at' => 'datetime',
     ];
 
-    public function entity()
+    public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class);
     }
 
-    public function creator()
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function slideAnnouncer()
+    public function slideAnnouncer(): BelongsTo
     {
         return $this->belongsTo(SlideAnnouncer::class);
     }
 
-    public function scopeUnused($query)
+    public function scopeUnused(Builder $query): Builder
     {
         return $query->whereNull('used_at');
     }
 
-    public function scopeUnexpired($query)
+    public function scopeUnexpired(Builder $query): Builder
     {
         return $query->where('expires_at', '>', now());
     }

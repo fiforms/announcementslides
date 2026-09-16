@@ -2,7 +2,11 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Entity extends Model
 {
@@ -31,29 +35,29 @@ class Entity extends Model
         'longitude'   => 'decimal:7',
     ];
 
-    public function users()
+    public function users(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'user_entities')
             ->withPivot('role', 'granted_by')
             ->withTimestamps();
     }
 
-    public function creator()
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function slides()
+    public function slides(): HasMany
     {
         return $this->hasMany(Slide::class);
     }
 
-    public function slideAnnouncers()
+    public function slideAnnouncers(): HasMany
     {
         return $this->hasMany(SlideAnnouncer::class);
     }
 
-    public function shows()
+    public function shows(): HasMany
     {
         return $this->hasMany(Show::class);
     }
@@ -63,7 +67,7 @@ class Entity extends Model
         return Show::mainFor($this);
     }
 
-    public function scopeSearch($query, string $term)
+    public function scopeSearch(Builder $query, string $term): Builder
     {
         return $query->where('name', 'like', '%' . $term . '%');
     }

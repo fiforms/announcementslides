@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -41,12 +43,12 @@ class User extends Authenticatable
         return $this->role === 'banned';
     }
 
-    public function slides()
+    public function slides(): HasMany
     {
         return $this->hasMany(Slide::class, 'uploaded_by');
     }
 
-    public function entities()
+    public function entities(): BelongsToMany
     {
         return $this->belongsToMany(Entity::class, 'user_entities')
             ->withPivot('role', 'granted_by')
@@ -58,7 +60,7 @@ class User extends Authenticatable
         return $this->entities()->find($entityId)?->pivot->role;
     }
 
-    public function adminEntities()
+    public function adminEntities(): BelongsToMany
     {
         return $this->entities()->wherePivot('role', 'admin');
     }
@@ -73,7 +75,7 @@ class User extends Authenticatable
         return $this->entities()->pluck('entities.id')->toArray();
     }
 
-    public function settings()
+    public function settings(): HasMany
     {
         return $this->hasMany(UserSetting::class);
     }
@@ -81,7 +83,7 @@ class User extends Authenticatable
     /**
      * Read a single per-user setting value, falling back to $default when unset.
      */
-    public function setting(string $tag, $default = null)
+    public function setting(string $tag, $default = null): mixed
     {
         return $this->settings()->where('setting_tag', $tag)->value('setting_value') ?? $default;
     }

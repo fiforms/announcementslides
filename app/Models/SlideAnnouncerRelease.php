@@ -2,7 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Storage;
 
 class SlideAnnouncerRelease extends Model
@@ -29,22 +32,22 @@ class SlideAnnouncerRelease extends Model
         'created_by',
     ];
 
-    public function creator()
+    public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function channels()
+    public function channels(): HasMany
     {
         return $this->hasMany(SlideAnnouncerReleaseChannel::class);
     }
 
-    public function scopeOfKindAndArchitecture($query, string $kind, ?string $architecture)
+    public function scopeOfKindAndArchitecture(Builder $query, string $kind, ?string $architecture): Builder
     {
         return $query->where('kind', $kind)->where('architecture', $architecture);
     }
 
-    public function scopeCurrentOnChannel($query, string $kind, ?string $architecture, string $channel)
+    public function scopeCurrentOnChannel(Builder $query, string $kind, ?string $architecture, string $channel): Builder
     {
         return $query->ofKindAndArchitecture($kind, $architecture)
             ->whereHas('channels', fn ($q) => $q->where('channel', $channel));

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
 
 class SlideMedia extends Model
@@ -27,7 +28,7 @@ class SlideMedia extends Model
         ];
     }
 
-    public function slide()
+    public function slide(): BelongsTo
     {
         return $this->belongsTo(Slide::class);
     }
