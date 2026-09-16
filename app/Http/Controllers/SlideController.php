@@ -29,7 +29,7 @@ class SlideController extends Controller
     {
         $languageCode = $request->query('language');
         $languageId = null;
-        $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
+        $entityId = $this->requestedEntityId($request);
 
         // If no language specified, try to detect from Accept-Language header (browser default)
         if (!$languageCode) {
@@ -115,7 +115,7 @@ class SlideController extends Controller
     {
         $languageCode = $request->query('language');
         $languageId = null;
-        $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
+        $entityId = $this->requestedEntityId($request);
 
         // If no language specified, try to detect from Accept-Language header (browser default)
         if (!$languageCode) {
@@ -313,6 +313,38 @@ class SlideController extends Controller
      * or the legacy ad-hoc-selection path (?ids=, used from the global
      * Slides/Index.vue browsing page, which has no single show concept).
      */
+    /**
+     * The entity whose board was asked for, or null.
+     *
+     * Honoured only for someone who belongs to that entity. `/` is public and
+     * `entity_id` is just a query parameter, so an arbitrary one used to
+     * resolve an Entity and publish that entity's show list into the page
+     * props -- telling an anonymous caller both that the entity exists (a
+     * real id renders, an unknown one 404s) and what its leaders named their
+     * shows.
+     *
+     * Ignoring it rather than 403ing keeps this from becoming a new error
+     * path: the app's own links never carry entity_id for a signed-out
+     * visitor (PublicLayout derives it from auth.user_entities, which is
+     * empty for a guest), so anyone sending one has typed or crafted it, and
+     * the Global Board is the honest answer.
+     *
+     * Membership, not site-admin, is the test -- matching
+     * Slide::scopeVisibleToUser(), which scopes slides the same way.
+     */
+    private function requestedEntityId(Request $request): ?int
+    {
+        $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
+
+        if (! $entityId) {
+            return null;
+        }
+
+        return in_array($entityId, $request->user()?->memberEntityIds() ?? [], true)
+            ? $entityId
+            : null;
+    }
+
     private function resolveDownloadSlides(Request $request)
     {
         $showId = $request->query('show_id');
