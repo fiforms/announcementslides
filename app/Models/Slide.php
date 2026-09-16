@@ -2,13 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Entity;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use App\Models\Entity;
-use App\Models\User;
 
 class Slide extends Model
 {
@@ -32,32 +36,32 @@ class Slide extends Model
 
     // ── Relationships ─────────────────────────────────────────────────────────
 
-    public function uploader()
+    public function uploader(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by');
     }
 
-    public function reviewer()
+    public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
     }
 
-    public function entity()
+    public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class);
     }
 
-    public function language()
+    public function language(): BelongsTo
     {
         return $this->belongsTo(\App\Models\Language::class);
     }
 
-    public function media()
+    public function media(): HasMany
     {
         return $this->hasMany(SlideMedia::class);
     }
 
-    public function shows()
+    public function shows(): BelongsToMany
     {
         return $this->belongsToMany(Show::class, 'show_slides')
             ->withPivot('sort_order')
@@ -69,7 +73,7 @@ class Slide extends Model
      * one, seeded at creation time; this is what the file_url/thumbnail_url/
      * mime_type/etc. proxy accessors below resolve against.
      */
-    public function primaryMedia()
+    public function primaryMedia(): HasOne
     {
         return $this->hasOne(SlideMedia::class)->where('media_type', 'slide')->oldest('sort_order');
     }
@@ -78,7 +82,7 @@ class Slide extends Model
      * The slide's optional 'slide-overlay' media row — a same-aspect-ratio
      * graphic composited on top of primaryMedia when present.
      */
-    public function overlayMedia()
+    public function overlayMedia(): HasOne
     {
         return $this->hasOne(SlideMedia::class)->where('media_type', 'slide-overlay')->oldest('sort_order');
     }

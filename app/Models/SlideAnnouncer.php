@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Laravel\Sanctum\HasApiTokens;
 
 class SlideAnnouncer extends Model
@@ -41,22 +43,22 @@ class SlideAnnouncer extends Model
         'revoked_at' => 'datetime',
     ];
 
-    public function entity()
+    public function entity(): BelongsTo
     {
         return $this->belongsTo(Entity::class);
     }
 
-    public function language()
+    public function language(): BelongsTo
     {
         return $this->belongsTo(Language::class);
     }
 
-    public function pairedBy()
+    public function pairedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'paired_by');
     }
 
-    public function heartbeats()
+    public function heartbeats(): HasMany
     {
         return $this->hasMany(SlideAnnouncerHeartbeat::class);
     }
