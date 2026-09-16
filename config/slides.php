@@ -54,6 +54,38 @@ return [
     | string column.
     |
     */
+    /*
+    |--------------------------------------------------------------------------
+    | Mime type -> stored file extension
+    |--------------------------------------------------------------------------
+    |
+    | The extension an upload is *stored* under is derived from its validated
+    | mime type via this map, never from the filename the client sent. The
+    | client's name is kept verbatim in slide_media.original_filename for
+    | display and for the download prompt, but it never reaches the disk.
+    |
+    | This is a security boundary, not a convenience: the assembled file lands
+    | on the `public` disk, which is web-served via the storage:link symlink.
+    | Taking the extension from the client meant any authenticated user could
+    | choose it, and a `.php` under the document root is executed by the
+    | default nginx/Apache Laravel config.
+    |
+    | Every mime listed under `media_types` below must have an entry here, or
+    | uploads of that type are rejected (fail closed, by design).
+    |
+    */
+    'mime_extensions' => [
+        'image/jpeg'      => 'jpg',
+        'image/png'       => 'png',
+        'image/webp'      => 'webp',
+        'image/gif'       => 'gif',
+        'image/svg+xml'   => 'svg',
+        'video/mp4'       => 'mp4',
+        'video/quicktime' => 'mov',
+        'video/webm'      => 'webm',
+        'application/pdf' => 'pdf',
+    ],
+
     'media_types' => [
         'slide' => [
             'label' => 'Slide',
