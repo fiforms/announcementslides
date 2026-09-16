@@ -43,6 +43,17 @@ Run database migrations:
 php artisan migrate
 ```
 
+Link the public storage directory:
+
+```bash
+php artisan storage:link
+```
+
+Uploaded slides, thumbnails and overlays are written to the `public` disk
+(`storage/app/public`) and served from `/storage/...`. Without this symlink
+the app runs, but no slide image or video renders anywhere — and nothing
+reports an error, so it looks like an empty or broken install.
+
 Build frontend assets:
 
 ```bash

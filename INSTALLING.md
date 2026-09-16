@@ -1,8 +1,10 @@
 # Installing / Deploying
 
 This covers the parts of a production deployment that go beyond the local
-dev setup in [README.md](README.md#installation): the queue worker and
-`ffmpeg`, both required for slide thumbnails to actually generate.
+dev setup in [README.md](README.md#installation): the public storage
+symlink, the queue worker, and `ffmpeg` — the latter two both required for
+slide thumbnails to actually generate, the first for any uploaded media to
+be served at all.
 
 ## Requirements beyond README's list
 
@@ -23,6 +25,37 @@ dev setup in [README.md](README.md#installation): the queue worker and
   FFMPEG_BINARY=/usr/bin/ffmpeg
   ```
   (`config/slides.php`'s `ffmpeg_binary` key.)
+
+## Public storage symlink (required)
+
+`php artisan storage:link` creates `public/storage` -> `storage/app/public`.
+Every slide image, video, thumbnail and overlay is written to the `public`
+disk and served through that path, so without the symlink the site loads but
+renders no media at all — with no error anywhere, which makes it a
+frustrating first thing to debug.
+
+```bash
+php artisan storage:link
+ls -l public/storage      # should be a symlink, not a directory
+```
+
+Two deployment notes:
+
+- **It is not idempotent across releases.** A deploy that builds into a fresh
+  release directory (Envoyer, Deployer, a `releases/<timestamp>` layout) needs
+  this re-run on every deploy, since the new release has no `public/storage`.
+  It is already in `composer setup`, but that is a first-install script, not a
+  deploy script.
+- **`storage/app/public` must be the shared one.** If `storage/` is symlinked
+  to a shared directory across releases (the usual arrangement), make sure the
+  symlink is created after that, or a release will link to its own empty
+  directory and previously uploaded slides will appear to vanish.
+
+Related: whatever serves `public/` should decline to execute scripts under
+`public/storage`. Uploads land there, and the extension is derived from the
+validated mime type rather than the client's filename (`config/slides.php`'s
+`mime_extensions`), but denying execution under that path is cheap
+defence in depth.
 
 ## Queue worker (required)
 
