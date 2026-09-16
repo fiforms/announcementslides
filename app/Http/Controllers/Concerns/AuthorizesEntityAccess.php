@@ -21,10 +21,9 @@ trait AuthorizesEntityAccess
     {
         $user = $request->user();
         $entityId = (int) $request->query('entity_id');
+        $fromQuery = $entityId > 0;
 
-        if ($entityId) {
-            session(['current_entity_id' => $entityId]);
-        } else {
+        if (! $fromQuery) {
             $entityId = (int) session('current_entity_id');
         }
 
@@ -42,6 +41,15 @@ trait AuthorizesEntityAccess
 
         if ($requireAdmin) {
             abort_unless($user->isAdmin() || $user->isEntityAdmin($entityId), 403);
+        }
+
+        // Remembered only once it has survived the checks above. Storing it
+        // beforehand meant a single rejected ?entity_id= stuck in the session
+        // and then failed every later visit that arrived without one — the
+        // fallback would read the poisoned value back out and 403 on it,
+        // instead of landing on the user's own entity.
+        if ($fromQuery) {
+            session(['current_entity_id' => $entityId]);
         }
 
         return $entityId;
