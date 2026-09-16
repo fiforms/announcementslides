@@ -254,7 +254,7 @@ class SlideController extends Controller
         }
 
         $presentation = new PhpPresentation();
-        $presentation->getProperties()->setTitle('Announcement Slides');
+        $presentation->getDocumentProperties()->setTitle('Announcement Slides');
         $presentation->getLayout()->setDocumentLayout(DocumentLayout::LAYOUT_SCREEN_16X9);
         $presentation->removeSlideByIndex(0);
 
