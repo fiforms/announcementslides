@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Concerns\RedirectsToHome;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Inertia\Response;
 
 class ConfirmablePasswordController extends Controller
 {
+    use RedirectsToHome;
+
     /**
      * Show the confirm password view.
      */
@@ -36,6 +39,6 @@ class ConfirmablePasswordController extends Controller
 
         $request->session()->put('auth.password_confirmed_at', time());
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        return redirect()->intended($this->homeRouteFor($request->user()));
     }
 }
