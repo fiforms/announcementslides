@@ -85,10 +85,22 @@ class Slide extends Model
 
     // ── Scopes ────────────────────────────────────────────────────────────────
 
-    public function scopeCurrent(Builder $query): Builder
+    /**
+     * Published and past its publish date, with no opinion on expiry — the
+     * "this slide has been released to the world" test. `current()` is this
+     * plus "not expired yet"; the /archive page and the download endpoints
+     * deliberately serve released-but-expired slides, so they gate on this
+     * rather than on current().
+     */
+    public function scopeReleased(Builder $query): Builder
     {
         return $query->where('status', 'published')
-            ->where(fn ($q) => $q->whereNull('publish_at')->orWhere('publish_at', '<=', now()))
+            ->where(fn ($q) => $q->whereNull('publish_at')->orWhere('publish_at', '<=', now()));
+    }
+
+    public function scopeCurrent(Builder $query): Builder
+    {
+        return $query->released()
             ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()));
     }
 

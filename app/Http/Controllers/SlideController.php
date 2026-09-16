@@ -82,7 +82,14 @@ class SlideController extends Controller
         // Language filtering only applies in Global View: an entity's shows
         // already encode their own preferred language (see Show::$language_id),
         // so filtering again on top would fight the leader's own curation.
-        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->orderedInShow($showId)->current();
+        // visibleToUser() is load-bearing here: $showId and $entityId both come
+        // straight off the query string, and membership in a show is not by
+        // itself permission to see a slide. Without it, a hand-crafted
+        // ?entity_id=/?show_id= served any entity's local slides to anyone.
+        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia', 'media'])
+            ->orderedInShow($showId)
+            ->current()
+            ->visibleToUser($request->user());
         if (!$entityId) {
             $slidesQuery->language($languageId);
         }
@@ -134,10 +141,13 @@ class SlideController extends Controller
 
         $query = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->archived()->language($languageId);
 
+        // visibleToUser() always applies; ?entity_id= only narrows what is
+        // already visible. Previously it replaced the check outright, so
+        // /archive?entity_id= handed out any entity's archived slides.
+        $query->visibleToUser($request->user());
+
         if ($entityId) {
             $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
-        } else {
-            $query->visibleToUser($request->user());
         }
 
         $query->orderByDesc('expires_at');
@@ -184,10 +194,14 @@ class SlideController extends Controller
         return back()->with('success', 'Slide restored.');
     }
 
-    public function download(Slide $slide)
+    public function download(Request $request, Slide $slide)
     {
+        // released() rather than current(): /archive is public and its cards
+        // link here, so an expired slide stays downloadable. The bare
+        // status check this replaces also served slides whose publish_at was
+        // still in the future, and never consulted entity visibility at all.
         abort_unless(
-            $slide->status === 'published',
+            Slide::released()->visibleToUser($request->user())->whereKey($slide->id)->exists(),
             404
         );
 
@@ -200,13 +214,19 @@ class SlideController extends Controller
     /**
      * Download any of a slide's attached media (overlay, flyer PDF, social
      * image, ...), not just the primary file — used by the lightbox's
-     * per-attachment download buttons. Gated the same way any other
-     * public-facing slide content is: the slide must be current.
+     * per-attachment download buttons. Gated exactly like download() above,
+     * so an attachment is reachable wherever its slide's primary file is:
+     * released, and visible to this viewer. It previously used current(),
+     * which both 404'd attachments on archived slides whose primary file
+     * downloaded fine, and skipped the entity-visibility check.
      */
-    public function downloadMedia(Slide $slide, SlideMedia $media)
+    public function downloadMedia(Request $request, Slide $slide, SlideMedia $media)
     {
         abort_unless($media->slide_id === $slide->id, 404);
-        abort_unless(Slide::current()->whereKey($slide->id)->exists(), 404);
+        abort_unless(
+            Slide::released()->visibleToUser($request->user())->whereKey($slide->id)->exists(),
+            404
+        );
 
         return Storage::disk('public')->download($media->disk_path, $media->original_filename);
     }
@@ -317,8 +337,15 @@ class SlideController extends Controller
     {
         $showId = $request->query('show_id');
 
+        // Both branches gate on visibleToUser(). Only this one used to skip
+        // it, which let a ?show_id= pointing at another entity's show export
+        // that entity's slides as a zip or a PowerPoint deck.
         if ($showId) {
-            return Slide::with('primaryMedia')->orderedInShow((int) $showId)->current()->get();
+            return Slide::with('primaryMedia')
+                ->orderedInShow((int) $showId)
+                ->current()
+                ->visibleToUser($request->user())
+                ->get();
         }
 
         $ids = $request->query('ids');
