@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Concerns\RedirectsToHome;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
@@ -13,6 +14,8 @@ use Inertia\Response;
 
 class AuthenticatedSessionController extends Controller
 {
+    use RedirectsToHome;
+
     /**
      * Display the login view.
      */
@@ -33,11 +36,7 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        $home = $request->user()->isAdmin()
-            ? route('admin.dashboard', absolute: false)
-            : route('slides.index', absolute: false);
-
-        return redirect()->intended($home);
+        return redirect()->intended($this->homeRouteFor($request->user()));
     }
 
     /**
