@@ -73,6 +73,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{slide}/unshare-nearby', [LocalSlideController::class, 'unshareNearby'])->name('unshare-nearby');
         Route::post('/{slide}/media', [LocalSlideController::class, 'storeMedia'])->name('media.store');
         Route::delete('/{slide}/media/{media}', [LocalSlideController::class, 'destroyMedia'])->name('media.destroy');
+        Route::get('/{slide}/overlay', [LocalSlideController::class, 'showOverlay'])->name('overlay.show');
+        Route::put('/{slide}/overlay', [LocalSlideController::class, 'saveOverlay'])->name('overlay.save');
     });
 
     // ── Entity leader: manage per-site "shows" (playlists) ──────────────────

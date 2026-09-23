@@ -7,6 +7,7 @@ import UploadPanel from '@/Components/UploadPanel.vue';
 import ShowSlideRow from '@/Components/ShowSlideRow.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
 import MediaManager from '@/Components/MediaManager.vue';
+import OverlayEditor from '@/Components/OverlayEditor/OverlayEditor.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useLightbox } from '@/Composables/useLightbox.js';
 
@@ -21,7 +22,7 @@ const props = defineProps({
     mediaTypes: { type: Array, default: () => [] },
 });
 
-const { locale } = useI18n();
+const { locale, t } = useI18n();
 
 const user = usePage().props.auth.user;
 
@@ -58,6 +59,20 @@ function toLocalDatetime(iso) {
 const { lightboxSlide, openLightbox, closeLightbox } = useLightbox();
 
 const editingSlide = ref(null);
+const editTab = ref('details');
+const overlayEditor = ref(null);
+
+// Unsaved overlay edits live only in the editor, which unmounts on tab
+// switch or close — confirm before throwing them away.
+function confirmDiscardOverlay() {
+    return !overlayEditor.value?.isDirty() || confirm(t('overlay_editor.confirm_discard'));
+}
+
+function switchEditTab(tab) {
+    if (tab === editTab.value) return;
+    if (editTab.value === 'overlay' && !confirmDiscardOverlay()) return;
+    editTab.value = tab;
+}
 const editForm = useForm({
     title: '',
     notes: '',
@@ -71,6 +86,7 @@ const editForm = useForm({
 
 function openEdit(slide) {
     editingSlide.value = slide;
+    editTab.value = 'details';
     editForm.title = slide.title;
     editForm.notes = slide.notes ?? '';
     editForm.text_description = slide.text_description ?? '';
@@ -83,13 +99,14 @@ function openEdit(slide) {
 }
 
 function closeEdit() {
+    if (editTab.value === 'overlay' && !confirmDiscardOverlay()) return;
     editingSlide.value = null;
 }
 
 function submitEdit() {
     editForm.patch(route('local-slides.update', { slide: editingSlide.value.id, entity_id: props.entity.id }), {
         preserveScroll: true,
-        onSuccess: () => closeEdit(),
+        onSuccess: () => { editingSlide.value = null; },
     });
 }
 
@@ -191,6 +208,12 @@ const filteredUnused = computed(() => unused.value.filter(s =>
 watch(() => [props.showSlides, props.unusedSlides], () => {
     inShow.value = [...props.showSlides];
     unused.value = [...props.unusedSlides];
+    // Keep the open edit modal pointed at the refreshed slide (new media,
+    // new overlay) rather than the stale object from before the reload.
+    if (editingSlide.value) {
+        editingSlide.value = [...props.showSlides, ...props.unusedSlides]
+            .find(s => s.id === editingSlide.value.id) ?? editingSlide.value;
+    }
 });
 
 const selectedShow = computed(() => props.shows.find(s => s.id === props.selectedShowId));
@@ -524,98 +547,115 @@ function persistLeaderOrder() {
 
             <div v-if="editingSlide" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
                 @click.self="closeEdit">
-                <div class="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg space-y-4">
+                <div class="relative w-full max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg space-y-4"
+                    :class="editTab === 'overlay' ? 'max-w-6xl' : 'max-w-2xl'">
                     <div class="flex items-center justify-between">
                         <h3 class="text-sm font-semibold text-gray-900">Edit Slide</h3>
                         <button @click="closeEdit" class="text-gray-400 hover:text-gray-600">&times;</button>
                     </div>
 
-                    <div class="aspect-video w-full max-w-sm overflow-hidden rounded-lg bg-slate-100">
-                        <img v-if="editingSlide.thumbnail_url || editingSlide.file_url"
-                            :src="editingSlide.thumbnail_url || editingSlide.file_url"
-                            :alt="editingSlide.title"
-                            class="h-full w-full object-contain" />
-                    </div>
+                    <nav class="-mb-px flex gap-6 border-b border-gray-200">
+                        <button v-for="tab in ['details', 'overlay']" :key="tab" type="button"
+                            @click="switchEditTab(tab)"
+                            class="pb-3 text-sm font-medium border-b-2 transition-colors"
+                            :class="editTab === tab ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                            {{ t(`overlay_editor.tab_${tab}`) }}
+                        </button>
+                    </nav>
 
-                    <form @submit.prevent="submitEdit" class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
-                            <input v-model="editForm.title" type="text" required
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            <p v-if="editForm.errors.title" class="mt-1 text-xs text-red-600">{{ editForm.errors.title }}</p>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
-                            <textarea v-model="editForm.notes" rows="2"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
-                            <textarea v-model="editForm.text_description" rows="2"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
-                            <input v-model="editForm.link" type="url" placeholder="https://…"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            <p v-if="editForm.errors.link" class="mt-1 text-xs text-red-600">{{ editForm.errors.link }}</p>
-                        </div>
-
-                        <div v-if="editingSlide.mime_type?.startsWith('video/')">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
-                            <select v-model="editForm.video_playback_mode"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="play_through">Play through, then advance immediately</option>
-                                <option value="hold_last_frame">Hold last frame until slide delay</option>
-                                <option value="loop">Loop until slide delay</option>
-                            </select>
-                        </div>
-
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
-                            <select v-model="editForm.language_id"
-                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                <option value="">No specific language (visible in all)</option>
-                                <option v-for="lang in languages" :key="lang.id" :value="lang.id">
-                                    {{ lang.name }} ({{ lang.native_name }})
-                                </option>
-                            </select>
-                            <p v-if="editForm.errors.language_id" class="mt-1 text-xs text-red-600">{{ editForm.errors.language_id }}</p>
-                        </div>
-
-                        <div class="grid grid-cols-2 gap-4">
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date</label>
-                                <DateTimeLocalInput v-model="editForm.publish_at" />
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
-                                <DateTimeLocalInput v-model="editForm.expires_at" />
-                            </div>
-                        </div>
-
-                        <div class="flex gap-3 pt-2">
-                            <button type="submit" :disabled="editForm.processing"
-                                class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                {{ editForm.processing ? 'Saving…' : 'Save Changes' }}
-                            </button>
-                            <button type="button" @click="closeEdit"
-                                class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                                Cancel
-                            </button>
-                            <button v-if="!isExpired(editingSlide)" type="button" @click="archiveEditingSlide"
-                                class="ml-auto rounded-lg border border-red-200 px-5 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors">
-                                Archive
-                            </button>
-                        </div>
-                    </form>
-
-                    <MediaManager :slide="editingSlide" :media-types="mediaTypes"
-                        store-route="local-slides.media.store" destroy-route="local-slides.media.destroy"
+                    <OverlayEditor v-if="editTab === 'overlay'" ref="overlayEditor" :slide="editingSlide"
+                        show-route="local-slides.overlay.show" save-route="local-slides.overlay.save"
+                        destroy-route="local-slides.media.destroy"
                         :route-params="{ entity_id: entity.id }" :reload-only="['showSlides', 'unusedSlides']" />
+
+                    <template v-else>
+                        <div class="aspect-video w-full max-w-sm overflow-hidden rounded-lg bg-slate-100">
+                            <img v-if="editingSlide.thumbnail_url || editingSlide.file_url"
+                                :src="editingSlide.thumbnail_url || editingSlide.file_url"
+                                :alt="editingSlide.title"
+                                class="h-full w-full object-contain" />
+                        </div>
+
+                        <form @submit.prevent="submitEdit" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+                                <input v-model="editForm.title" type="text" required
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                <p v-if="editForm.errors.title" class="mt-1 text-xs text-red-600">{{ editForm.errors.title }}</p>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <textarea v-model="editForm.notes" rows="2"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <textarea v-model="editForm.text_description" rows="2"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <input v-model="editForm.link" type="url" placeholder="https://…"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                <p v-if="editForm.errors.link" class="mt-1 text-xs text-red-600">{{ editForm.errors.link }}</p>
+                            </div>
+
+                            <div v-if="editingSlide.mime_type?.startsWith('video/')">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
+                                <select v-model="editForm.video_playback_mode"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="play_through">Play through, then advance immediately</option>
+                                    <option value="hold_last_frame">Hold last frame until slide delay</option>
+                                    <option value="loop">Loop until slide delay</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <select v-model="editForm.language_id"
+                                    class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">No specific language (visible in all)</option>
+                                    <option v-for="lang in languages" :key="lang.id" :value="lang.id">
+                                        {{ lang.name }} ({{ lang.native_name }})
+                                    </option>
+                                </select>
+                                <p v-if="editForm.errors.language_id" class="mt-1 text-xs text-red-600">{{ editForm.errors.language_id }}</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date</label>
+                                    <DateTimeLocalInput v-model="editForm.publish_at" />
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
+                                    <DateTimeLocalInput v-model="editForm.expires_at" />
+                                </div>
+                            </div>
+
+                            <div class="flex gap-3 pt-2">
+                                <button type="submit" :disabled="editForm.processing"
+                                    class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                                    {{ editForm.processing ? 'Saving…' : 'Save Changes' }}
+                                </button>
+                                <button type="button" @click="closeEdit"
+                                    class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                                    Cancel
+                                </button>
+                                <button v-if="!isExpired(editingSlide)" type="button" @click="archiveEditingSlide"
+                                    class="ml-auto rounded-lg border border-red-200 px-5 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors">
+                                    Archive
+                                </button>
+                            </div>
+                        </form>
+
+                        <MediaManager :slide="editingSlide" :media-types="mediaTypes"
+                            store-route="local-slides.media.store" destroy-route="local-slides.media.destroy"
+                            :route-params="{ entity_id: entity.id }" :reload-only="['showSlides', 'unusedSlides']" />
+                    </template>
                 </div>
             </div>
         </div>

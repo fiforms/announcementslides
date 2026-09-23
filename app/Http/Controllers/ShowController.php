@@ -299,6 +299,7 @@ class ShowController extends Controller
             'notes' => $slide->notes,
             'text_description' => $slide->text_description,
             'link' => $slide->link,
+            'canonical_url' => route('slides.show', $slide),
             'video_playback_mode' => $slide->video_playback_mode,
             'entity_id' => $slide->entity_id,
             'language_id' => $slide->language_id,

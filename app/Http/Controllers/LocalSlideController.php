@@ -116,6 +116,21 @@ class LocalSlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
+    public function showOverlay(Request $request, Slide $slide)
+    {
+        $this->authorizeSlideAction($request, $slide);
+
+        return $this->showOverlayForSlide($slide);
+    }
+
+    public function saveOverlay(Request $request, Slide $slide)
+    {
+        $this->authorizeSlideAction($request, $slide);
+        $this->saveOverlayForSlide($request, $slide);
+
+        return back()->with('success', 'Overlay saved.');
+    }
+
     public function archive(Request $request, Slide $slide)
     {
         $entityId = $this->authorizeSlideAction($request, $slide);
