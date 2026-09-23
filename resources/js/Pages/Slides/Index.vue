@@ -118,7 +118,12 @@ const { lightboxSlide, openLightbox: openLightboxRaw, closeLightbox: closeLightb
 // close, since the lightbox URL itself carries no query string.
 let backgroundUrl = null;
 
+// A tile click always starts the lightbox in windowed mode; only landing on
+// a slide's canonical URL directly starts it full-page (set true just below).
+const lightboxStartExpanded = ref(false);
+
 function openLightbox(slide) {
+    lightboxStartExpanded.value = false;
     openLightboxRaw(slide);
     const slideUrl = route('slides.show', slide.id, false);
     if (window.location.pathname !== slideUrl) {
@@ -139,6 +144,7 @@ function onPopState() {
     const match = window.location.pathname.match(/^\/slides\/(\d+)$/);
     const slide = match ? props.slides.find(s => s.id === Number(match[1])) : null;
     if (slide) {
+        lightboxStartExpanded.value = false;
         openLightboxRaw(slide);
     } else {
         closeLightboxRaw();
@@ -147,7 +153,10 @@ function onPopState() {
 
 onMounted(() => {
     window.addEventListener('popstate', onPopState);
-    if (props.initialSlide) openLightboxRaw(props.initialSlide);
+    if (props.initialSlide) {
+        lightboxStartExpanded.value = true;
+        openLightboxRaw(props.initialSlide);
+    }
 });
 onUnmounted(() => window.removeEventListener('popstate', onPopState));
 </script>
@@ -259,6 +268,6 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
         <!-- Slideshow Modal -->
         <SlideshowModal :show="showSlideshow" :slides="slideshowSlides" @close="showSlideshow = false" />
 
-        <SlideLightbox :slide="lightboxSlide" @close="closeLightbox" />
+        <SlideLightbox :slide="lightboxSlide" :start-expanded="lightboxStartExpanded" @close="closeLightbox" />
     </PublicLayout>
 </template>

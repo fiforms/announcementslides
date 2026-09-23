@@ -1,12 +1,24 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     slide: { type: Object, default: null },
     canUnarchive: { type: Boolean, default: false },
+    // Which mode a newly-opened slide should start in: the windowed preview
+    // (default for a tile click) or the full-page mode (default when landing
+    // on a slide's canonical URL directly).
+    startExpanded: { type: Boolean, default: false },
 });
 
 defineEmits(['close', 'unarchive']);
+
+const isExpanded = ref(props.startExpanded);
+
+// The component stays mounted across slide changes (only the `slide` prop
+// changes), so reset the mode whenever a *different* slide opens.
+watch(() => props.slide?.id, (id, previousId) => {
+    if (id !== undefined && id !== previousId) isExpanded.value = props.startExpanded;
+});
 
 const MEDIA_TYPE_LABELS = {
     slide: 'Slide',
@@ -51,6 +63,20 @@ async function copy(text, field) {
                 class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 overflow-y-auto bg-black/85 p-4"
                 @click.self="$emit('close')">
 
+                <!-- Expand/shrink button -->
+                <button @click="isExpanded = !isExpanded"
+                    class="absolute top-4 right-16 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
+                    :aria-label="isExpanded ? 'Shrink' : 'Expand'">
+                    <svg v-if="!isExpanded" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" />
+                    </svg>
+                    <svg v-else class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 4v4H5M15 4v4h4M9 20v-4H5M15 20v-4h4" />
+                    </svg>
+                </button>
+
                 <!-- Close button -->
                 <button @click="$emit('close')"
                     class="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
@@ -61,20 +87,25 @@ async function copy(text, field) {
                 </button>
 
                 <!-- Preview (base + overlay, composited exactly like the slideshow) -->
-                <div class="relative max-h-[65vh] w-full max-w-4xl flex-shrink" @click.self="$emit('close')">
+                <div class="relative w-full flex-shrink"
+                    :class="isExpanded ? 'max-h-[85vh] max-w-[95vw]' : 'max-h-[65vh] max-w-4xl'"
+                    @click.self="$emit('close')">
                     <video v-if="slide.mime_type?.startsWith('video/')"
                         :src="slide.file_url"
                         controls autoplay loop
-                        class="max-h-[65vh] w-full rounded-lg object-contain shadow-2xl" />
+                        class="w-full rounded-lg object-contain shadow-2xl"
+                        :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
                     <img v-else :src="slide.file_url || slide.thumbnail_url"
                         :alt="slide.title"
-                        class="max-h-[65vh] w-full rounded-lg object-contain shadow-2xl" />
+                        class="w-full rounded-lg object-contain shadow-2xl"
+                        :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
                     <img v-if="slide.overlay_url" :src="slide.overlay_url" :alt="`${slide.title} overlay`"
                         class="pointer-events-none absolute inset-0 h-full w-full object-contain" />
                 </div>
 
                 <!-- Description / link / attached files -->
-                <div class="w-full max-w-4xl rounded-xl border border-white/10 bg-black/60 p-4 text-white shadow-2xl backdrop-blur-md space-y-3"
+                <div class="w-full rounded-xl border border-white/10 bg-black/60 p-4 text-white shadow-2xl backdrop-blur-md space-y-3"
+                    :class="isExpanded ? 'max-w-[95vw]' : 'max-w-4xl'"
                     @click.stop>
                     <div class="flex items-start justify-between gap-3">
                         <p class="text-lg font-medium">{{ slide.title }}</p>
