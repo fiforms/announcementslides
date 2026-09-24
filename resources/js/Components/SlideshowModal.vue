@@ -68,9 +68,10 @@ const getSlideshowInterval = () => {
     return 10000;
 };
 
-const advanceSlide = () => {
-    currentIndex.value = (currentIndex.value + 1) % slidesList.value.length;
-};
+// Routed through goToIndex so each auto-advance (timer or a play_through
+// video's 'ended') re-arms the countdown for the next slide, including the
+// wrap from the last slide back to the first.
+const advanceSlide = () => goToIndex(currentIndex.value + 1);
 
 // Per-slide scheduler: an image or a video in 'hold_last_frame'/'loop' mode
 // advances after the normal slide delay; a 'play_through' video advances
