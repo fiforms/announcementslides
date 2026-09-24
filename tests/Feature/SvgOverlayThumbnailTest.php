@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\SyncOverlayThumbnail;
 use App\Models\Slide;
 use App\Models\User;
+use App\Services\OverlayCompositor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -41,7 +42,7 @@ class SvgOverlayThumbnailTest extends TestCase
 
         config(['slides.rsvg_binary' => 'a-binary-that-definitely-does-not-exist-xyz']);
 
-        (new SyncOverlayThumbnail($slide->id))->handle();
+        (new SyncOverlayThumbnail($slide->id))->handle(new OverlayCompositor());
 
         $slide->refresh();
         $this->assertNull($slide->overlay_thumbnail_path);

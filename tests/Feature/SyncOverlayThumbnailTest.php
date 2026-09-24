@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Jobs\SyncOverlayThumbnail;
 use App\Models\Slide;
 use App\Models\User;
+use App\Services\OverlayCompositor;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -57,7 +58,7 @@ class SyncOverlayThumbnailTest extends TestCase
             'disk_path' => 'slides/overlay.png', 'file_size' => 10, 'mime_type' => 'image/png',
         ]);
 
-        (new SyncOverlayThumbnail($slide->id))->handle();
+        (new SyncOverlayThumbnail($slide->id))->handle(new OverlayCompositor());
 
         $slide->refresh();
         $this->assertNotNull($slide->overlay_thumbnail_path);
@@ -78,7 +79,7 @@ class SyncOverlayThumbnailTest extends TestCase
             'thumbnail_path' => 'thumbs/base.jpg',
         ]);
 
-        (new SyncOverlayThumbnail($slide->id))->handle();
+        (new SyncOverlayThumbnail($slide->id))->handle(new OverlayCompositor());
 
         $slide->refresh();
         $this->assertNull($slide->overlay_thumbnail_path);
@@ -103,11 +104,11 @@ class SyncOverlayThumbnailTest extends TestCase
             'disk_path' => 'slides/overlay.png', 'file_size' => 10, 'mime_type' => 'image/png',
         ]);
 
-        (new SyncOverlayThumbnail($slide->id))->handle();
+        (new SyncOverlayThumbnail($slide->id))->handle(new OverlayCompositor());
         $this->assertNotNull($slide->refresh()->overlay_thumbnail_path);
 
         $overlay->delete();
-        (new SyncOverlayThumbnail($slide->id))->handle();
+        (new SyncOverlayThumbnail($slide->id))->handle(new OverlayCompositor());
 
         $this->assertNull($slide->refresh()->overlay_thumbnail_path);
     }

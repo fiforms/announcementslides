@@ -9,9 +9,11 @@ use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
+use App\Services\OverlayCompositor;
 use App\Support\NearbyEntities;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpPresentation\DocumentLayout;
@@ -245,9 +247,10 @@ class SlideController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    public function downloadPowerPoint(Request $request)
+    public function downloadPowerPoint(Request $request, OverlayCompositor $compositor)
     {
         $slides = $this->resolveDownloadSlides($request);
+        $slides->load('overlayMedia');
 
         if ($slides->isEmpty()) {
             abort(404);
@@ -262,12 +265,28 @@ class SlideController extends Controller
         $slideWidth = 1920;
         $slideHeight = 1080;
 
+        // Flattened overlay composites; the writer reads them at save(), so
+        // they're only removed afterwards.
+        $tempImages = [];
+
         foreach ($slides as $slide) {
             $media = $slide->primaryMedia;
             if (! $media) {
                 continue;
             }
             $fullPath = Storage::disk('public')->path($media->disk_path);
+
+            // PowerPoint has no notion of our overlay layer, so burn it into
+            // a single full-slide JPEG. If flattening fails (e.g. an SVG
+            // overlay without rsvg-convert), export the base alone.
+            if ($slide->overlayMedia && $media->isImage()) {
+                $compositePath = sys_get_temp_dir() . '/slide-composite-' . Str::uuid() . '.jpg';
+                if ($compositor->flatten($fullPath, $slide->overlayMedia, $compositePath, $slideWidth, $slideHeight, 92)) {
+                    $tempImages[] = $compositePath;
+                    $fullPath = $compositePath;
+                }
+            }
+
             if (file_exists($fullPath)) {
                 $newSlide = $presentation->createSlide();
 
@@ -301,7 +320,13 @@ class SlideController extends Controller
 
         $tmpFile = tempnam(sys_get_temp_dir(), 'slides_');
         $oWriterPPTX = \PhpOffice\PhpPresentation\IOFactory::createWriter($presentation, 'PowerPoint2007');
-        $oWriterPPTX->save($tmpFile);
+        try {
+            $oWriterPPTX->save($tmpFile);
+        } finally {
+            foreach ($tempImages as $path) {
+                @unlink($path);
+            }
+        }
 
         return response()->download($tmpFile, 'announcement-slides.pptx', [
             'Content-Type' => 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
