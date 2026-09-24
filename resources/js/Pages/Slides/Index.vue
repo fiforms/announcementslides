@@ -109,7 +109,9 @@ function openSlideshowAll() {
     showSlideshow.value = true;
 }
 
-const { lightboxSlide, openLightbox: openLightboxRaw, closeLightbox: closeLightboxRaw } = useLightbox();
+const { lightboxSlide, openLightbox: openLightboxRaw, closeLightbox: closeLightboxRaw } = useLightbox({
+    onEscape: () => closeLightbox(),
+});
 
 // Give every slide a canonical, shareable URL: opening/closing the lightbox
 // pushes/pops history entries (no Inertia visit, no reload) so the address
@@ -134,7 +136,10 @@ function openLightbox(slide) {
 
 function closeLightbox() {
     closeLightboxRaw();
-    if (window.history.state?.slideId) {
+    // Match on the path rather than a pushed-state marker, so this also
+    // covers landing directly on a slide's canonical URL (initialSlide),
+    // whose history entry is Inertia's and carries no slideId.
+    if (/^\/slides\/\d+$/.test(window.location.pathname)) {
         window.history.pushState({}, '', backgroundUrl ?? (route('slides.index') + window.location.search));
         backgroundUrl = null;
     }

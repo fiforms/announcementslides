@@ -6,8 +6,12 @@ import { ref, onMounted, onUnmounted } from 'vue';
  * Kept separate from the component so every page that can open a lightbox
  * (Announcements, Archive, Show Editor, ...) gets identical behavior without
  * re-wiring the keydown listener and scroll lock each time.
+ *
+ * A page that wraps close with extra behavior (e.g. Announcements restoring
+ * the URL) passes it as onEscape, so Escape goes through the same path as
+ * the close button instead of bypassing it.
  */
-export function useLightbox() {
+export function useLightbox({ onEscape } = {}) {
     const lightboxSlide = ref(null);
 
     function openLightbox(slide) {
@@ -21,7 +25,7 @@ export function useLightbox() {
     }
 
     function onLightboxKeydown(e) {
-        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'Escape' && lightboxSlide.value) (onEscape ?? closeLightbox)();
     }
 
     onMounted(() => document.addEventListener('keydown', onLightboxKeydown));
