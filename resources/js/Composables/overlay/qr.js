@@ -65,13 +65,19 @@ export function errorCorrectionFor(symbol) {
 // viewBox, cleaned up for nesting inside the overlay SVG: no XML
 // declaration, <title> tooltip, ids or classes (several QR codes can share
 // one document).
+// Blank margin (in modules) between the code and the edge of its
+// background square: the 4 modules the QR spec requires.
+export const QUIET_ZONE_MODULES = 4;
+
 export async function renderQr({ data, foreground, background, backgroundEnabled, radius, symbol, symbolColor }) {
     const symbolSvg = symbol ? QR_SYMBOLS.find(s => s.id === symbol)?.svg : null;
-    const padding = backgroundEnabled ? 2 : 0;
+    const padding = backgroundEnabled ? QUIET_ZONE_MODULES : 0;
     const svg = await new QRCodeStyling({
         data,
         foregroundColor: foreground,
-        backgroundColor: backgroundEnabled ? background : 'transparent',
+        // The background square is drawn by the overlay compiler instead,
+        // so its opacity can change without regenerating the code.
+        backgroundColor: 'transparent',
         radius,
         padding,
         errorCorrectionLevel: errorCorrectionFor(symbolSvg),

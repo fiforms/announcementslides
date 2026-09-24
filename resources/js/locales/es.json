@@ -309,6 +309,8 @@
         "locked_hint": "Esta capa está bloqueada. Desbloquéela en la lista de capas para moverla o cambiar su tamaño.",
         "imported_hint": "Ilustración importada de un archivo SVG. Se conserva tal como se importó.",
         "opacity": "Opacidad",
+        "background_opacity": "Opacidad del fondo",
+        "fill_opacity": "Opacidad del relleno",
         "text": "Texto",
         "font": "Fuente",
         "font_size": "Tamaño",

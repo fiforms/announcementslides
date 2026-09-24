@@ -24,13 +24,19 @@ export const HEAVY_FIELDS = {
 // Image-like elements keep their aspect ratio when resized.
 export const ASPECT_LOCKED = new Set(['image', 'qr', 'svg-import']);
 
+// Types whose opacity setting applies to their background (text box, QR
+// square, rectangle fill) rather than the whole element — the text, code
+// and borders stay fully opaque. Images and imported artwork have no
+// background, so they fade as a whole (`opacity`).
+export const BACKGROUND_OPACITY_TYPES = new Set(['text', 'qr', 'rect']);
+
 export function nextId(elements) {
     const max = elements.reduce((m, el) => Math.max(m, Number(el.id.replace('as-el-', '')) || 0), 0);
     return `as-el-${max + 1}`;
 }
 
 function base(elements, type, box) {
-    return { id: nextId(elements), type, ...box, opacity: 1, hidden: false, locked: false };
+    return { id: nextId(elements), type, ...box, opacity: 1, backgroundOpacity: 1, hidden: false, locked: false };
 }
 
 export function createText(elements) {
@@ -104,7 +110,26 @@ export function toSource(elements) {
 
 // Rebuilds full elements from an embedded source plus its (metadata-free)
 // SVG body. Elements whose heavy content can't be found are dropped.
+// Brings elements saved by earlier editor versions up to date: whole-
+// element opacity on text/QR/rect becomes background opacity, and QR codes
+// lose the background square that used to be baked into their markup (it's
+// drawn separately now, so its opacity can change without regenerating).
+function upgrade(el) {
+    if (BACKGROUND_OPACITY_TYPES.has(el.type) && el.backgroundOpacity === undefined) {
+        el.backgroundOpacity = el.opacity ?? 1;
+        el.opacity = 1;
+    }
+    if (el.type === 'qr' && el.markup) {
+        el.markup = el.markup.replace(/^<rect\b[^>]*?(\/>|>\s*<\/rect>)/, '');
+    }
+    return el;
+}
+
 export function fromSource(source, svgText) {
+    return parseSource(source, svgText).map(upgrade);
+}
+
+function parseSource(source, svgText) {
     const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
     const serializer = new XMLSerializer();
 

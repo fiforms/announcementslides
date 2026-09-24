@@ -309,6 +309,8 @@
         "locked_hint": "This layer is locked. Unlock it in the layer list to move or resize it.",
         "imported_hint": "Artwork imported from an SVG file. It's kept exactly as imported.",
         "opacity": "Opacity",
+        "background_opacity": "Background opacity",
+        "fill_opacity": "Fill opacity",
         "text": "Text",
         "font": "Font",
         "font_size": "Size",

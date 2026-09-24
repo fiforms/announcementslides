@@ -37,6 +37,31 @@ function wrapperAttrs(el) {
     return attrs;
 }
 
+function fillOpacity(el) {
+    const value = num(el.backgroundOpacity ?? 1);
+    return value < 1 ? ` fill-opacity="${Math.max(0, value)}"` : '';
+}
+
+// Corner radius of a QR code's background square, in the code's viewBox
+// units: follows the roundness slider, up to twice the quiet zone at full
+// roundness (the curve would only reach the finder squares at ~3.4×). The
+// quiet zone is read from the viewBox, which starts at minus its width.
+export function qrCornerRadius(viewBox, roundness) {
+    const quietZone = -Number(String(viewBox ?? '').split(/[\s,]+/)[0]) || 0;
+    return Math.max(0, Math.min(1, Number(roundness) || 0)) * 2 * quietZone;
+}
+
+// The square behind a QR code: the element's whole box, since the code's
+// viewBox (quiet zone included) is stretched to fill it.
+export function qrBackground(el) {
+    if (!el.backgroundEnabled) return '';
+    const viewBoxWidth = Number(String(el.viewBox ?? '').split(/[\s,]+/)[2]) || el.w;
+    const rx = qrCornerRadius(el.viewBox, el.radius) * (el.w / viewBoxWidth);
+    return `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.w)}" height="${num(el.h)}" `
+        + (rx > 0 ? `rx="${num(rx)}" ` : '')
+        + `fill="${color(el.background, '#ffffff')}"${fillOpacity(el)}/>`;
+}
+
 function textInner(el) {
     const size = Math.max(1, num(el.fontSize));
     const anchor = ['start', 'middle', 'end'].includes(el.align) ? el.align : 'start';
@@ -48,7 +73,7 @@ function textInner(el) {
     let out = '';
     if (el.backgroundEnabled) {
         out += `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.w)}" height="${num(el.h)}" `
-            + `rx="${num(el.backgroundRadius)}" fill="${color(el.background)}"/>`;
+            + `rx="${num(el.backgroundRadius)}" fill="${color(el.background)}"${fillOpacity(el)}/>`;
     }
     out += `<text x="${num(x)}" y="${num(el.y + TEXT_PADDING)}" font-family="${escapeXml(el.fontFamily || 'sans-serif')}" `
         + `font-size="${size}" font-weight="${el.bold ? 'bold' : 'normal'}" font-style="${el.italic ? 'italic' : 'normal'}" `
@@ -65,7 +90,7 @@ function textInner(el) {
 function rectInner(el) {
     const strokeWidth = num(el.strokeWidth);
     return `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.w)}" height="${num(el.h)}" rx="${num(el.radius)}" `
-        + `fill="${el.fillEnabled === false ? 'none' : color(el.fill, '#ffffff')}"`
+        + (el.fillEnabled === false ? 'fill="none"' : `fill="${color(el.fill, '#ffffff')}"${fillOpacity(el)}`)
         + (strokeWidth > 0 ? ` stroke="${color(el.stroke)}" stroke-width="${strokeWidth}"` : '')
         + '/>';
 }
@@ -88,6 +113,8 @@ export function compileElement(el) {
                 + `preserveAspectRatio="none" href="${escapeXml(el.href ?? '')}"/>`;
             break;
         case 'qr':
+            inner = `${qrBackground(el)}${nestedSvgOpen(el)}${el.markup ?? ''}</svg>`;
+            break;
         case 'svg-import':
             inner = `${nestedSvgOpen(el)}${el.markup ?? ''}</svg>`;
             break;

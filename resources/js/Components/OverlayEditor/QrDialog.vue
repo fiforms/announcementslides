@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { QR_DEFAULTS, QR_SYMBOLS, normalizeUrl, renderQr, symbolsForUrl } from '@/Composables/overlay/qr.js';
 import { prepareSvgImport } from '@/Composables/overlay/importSvg.js';
+import { qrCornerRadius } from '@/Composables/overlay/compileOverlay.js';
 
 // Creates or edits a QR code. The target is the slide's Link, its canonical
 // page, or a typed-in URL; the URL is captured when the code is generated
@@ -53,6 +54,10 @@ watch(matchedBrand, brand => {
 }, { immediate: !props.initial });
 
 const preview = ref(null);
+const previewBox = computed(() => {
+    const [x, y, width, height] = (preview.value?.viewBox ?? '0 0 0 0').split(/[\s,]+/).map(Number);
+    return { x, y, width, height, rx: qrCornerRadius(preview.value?.viewBox, radius.value) };
+});
 const failed = ref(false);
 let renderSeq = 0;
 
@@ -181,7 +186,11 @@ const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shad
                     <p v-if="!backgroundEnabled" class="col-span-2 text-amber-700">{{ t('overlay_editor.qr_transparent_hint') }}</p>
                 </div>
                 <div class="flex h-36 w-36 shrink-0 items-center justify-center rounded-lg bg-[repeating-conic-gradient(#e5e7eb_0%_25%,#fff_0%_50%)] bg-[length:16px_16px]">
-                    <svg v-if="preview" :viewBox="preview.viewBox" class="h-32 w-32" v-html="preview.markup" />
+                    <svg v-if="preview" :viewBox="preview.viewBox" class="h-32 w-32">
+                        <!-- The background square is drawn by the overlay, not baked into the code. -->
+                        <rect v-if="backgroundEnabled" v-bind="previewBox" :fill="background" />
+                        <g v-html="preview.markup" />
+                    </svg>
                     <span v-else class="px-2 text-center text-xs text-gray-400">
                         {{ failed ? t('overlay_editor.qr_failed') : t('overlay_editor.qr_preview') }}
                     </span>

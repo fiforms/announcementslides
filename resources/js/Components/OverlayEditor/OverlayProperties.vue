@@ -1,7 +1,7 @@
 <script setup>
 import { computed, inject, nextTick, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { FONTS } from '@/Composables/overlay/model.js';
+import { BACKGROUND_OPACITY_TYPES, FONTS } from '@/Composables/overlay/model.js';
 
 // Edits the selected element's fields in place; `change` events (which
 // bubble, and fire once an edit is finished) record an undo step.
@@ -10,6 +10,17 @@ const { t } = useI18n();
 const editor = inject('overlayEditor');
 const textArea = ref(null);
 const el = computed(() => editor.selected.value);
+
+// Text, QR codes and rectangles fade only their background (and only have
+// the slider while they have one); images and imported artwork fade whole.
+const opacityField = computed(() => {
+    const e = el.value;
+    if (!e) return null;
+    if (!BACKGROUND_OPACITY_TYPES.has(e.type)) return { key: 'opacity', label: 'opacity' };
+    const hasBackground = e.type === 'rect' ? e.fillEnabled !== false : e.backgroundEnabled;
+    if (!hasBackground) return null;
+    return { key: 'backgroundOpacity', label: e.type === 'rect' ? 'fill_opacity' : 'background_opacity' };
+});
 
 defineExpose({
     focusText: () => nextTick(() => textArea.value?.focus()),
@@ -34,9 +45,9 @@ const labelCls = 'block text-[11px] font-medium text-gray-600 mb-0.5';
             </div>
         </div>
 
-        <div>
-            <label :class="labelCls">{{ t('overlay_editor.opacity') }} ({{ Math.round((el.opacity ?? 1) * 100) }}%)</label>
-            <input v-model.number="el.opacity" type="range" min="0" max="1" step="0.05" class="w-full" />
+        <div v-if="opacityField">
+            <label :class="labelCls">{{ t(`overlay_editor.${opacityField.label}`) }} ({{ Math.round((el[opacityField.key] ?? 1) * 100) }}%)</label>
+            <input v-model.number="el[opacityField.key]" type="range" min="0" max="1" step="0.05" class="w-full" />
         </div>
 
         <template v-if="el.type === 'text'">
