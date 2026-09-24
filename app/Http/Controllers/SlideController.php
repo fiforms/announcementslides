@@ -10,6 +10,7 @@ use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Services\OverlayCompositor;
+use App\Services\VideoFrameExtractor;
 use App\Support\NearbyEntities;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -247,7 +248,7 @@ class SlideController extends Controller
         ])->deleteFileAfterSend(true);
     }
 
-    public function downloadPowerPoint(Request $request, OverlayCompositor $compositor)
+    public function downloadPowerPoint(Request $request, OverlayCompositor $compositor, VideoFrameExtractor $frames)
     {
         $slides = $this->resolveDownloadSlides($request);
         $slides->load('overlayMedia');
@@ -265,21 +266,37 @@ class SlideController extends Controller
         $slideWidth = 1920;
         $slideHeight = 1080;
 
-        // Flattened overlay composites; the writer reads them at save(), so
-        // they're only removed afterwards.
+        // Video frames and flattened overlay composites; the writer reads
+        // them at save(), so they're only removed afterwards.
         $tempImages = [];
+        $disk = Storage::disk('public');
 
         foreach ($slides as $slide) {
             $media = $slide->primaryMedia;
             if (! $media) {
                 continue;
             }
-            $fullPath = Storage::disk('public')->path($media->disk_path);
+            $fullPath = $disk->path($media->disk_path);
+
+            // Videos aren't embedded yet — export a full-size still frame
+            // instead, falling back to the small listing thumbnail if ffmpeg
+            // can't produce one (and skipping the slide if there's neither).
+            if ($media->isVideo()) {
+                $framePath = sys_get_temp_dir() . '/slide-frame-' . Str::uuid() . '.jpg';
+                if ($frames->extract($fullPath, $framePath, logContext: ['slide_media_id' => $media->id])) {
+                    $tempImages[] = $framePath;
+                    $fullPath = $framePath;
+                } elseif ($media->thumbnail_path) {
+                    $fullPath = $disk->path($media->thumbnail_path);
+                } else {
+                    continue;
+                }
+            }
 
             // PowerPoint has no notion of our overlay layer, so burn it into
             // a single full-slide JPEG. If flattening fails (e.g. an SVG
             // overlay without rsvg-convert), export the base alone.
-            if ($slide->overlayMedia && $media->isImage()) {
+            if ($slide->overlayMedia) {
                 $compositePath = sys_get_temp_dir() . '/slide-composite-' . Str::uuid() . '.jpg';
                 if ($compositor->flatten($fullPath, $slide->overlayMedia, $compositePath, $slideWidth, $slideHeight, 92)) {
                     $tempImages[] = $compositePath;
