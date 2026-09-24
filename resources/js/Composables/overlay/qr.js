@@ -1,5 +1,6 @@
 import { QRCodeStyling } from 'beautiful-qr-code';
 import { prepareSvgImport } from './importSvg.js';
+import { escapeXml, qrCornerRadius } from './compileOverlay.js';
 
 export const QR_DEFAULTS = {
     foreground: '#000000',
@@ -61,14 +62,14 @@ export function errorCorrectionFor(symbol) {
     return symbol ? 'H' : 'M';
 }
 
-// Renders a QR code with beautiful-qr-code and returns its inner markup and
-// viewBox, cleaned up for nesting inside the overlay SVG: no XML
-// declaration, <title> tooltip, ids or classes (several QR codes can share
-// one document).
 // Blank margin (in modules) between the code and the edge of its
 // background square: the 4 modules the QR spec requires.
 export const QUIET_ZONE_MODULES = 4;
 
+// Renders a QR code with beautiful-qr-code and returns its inner markup and
+// viewBox, cleaned up for nesting inside the overlay SVG: no XML
+// declaration, <title> tooltip, ids or classes (several QR codes can share
+// one document).
 export async function renderQr({ data, foreground, background, backgroundEnabled, radius, symbol, symbolColor }) {
     const symbolSvg = symbol ? QR_SYMBOLS.find(s => s.id === symbol)?.svg : null;
     const padding = backgroundEnabled ? QUIET_ZONE_MODULES : 0;
@@ -120,6 +121,49 @@ function symbolMarkup(symbolSvg, viewBox, paddingUnits, color) {
 
     return `<svg x="${start}" y="${start}" width="${size}" height="${size}" viewBox="${symbolViewBox}" `
         + `preserveAspectRatio="xMidYMid meet">${markup}</svg>`;
+}
+
+// A complete, standalone SVG for a rendered code (rendered = renderQr()'s
+// result), with its background square: used for previews and downloads.
+export function qrSvgDocument(rendered, { background, backgroundEnabled, radius }, size = null) {
+    const [x, y, w, h] = rendered.viewBox.split(/[\s,]+/).map(Number);
+    const rx = qrCornerRadius(rendered.viewBox, radius);
+    const box = backgroundEnabled
+        ? `<rect x="${x}" y="${y}" width="${w}" height="${h}"${rx > 0 ? ` rx="${rx}"` : ''} fill="${escapeXml(background)}"/>`
+        : '';
+    const dimensions = size ? ` width="${size}" height="${size}"` : '';
+    return `<svg xmlns="http://www.w3.org/2000/svg"${dimensions} viewBox="${rendered.viewBox}">${box}${rendered.markup}</svg>`;
+}
+
+// Rasterizes a standalone SVG (qrSvgDocument) to a PNG blob, entirely in the
+// browser. Transparent where the code has no background.
+export function svgToPngBlob(svg, size) {
+    return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+        const img = new Image();
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            canvas.getContext('2d').drawImage(img, 0, 0, size, size);
+            URL.revokeObjectURL(url);
+            canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('png-failed'))), 'image/png');
+        };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new Error('png-failed'));
+        };
+        img.src = url;
+    });
+}
+
+export function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: filename });
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 // Light validation for a typed-in QR target. Adds https:// when no scheme

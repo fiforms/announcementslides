@@ -10,7 +10,8 @@
         "entity_slides": "Diapositivas de entidades",
         "slide_announcers": "Dispositivos anunciadores",
         "slide_announcer_releases": "Versiones del anunciador",
-        "view_public_site": "Ver sitio público"
+        "view_public_site": "Ver sitio público",
+        "qr_code": "Creador de códigos QR"
     },
     "auth": {
         "email": "Correo electrónico",
@@ -359,5 +360,16 @@
         "qr_insert": "Insertar",
         "qr_update": "Actualizar",
         "cancel": "Cancelar"
+    },
+    "qr_code": {
+        "title": "Creador de códigos QR",
+        "intro": "Pegue una dirección web, dele estilo a su código y descárguelo. Todo sucede en su navegador.",
+        "url": "Dirección web",
+        "download_svg": "Descargar SVG",
+        "download_png": "Descargar PNG",
+        "exporting": "Preparando…",
+        "png_size": "Tamaño del PNG",
+        "export_failed": "No se pudo crear el PNG. Pruebe con la descarga SVG.",
+        "format_hint": "El SVG se ve nítido a cualquier tamaño (ideal para imprimir); el PNG funciona en todas partes."
     }
 }

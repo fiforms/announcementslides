@@ -10,7 +10,8 @@
         "entity_slides": "Entity Slides",
         "slide_announcers": "Announcer Devices",
         "slide_announcer_releases": "Announcer Releases",
-        "view_public_site": "View Public Site"
+        "view_public_site": "View Public Site",
+        "qr_code": "QR Code Creator"
     },
     "auth": {
         "email": "Email",
@@ -359,5 +360,16 @@
         "qr_insert": "Insert",
         "qr_update": "Update",
         "cancel": "Cancel"
+    },
+    "qr_code": {
+        "title": "QR Code Creator",
+        "intro": "Paste a web address, style your code, and download it. Everything happens in your browser.",
+        "url": "Web address",
+        "download_svg": "Download SVG",
+        "download_png": "Download PNG",
+        "exporting": "Preparing…",
+        "png_size": "PNG size",
+        "export_failed": "The PNG couldn't be created. Try the SVG download instead.",
+        "format_hint": "SVG stays sharp at any size (best for print); PNG works everywhere."
     }
 }

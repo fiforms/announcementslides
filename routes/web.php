@@ -37,6 +37,8 @@ require __DIR__.'/auth.php';
 
 Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    // Fully client-side QR Code Creator (nothing is posted back).
+    Route::inertia('/qr-code', 'QrCode')->name('qr-code');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::patch('/profile/settings', [ProfileController::class, 'updateSettings'])->name('profile.settings.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');

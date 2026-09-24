@@ -1,36 +1,34 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { QR_DEFAULTS, QR_SYMBOLS, normalizeUrl, renderQr, symbolsForUrl } from '@/Composables/overlay/qr.js';
-import { prepareSvgImport } from '@/Composables/overlay/importSvg.js';
-import { qrCornerRadius } from '@/Composables/overlay/compileOverlay.js';
+import QrDesigner from './QrDesigner.vue';
+import QrPreview from './QrPreview.vue';
+import { QR_DEFAULTS, QR_SYMBOLS, normalizeUrl } from '@/Composables/overlay/qr.js';
 
 // Creates or edits a QR code. The target is the slide's Link, its canonical
 // page, or a typed-in URL; the URL is captured when the code is generated
-// (changing the slide's Link later doesn't rewrite existing codes).
+// (changing the slide's Link later doesn't rewrite existing codes). The
+// design controls are shared with the QR Code Creator page (QrDesigner).
 const props = defineProps({
     slide: { type: Object, required: true },
     initial: { type: Object, default: null }, // existing QR element when editing
 });
 const emit = defineEmits(['apply', 'close']);
-const { t, te } = useI18n();
+const { t } = useI18n();
 
 const init = props.initial ?? {};
 const target = ref(init.target ?? (props.slide.link ? 'link' : 'canonical'));
 const custom = ref(init.target === 'custom' ? init.data : '');
-const foreground = ref(init.foreground ?? QR_DEFAULTS.foreground);
-const background = ref(init.background ?? QR_DEFAULTS.background);
-const backgroundEnabled = ref(init.backgroundEnabled ?? QR_DEFAULTS.backgroundEnabled);
-const radius = ref(init.radius ?? QR_DEFAULTS.radius);
-const symbol = ref(QR_SYMBOLS.some(s => s.id === init.symbol) ? init.symbol : QR_DEFAULTS.symbol);
-const symbolColor = ref(init.symbolColor ?? QR_DEFAULTS.symbolColor);
-
-// Picker thumbnails, built once per symbol.
-const thumbnails = Object.fromEntries(QR_SYMBOLS.map(s => [s.id, {
-    ...s,
-    label: te(`overlay_editor.qr_symbol_${s.id}`) ? t(`overlay_editor.qr_symbol_${s.id}`) : s.id.replace(/[-_]/g, ' '),
-    ...prepareSvgImport(s.svg, `pick-${s.id}`),
-}]));
+const options = ref({
+    foreground: init.foreground ?? QR_DEFAULTS.foreground,
+    background: init.background ?? QR_DEFAULTS.background,
+    backgroundEnabled: init.backgroundEnabled ?? QR_DEFAULTS.backgroundEnabled,
+    radius: init.radius ?? QR_DEFAULTS.radius,
+    symbol: QR_SYMBOLS.some(s => s.id === init.symbol) ? init.symbol : QR_DEFAULTS.symbol,
+    symbolColor: init.symbolColor ?? QR_DEFAULTS.symbolColor,
+});
+const rendered = ref(null);
+const failed = ref(false);
 
 const resolved = computed(() => {
     if (target.value === 'link') return props.slide.link ? normalizeUrl(props.slide.link) : { url: null, error: 'empty' };
@@ -38,65 +36,15 @@ const resolved = computed(() => {
     return normalizeUrl(custom.value);
 });
 
-// Brand symbols (Facebook, YouTube, …) only appear when the URL is on that
-// network; a chosen one is cleared if the URL moves elsewhere.
-const symbolChoices = computed(() => symbolsForUrl(resolved.value.url).map(s => thumbnails[s.id]));
-watch(symbolChoices, choices => {
-    if (symbol.value && !choices.some(c => c.id === symbol.value)) symbol.value = null;
-}, { immediate: true });
-
-// When the URL lands on a (different) social network, select its symbol,
-// replacing whatever was chosen. Only on change: reopening a saved code
-// keeps the symbol (or none) it was saved with.
-const matchedBrand = computed(() => symbolChoices.value.find(c => c.hosts)?.id ?? null);
-watch(matchedBrand, brand => {
-    if (brand) symbol.value = brand;
-}, { immediate: !props.initial });
-
-const preview = ref(null);
-const previewBox = computed(() => {
-    const [x, y, width, height] = (preview.value?.viewBox ?? '0 0 0 0').split(/[\s,]+/).map(Number);
-    return { x, y, width, height, rx: qrCornerRadius(preview.value?.viewBox, radius.value) };
-});
-const failed = ref(false);
-let renderSeq = 0;
-
-watch([() => resolved.value.url, foreground, background, backgroundEnabled, radius, symbol, symbolColor], async () => {
-    const url = resolved.value.url;
-    if (!url) {
-        preview.value = null;
-        return;
-    }
-    const seq = ++renderSeq;
-    try {
-        const out = await renderQr(options(url));
-        if (seq === renderSeq) {
-            preview.value = out;
-            failed.value = false;
-        }
-    } catch {
-        if (seq === renderSeq) {
-            preview.value = null;
-            failed.value = true;
-        }
-    }
-}, { immediate: true });
-
-function options(url) {
-    return {
-        data: url,
-        foreground: foreground.value,
-        background: background.value,
-        backgroundEnabled: backgroundEnabled.value,
-        radius: Number(radius.value),
-        symbol: symbol.value,
-        symbolColor: symbolColor.value,
-    };
-}
-
 function apply() {
-    if (!preview.value) return;
-    emit('apply', { ...options(resolved.value.url), target: target.value, ...preview.value });
+    if (!rendered.value) return;
+    emit('apply', {
+        ...options.value,
+        radius: Number(options.value.radius),
+        data: resolved.value.url,
+        target: target.value,
+        ...rendered.value,
+    });
 }
 
 const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500';
@@ -146,61 +94,16 @@ const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shad
                 </p>
             </fieldset>
 
-            <fieldset v-if="symbolChoices.length" class="space-y-2">
-                <legend class="mb-1 text-xs font-medium text-gray-700">{{ t('overlay_editor.qr_symbol') }}</legend>
-                <div class="flex flex-wrap gap-2">
-                    <button type="button" @click="symbol = null"
-                        class="flex h-14 w-14 items-center justify-center rounded-lg border-2 text-xs text-gray-500"
-                        :class="!symbol ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
-                        {{ t('overlay_editor.qr_symbol_none') }}
-                    </button>
-                    <button v-for="choice in symbolChoices" :key="choice.id" type="button" :title="choice.label"
-                        @click="symbol = choice.id"
-                        class="flex h-14 w-14 items-center justify-center rounded-lg border-2 bg-white p-2"
-                        :class="symbol === choice.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
-                        <svg :viewBox="choice.viewBox" class="h-full w-full" v-html="choice.markup" />
-                    </button>
-                </div>
-                <div v-if="symbol" class="flex flex-wrap items-center gap-3 text-xs">
-                    <label class="flex items-center gap-1">
-                        <input type="checkbox" class="rounded" :checked="!symbolColor"
-                            @change="symbolColor = $event.target.checked ? null : foreground" />
-                        {{ t('overlay_editor.qr_symbol_match') }}
-                    </label>
-                    <input v-if="symbolColor" v-model="symbolColor" type="color" class="h-6 w-8" />
-                </div>
-            </fieldset>
-
             <div class="flex gap-4">
-                <div class="grid flex-1 grid-cols-2 gap-3 text-xs">
-                    <label class="flex items-center gap-2">{{ t('overlay_editor.qr_foreground') }}
-                        <input v-model="foreground" type="color" class="h-6 w-8" />
-                    </label>
-                    <label class="flex items-center gap-2">
-                        <input v-model="backgroundEnabled" type="checkbox" class="rounded" /> {{ t('overlay_editor.qr_background') }}
-                        <input v-if="backgroundEnabled" v-model="background" type="color" class="h-6 w-8" />
-                    </label>
-                    <label class="col-span-2">{{ t('overlay_editor.qr_roundness') }}
-                        <input v-model.number="radius" type="range" min="0" max="1" step="0.1" class="w-full" />
-                    </label>
-                    <p v-if="!backgroundEnabled" class="col-span-2 text-amber-700">{{ t('overlay_editor.qr_transparent_hint') }}</p>
-                </div>
-                <div class="flex h-36 w-36 shrink-0 items-center justify-center rounded-lg bg-[repeating-conic-gradient(#e5e7eb_0%_25%,#fff_0%_50%)] bg-[length:16px_16px]">
-                    <svg v-if="preview" :viewBox="preview.viewBox" class="h-32 w-32">
-                        <!-- The background square is drawn by the overlay, not baked into the code. -->
-                        <rect v-if="backgroundEnabled" v-bind="previewBox" :fill="background" />
-                        <g v-html="preview.markup" />
-                    </svg>
-                    <span v-else class="px-2 text-center text-xs text-gray-400">
-                        {{ failed ? t('overlay_editor.qr_failed') : t('overlay_editor.qr_preview') }}
-                    </span>
-                </div>
+                <QrDesigner v-model:options="options" v-model:rendered="rendered" v-model:failed="failed"
+                    :url="resolved.url" :keep-initial-symbol="!!initial" class="min-w-0 flex-1" />
+                <QrPreview :rendered="rendered" :options="options" :failed="failed" class="h-36 w-36 shrink-0" />
             </div>
 
             <div class="flex justify-end gap-2">
                 <button type="button" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
                     @click="emit('close')">{{ t('overlay_editor.cancel') }}</button>
-                <button type="button" :disabled="!preview"
+                <button type="button" :disabled="!rendered"
                     class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
                     @click="apply">
                     {{ initial ? t('overlay_editor.qr_update') : t('overlay_editor.qr_insert') }}

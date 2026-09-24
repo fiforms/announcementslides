@@ -44,6 +44,12 @@ function getInitials(name) {
             {{ $t('nav.profile') }}
         </Link>
 
+        <!-- QR Code Creator Link -->
+        <Link :href="route('qr-code')"
+            class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-center">
+            {{ $t('nav.qr_code') }}
+        </Link>
+
         <!-- Logout Link -->
         <Link :href="route('logout')" method="post" as="button"
             class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-red-900/20 hover:text-red-200 transition-colors text-center">
