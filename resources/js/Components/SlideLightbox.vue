@@ -63,9 +63,10 @@ async function copy(text, field) {
                 class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 overflow-y-auto bg-black/85 p-4"
                 @click.self="$emit('close')">
 
-                <!-- Expand/shrink button -->
+                <!-- Expand/shrink button (z-10: the relative preview below
+                     otherwise paints over it once expanded to 95vw) -->
                 <button @click="isExpanded = !isExpanded"
-                    class="absolute top-4 right-16 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
+                    class="absolute top-4 right-16 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
                     :aria-label="isExpanded ? 'Shrink' : 'Expand'">
                     <svg v-if="!isExpanded" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -79,7 +80,7 @@ async function copy(text, field) {
 
                 <!-- Close button -->
                 <button @click="$emit('close')"
-                    class="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
+                    class="absolute top-4 right-4 z-10 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 transition-colors"
                     aria-label="Close">
                     <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
