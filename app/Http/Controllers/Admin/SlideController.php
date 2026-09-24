@@ -169,6 +169,18 @@ class SlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
+    public function showOverlay(Slide $slide)
+    {
+        return $this->showOverlayForSlide($slide);
+    }
+
+    public function saveOverlay(Request $request, Slide $slide)
+    {
+        $this->saveOverlayForSlide($request, $slide);
+
+        return back()->with('success', 'Overlay saved.');
+    }
+
     public function approve(Slide $slide)
     {
         $slide->update([
@@ -232,6 +244,8 @@ class SlideController extends Controller
             'notes'             => $slide->notes,
             'text_description'  => $slide->text_description,
             'link'              => $slide->link,
+            'canonical_url'     => route('slides.show', $slide),
+            'entity_id'         => $slide->entity_id,
             'video_playback_mode' => $slide->video_playback_mode,
             'language_id'       => $slide->language_id,
             'mime_type'         => $slide->mime_type,

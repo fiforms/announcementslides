@@ -1,9 +1,10 @@
 <script setup>
-import { computed } from 'vue';
-import { useForm, Link } from '@inertiajs/vue3';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { useForm, Link, router } from '@inertiajs/vue3';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import MediaManager from '@/Components/MediaManager.vue';
+import OverlayEditor from '@/Components/OverlayEditor/OverlayEditor.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useI18n } from 'vue-i18n';
 
@@ -38,6 +39,37 @@ const form = useForm({
 function submit() {
     form.patch(route('admin.slides.update', props.slide.id));
 }
+
+const tab = ref('details');
+const overlayEditor = ref(null);
+const overlayDirty = () => tab.value === 'overlay' && !!overlayEditor.value?.isDirty();
+
+function switchTab(next) {
+    if (next === tab.value) return;
+    if (overlayDirty() && !confirm(t('overlay_editor.confirm_discard'))) return;
+    tab.value = next;
+}
+
+// Unsaved overlay edits live only in the editor: confirm before leaving the
+// page by link (GET visits only — the editor's own save/remove requests
+// must go through) or by closing/reloading the browser tab.
+let removeBeforeListener;
+function onBeforeUnload(event) {
+    if (overlayDirty()) event.preventDefault();
+}
+onMounted(() => {
+    removeBeforeListener = router.on('before', event => {
+        if (event.detail.visit.method === 'get' && !event.detail.visit.only.length
+            && overlayDirty() && !confirm(t('overlay_editor.confirm_discard'))) {
+            event.preventDefault();
+        }
+    });
+    window.addEventListener('beforeunload', onBeforeUnload);
+});
+onBeforeUnmount(() => {
+    removeBeforeListener?.();
+    window.removeEventListener('beforeunload', onBeforeUnload);
+});
 </script>
 
 <template>
@@ -53,118 +85,135 @@ function submit() {
             </div>
         </template>
 
-        <div class="max-w-2xl">
-            <!-- Preview -->
-            <div class="mb-6 rounded-xl overflow-hidden bg-slate-100 aspect-video w-full max-w-sm">
-                <img v-if="slide.thumbnail_url || slide.file_url"
-                    :src="slide.thumbnail_url || slide.file_url"
-                    :alt="slide.title"
-                    class="w-full h-full object-contain" />
+        <div :class="tab === 'overlay' ? 'max-w-6xl' : 'max-w-2xl'">
+            <nav class="-mb-px mb-6 flex gap-6 border-b border-gray-200">
+                <button v-for="name in ['details', 'overlay']" :key="name" type="button"
+                    @click="switchTab(name)"
+                    class="pb-3 text-sm font-medium border-b-2 transition-colors"
+                    :class="tab === name ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'">
+                    {{ t(`overlay_editor.tab_${name}`) }}
+                </button>
+            </nav>
+
+            <div v-if="tab === 'overlay'" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+                <OverlayEditor ref="overlayEditor" :slide="slide"
+                    show-route="admin.slides.overlay.show" save-route="admin.slides.overlay.save"
+                    destroy-route="admin.slides.media.destroy" :reload-only="['slide']" />
             </div>
 
-            <!-- Validation warnings -->
-            <div v-if="slide.validation_issues?.length" class="mb-6">
-                <ValidationWarnings :issues="slide.validation_issues" />
-            </div>
-
-            <form @submit.prevent="submit" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.caption_title') }} <span class="text-red-500">*</span></label>
-                    <input v-model="form.title" type="text" required
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                    <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">{{ form.errors.title }}</p>
+            <template v-else>
+                <!-- Preview -->
+                <div class="mb-6 rounded-xl overflow-hidden bg-slate-100 aspect-video w-full max-w-sm">
+                    <img v-if="slide.thumbnail_url || slide.file_url"
+                        :src="slide.thumbnail_url || slide.file_url"
+                        :alt="slide.title"
+                        class="w-full h-full object-contain" />
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.notes') }}</label>
-                    <textarea v-model="form.notes" rows="3"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                <!-- Validation warnings -->
+                <div v-if="slide.validation_issues?.length" class="mb-6">
+                    <ValidationWarnings :issues="slide.validation_issues" />
                 </div>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
-                    <textarea v-model="form.text_description" rows="3"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
-                    <input v-model="form.link" type="url" placeholder="https://…"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                    <p v-if="form.errors.link" class="mt-1 text-xs text-red-600">{{ form.errors.link }}</p>
-                </div>
-
-                <div v-if="isVideoSlide">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
-                    <select v-model="form.video_playback_mode"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="play_through">Play through, then advance immediately</option>
-                        <option value="hold_last_frame">Hold last frame until slide delay</option>
-                        <option value="loop">Loop until slide delay</option>
-                    </select>
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
-                    <select v-model="form.language_id"
-                        class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="">No specific language (visible in all)</option>
-                        <option v-for="lang in languages" :key="lang.id" :value="lang.id">
-                            {{ lang.name }} ({{ lang.native_name }})
-                        </option>
-                    </select>
-                    <p v-if="form.errors.language_id" class="mt-1 text-xs text-red-600">{{ form.errors.language_id }}</p>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
+                <form @submit.prevent="submit" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.publish_date') }}</label>
-                        <DateTimeLocalInput v-model="form.publish_at" />
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.caption_title') }} <span class="text-red-500">*</span></label>
+                        <input v-model="form.title" type="text" required
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">{{ form.errors.title }}</p>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.expiration_date') }}</label>
-                        <DateTimeLocalInput v-model="form.expires_at" />
-                    </div>
-                </div>
 
-                <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.status') }}</label>
-                        <select v-model="form.status"
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.notes') }}</label>
+                        <textarea v-model="form.notes" rows="3"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <textarea v-model="form.text_description" rows="3"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <input v-model="form.link" type="url" placeholder="https://…"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <p v-if="form.errors.link" class="mt-1 text-xs text-red-600">{{ form.errors.link }}</p>
+                    </div>
+
+                    <div v-if="isVideoSlide">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
+                        <select v-model="form.video_playback_mode"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="draft">{{ $t('admin.draft') }}</option>
-                            <option value="pending">{{ $t('admin.pending_review') }}</option>
-                            <option value="published">{{ $t('admin.published') }}</option>
-                            <option value="rejected">{{ $t('admin.rejected') }}</option>
+                            <option value="play_through">Play through, then advance immediately</option>
+                            <option value="hold_last_frame">Hold last frame until slide delay</option>
+                            <option value="loop">Loop until slide delay</option>
                         </select>
                     </div>
-                </div>
 
-                <div v-if="slide.entity">
-                    <label class="flex items-center gap-2">
-                        <input v-model="form.share_nearby" type="checkbox"
-                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
-                        <span class="text-sm font-medium text-gray-700">Share with nearby churches</span>
-                    </label>
-                    <p class="mt-1 text-xs text-gray-500">When on, this slide can appear on nearby churches' dashboards if they enable "include nearby".</p>
-                </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <select v-model="form.language_id"
+                            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">No specific language (visible in all)</option>
+                            <option v-for="lang in languages" :key="lang.id" :value="lang.id">
+                                {{ lang.name }} ({{ lang.native_name }})
+                            </option>
+                        </select>
+                        <p v-if="form.errors.language_id" class="mt-1 text-xs text-red-600">{{ form.errors.language_id }}</p>
+                    </div>
 
-                <div class="flex gap-3 pt-2">
-                    <button type="submit" :disabled="form.processing"
-                        class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                        {{ form.processing ? $t('admin.saving') : $t('admin.save_changes') }}
-                    </button>
-                    <Link :href="route('admin.slides.index')"
-                        class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                        Cancel
-                    </Link>
-                </div>
-            </form>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.publish_date') }}</label>
+                            <DateTimeLocalInput v-model="form.publish_at" />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.expiration_date') }}</label>
+                            <DateTimeLocalInput v-model="form.expires_at" />
+                        </div>
+                    </div>
 
-            <div class="mt-6">
-                <MediaManager :slide="slide" :media-types="mediaTypes"
-                    store-route="admin.slides.media.store" destroy-route="admin.slides.media.destroy" />
-            </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.status') }}</label>
+                            <select v-model="form.status"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="draft">{{ $t('admin.draft') }}</option>
+                                <option value="pending">{{ $t('admin.pending_review') }}</option>
+                                <option value="published">{{ $t('admin.published') }}</option>
+                                <option value="rejected">{{ $t('admin.rejected') }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div v-if="slide.entity">
+                        <label class="flex items-center gap-2">
+                            <input v-model="form.share_nearby" type="checkbox"
+                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                            <span class="text-sm font-medium text-gray-700">Share with nearby churches</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500">When on, this slide can appear on nearby churches' dashboards if they enable "include nearby".</p>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button type="submit" :disabled="form.processing"
+                            class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
+                            {{ form.processing ? $t('admin.saving') : $t('admin.save_changes') }}
+                        </button>
+                        <Link :href="route('admin.slides.index')"
+                            class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                            Cancel
+                        </Link>
+                    </div>
+                </form>
+
+                <div class="mt-6">
+                    <MediaManager :slide="slide" :media-types="mediaTypes"
+                        store-route="admin.slides.media.store" destroy-route="admin.slides.media.destroy" />
+                </div>
+            </template>
         </div>
     </AdminLayout>
 </template>

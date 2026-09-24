@@ -127,6 +127,8 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/slides/{slide}/unarchive', [AdminSlideController::class, 'unarchive'])->name('slides.unarchive');
     Route::post('/slides/{slide}/media', [AdminSlideController::class, 'storeMedia'])->name('slides.media.store');
     Route::delete('/slides/{slide}/media/{media}', [AdminSlideController::class, 'destroyMedia'])->name('slides.media.destroy');
+    Route::get('/slides/{slide}/overlay', [AdminSlideController::class, 'showOverlay'])->name('slides.overlay.show');
+    Route::put('/slides/{slide}/overlay', [AdminSlideController::class, 'saveOverlay'])->name('slides.overlay.save');
 
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
     Route::patch('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');

@@ -200,4 +200,38 @@ class OverlayEditorTest extends TestCase
         Storage::disk('public')->assertMissing("slides/{$uuid}.svg");
         $this->assertNull($this->slide->fresh()->overlayMedia);
     }
+
+    public function test_site_admin_can_save_and_load_an_overlay_from_the_admin_editor(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)
+            ->put(route('admin.slides.overlay.save', $this->slide), ['svg' => self::SVG, 'source' => $this->source()])
+            ->assertSessionHasNoErrors();
+
+        Queue::assertPushed(SyncOverlayThumbnail::class);
+        $this->actingAs($admin)
+            ->getJson(route('admin.slides.overlay.show', $this->slide))
+            ->assertOk()
+            ->assertJsonPath('source.elements.0.id', 'as-el-1');
+
+        $this->actingAs($admin)
+            ->get(route('admin.slides.edit', $this->slide))
+            ->assertInertia(fn ($page) => $page
+                ->where('slide.canonical_url', route('slides.show', $this->slide))
+                ->where('slide.entity_id', $this->entity->id));
+    }
+
+    public function test_non_admins_cannot_use_the_admin_overlay_endpoints(): void
+    {
+        // $this->user leads the slide's entity, but isn't a site admin.
+        $this->actingAs($this->user)
+            ->getJson(route('admin.slides.overlay.show', $this->slide))
+            ->assertForbidden();
+        $this->actingAs($this->user)
+            ->put(route('admin.slides.overlay.save', $this->slide), ['svg' => self::SVG, 'source' => $this->source()])
+            ->assertForbidden();
+
+        $this->assertNull($this->slide->fresh()->overlayMedia);
+    }
 }
