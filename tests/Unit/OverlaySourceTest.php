@@ -88,6 +88,18 @@ class OverlaySourceTest extends TestCase
         $this->assertStringContainsString('data:image/png;base64,AAAA', $clean);
     }
 
+    public function test_sanitizer_keeps_local_use_references_and_masks(): void
+    {
+        // QR center symbols (e.g. qr-symbols/adventist.svg) mask via <use href="#…">.
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><defs><path id="a" d="M0 0h10v10H0z"/></defs>'
+            . '<mask id="b" fill="#fff"><use href="#a"/></mask><path d="M0 0h5v5H0z" mask="url(#b)"/></svg>';
+
+        $clean = (new SvgSanitizer())->sanitize($svg);
+
+        $this->assertStringContainsString('<use href="#a"/>', $clean);
+        $this->assertStringContainsString('mask="url(#b)"', $clean);
+    }
+
     public function test_sanitizer_rejects_non_svg(): void
     {
         $sanitizer = new SvgSanitizer();

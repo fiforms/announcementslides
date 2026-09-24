@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { QR_DEFAULTS, normalizeUrl, renderQr } from '@/Composables/overlay/qr.js';
+import { QR_DEFAULTS, QR_SYMBOLS, normalizeUrl, renderQr, symbolsForUrl } from '@/Composables/overlay/qr.js';
+import { prepareSvgImport } from '@/Composables/overlay/importSvg.js';
 
 // Creates or edits a QR code. The target is the slide's Link, its canonical
 // page, or a typed-in URL; the URL is captured when the code is generated
@@ -11,7 +12,7 @@ const props = defineProps({
     initial: { type: Object, default: null }, // existing QR element when editing
 });
 const emit = defineEmits(['apply', 'close']);
-const { t } = useI18n();
+const { t, te } = useI18n();
 
 const init = props.initial ?? {};
 const target = ref(init.target ?? (props.slide.link ? 'link' : 'canonical'));
@@ -20,7 +21,15 @@ const foreground = ref(init.foreground ?? QR_DEFAULTS.foreground);
 const background = ref(init.background ?? QR_DEFAULTS.background);
 const backgroundEnabled = ref(init.backgroundEnabled ?? QR_DEFAULTS.backgroundEnabled);
 const radius = ref(init.radius ?? QR_DEFAULTS.radius);
-const ecl = ref(init.ecl ?? QR_DEFAULTS.ecl);
+const symbol = ref(QR_SYMBOLS.some(s => s.id === init.symbol) ? init.symbol : QR_DEFAULTS.symbol);
+const symbolColor = ref(init.symbolColor ?? QR_DEFAULTS.symbolColor);
+
+// Picker thumbnails, built once per symbol.
+const thumbnails = Object.fromEntries(QR_SYMBOLS.map(s => [s.id, {
+    ...s,
+    label: te(`overlay_editor.qr_symbol_${s.id}`) ? t(`overlay_editor.qr_symbol_${s.id}`) : s.id.replace(/[-_]/g, ' '),
+    ...prepareSvgImport(s.svg, `pick-${s.id}`),
+}]));
 
 const resolved = computed(() => {
     if (target.value === 'link') return props.slide.link ? normalizeUrl(props.slide.link) : { url: null, error: 'empty' };
@@ -28,11 +37,26 @@ const resolved = computed(() => {
     return normalizeUrl(custom.value);
 });
 
+// Brand symbols (Facebook, YouTube, …) only appear when the URL is on that
+// network; a chosen one is cleared if the URL moves elsewhere.
+const symbolChoices = computed(() => symbolsForUrl(resolved.value.url).map(s => thumbnails[s.id]));
+watch(symbolChoices, choices => {
+    if (symbol.value && !choices.some(c => c.id === symbol.value)) symbol.value = null;
+}, { immediate: true });
+
+// When the URL lands on a (different) social network, select its symbol,
+// replacing whatever was chosen. Only on change: reopening a saved code
+// keeps the symbol (or none) it was saved with.
+const matchedBrand = computed(() => symbolChoices.value.find(c => c.hosts)?.id ?? null);
+watch(matchedBrand, brand => {
+    if (brand) symbol.value = brand;
+}, { immediate: !props.initial });
+
 const preview = ref(null);
 const failed = ref(false);
 let renderSeq = 0;
 
-watch([() => resolved.value.url, foreground, background, backgroundEnabled, radius, ecl], async () => {
+watch([() => resolved.value.url, foreground, background, backgroundEnabled, radius, symbol, symbolColor], async () => {
     const url = resolved.value.url;
     if (!url) {
         preview.value = null;
@@ -60,7 +84,8 @@ function options(url) {
         background: background.value,
         backgroundEnabled: backgroundEnabled.value,
         radius: Number(radius.value),
-        ecl: ecl.value,
+        symbol: symbol.value,
+        symbolColor: symbolColor.value,
     };
 }
 
@@ -110,6 +135,35 @@ const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shad
                     {{ t(`overlay_editor.qr_error_${resolved.error}`) }}
                 </p>
                 <p v-if="resolved.url && resolved.url.length > 300" class="text-xs text-amber-700">{{ t('overlay_editor.qr_long_url') }}</p>
+                <p v-if="resolved.url && resolved.removed?.length" class="text-xs text-gray-500">
+                    {{ t('overlay_editor.qr_trackers_removed', { params: resolved.removed.join(', ') }) }}
+                    <span class="block break-all">{{ resolved.url }}</span>
+                </p>
+            </fieldset>
+
+            <fieldset v-if="symbolChoices.length" class="space-y-2">
+                <legend class="mb-1 text-xs font-medium text-gray-700">{{ t('overlay_editor.qr_symbol') }}</legend>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" @click="symbol = null"
+                        class="flex h-14 w-14 items-center justify-center rounded-lg border-2 text-xs text-gray-500"
+                        :class="!symbol ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                        {{ t('overlay_editor.qr_symbol_none') }}
+                    </button>
+                    <button v-for="choice in symbolChoices" :key="choice.id" type="button" :title="choice.label"
+                        @click="symbol = choice.id"
+                        class="flex h-14 w-14 items-center justify-center rounded-lg border-2 bg-white p-2"
+                        :class="symbol === choice.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:border-gray-300'">
+                        <svg :viewBox="choice.viewBox" class="h-full w-full" v-html="choice.markup" />
+                    </button>
+                </div>
+                <div v-if="symbol" class="flex flex-wrap items-center gap-3 text-xs">
+                    <label class="flex items-center gap-1">
+                        <input type="checkbox" class="rounded" :checked="!symbolColor"
+                            @change="symbolColor = $event.target.checked ? null : foreground" />
+                        {{ t('overlay_editor.qr_symbol_match') }}
+                    </label>
+                    <input v-if="symbolColor" v-model="symbolColor" type="color" class="h-6 w-8" />
+                </div>
             </fieldset>
 
             <div class="flex gap-4">
@@ -123,14 +177,6 @@ const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shad
                     </label>
                     <label class="col-span-2">{{ t('overlay_editor.qr_roundness') }}
                         <input v-model.number="radius" type="range" min="0" max="1" step="0.1" class="w-full" />
-                    </label>
-                    <label class="col-span-2">{{ t('overlay_editor.qr_ecl') }}
-                        <select v-model="ecl" :class="input">
-                            <option value="L">{{ t('overlay_editor.qr_ecl_l') }}</option>
-                            <option value="M">{{ t('overlay_editor.qr_ecl_m') }}</option>
-                            <option value="Q">{{ t('overlay_editor.qr_ecl_q') }}</option>
-                            <option value="H">{{ t('overlay_editor.qr_ecl_h') }}</option>
-                        </select>
                     </label>
                     <p v-if="!backgroundEnabled" class="col-span-2 text-amber-700">{{ t('overlay_editor.qr_transparent_hint') }}</p>
                 </div>

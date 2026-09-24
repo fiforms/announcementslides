@@ -11,11 +11,46 @@ import DOMPurify from 'dompurify';
 // other layers; editors like Inkscape use inline styles, so that's rare.
 
 const SAFE_HREF = /^(#|data:image\/(png|jpe?g|gif)[;,])/i;
+const XLINK = 'http://www.w3.org/1999/xlink';
 
-export function prepareSvgImport(svgText, prefix) {
+// Root <svg> attributes that aren't presentation (and so aren't carried
+// over onto the wrapping <g> that replaces the root).
+const ROOT_ONLY_ATTRS = new Set(['width', 'height', 'viewbox', 'x', 'y', 'id', 'class', 'version', 'preserveaspectratio', 'baseprofile']);
+
+// Recolors painted fills/strokes (attributes and inline style) to one
+// color, leaving `none`, white, url(#…) paint servers and mask content
+// alone, since masks rely on white/black to work.
+function recolor(root, color) {
+    const keep = value => /^(none|transparent|#fff(fff)?|white|url\(.*\)|currentColor)$/i.test(value.trim());
+    for (const node of [root, ...root.querySelectorAll('*')]) {
+        if (node.closest('mask')) continue;
+        for (const name of ['fill', 'stroke']) {
+            const value = node.getAttribute(name);
+            if (value !== null && !keep(value)) node.setAttribute(name, color);
+        }
+        const style = node.getAttribute('style');
+        if (style) node.setAttribute('style', recolorCss(style, color, keep));
+    }
+    root.querySelectorAll('style').forEach(el => {
+        el.textContent = recolorCss(el.textContent, color, keep);
+    });
+    // Shapes with no fill anywhere up the tree default to black.
+    if (!root.hasAttribute('fill') && !/fill\s*:/.test(root.getAttribute('style') ?? '')) root.setAttribute('fill', color);
+}
+
+// Rewrites fill/stroke declarations in a style attribute or stylesheet.
+function recolorCss(css, color, keep) {
+    return css.replace(/(^|[;{\s])(fill|stroke)\s*:\s*([^;}]+)/gi,
+        (m, sep, prop, value) => keep(value) ? m : `${sep}${prop}:${color}`);
+}
+
+export function prepareSvgImport(svgText, prefix, { color = null } = {}) {
     const body = DOMPurify.sanitize(svgText, {
         USE_PROFILES: { svg: true, svgFilters: true },
         FORBID_TAGS: ['foreignObject', 'a'],
+        // Off by default because <use> can pull in external documents; the
+        // href filter below limits it to #fragment references in the file.
+        ADD_TAGS: ['use'],
         RETURN_DOM: true,
     });
     const root = body.querySelector('svg');
@@ -23,11 +58,18 @@ export function prepareSvgImport(svgText, prefix) {
 
     root.querySelectorAll('metadata, title, desc').forEach(n => n.remove());
 
+    // Normalize xlink:href to plain SVG 2 href (supported by browsers, rsvg
+    // and Inkscape). Rewriting a namespaced attribute with setAttribute()
+    // would serialize without its namespace, which the server then strips.
     for (const node of root.querySelectorAll('*')) {
-        for (const name of ['href', 'xlink:href']) {
-            const value = node.getAttribute(name);
-            if (value !== null && !SAFE_HREF.test(value.trim())) node.removeAttribute(name);
+        const xlink = node.getAttributeNS(XLINK, 'href') ?? node.getAttribute('xlink:href');
+        if (xlink !== null) {
+            node.removeAttributeNS(XLINK, 'href');
+            node.removeAttribute('xlink:href');
+            if (!node.hasAttribute('href')) node.setAttribute('href', xlink);
         }
+        const value = node.getAttribute('href');
+        if (value !== null && !SAFE_HREF.test(value.trim())) node.removeAttribute('href');
     }
 
     const ids = new Map();
@@ -48,7 +90,7 @@ export function prepareSvgImport(svgText, prefix) {
 
     for (const node of root.querySelectorAll('*')) {
         for (const attr of [...node.attributes]) {
-            if ((attr.name === 'href' || attr.name === 'xlink:href') && attr.value.startsWith('#')) {
+            if (attr.name === 'href' && attr.value.startsWith('#')) {
                 const id = attr.value.slice(1);
                 if (ids.has(id)) node.setAttribute(attr.name, `#${ids.get(id)}`);
             } else if (attr.value.includes('url(')) {
@@ -69,10 +111,23 @@ export function prepareSvgImport(svgText, prefix) {
         || (width > 0 && height > 0 ? `0 0 ${width} ${height}` : null);
     if (!viewBox) throw new Error('no-size');
 
+    if (color) recolor(root, color);
+
+    // The root's own presentation attributes (fill="none", style, …) would
+    // be lost with the root itself; keep them on a wrapping <g>.
     const serializer = new XMLSerializer();
-    const markup = [...root.childNodes].map(n => serializer.serializeToString(n)).join('');
+    const inner = [...root.childNodes].map(n => serializer.serializeToString(n)).join('');
+    const carried = [...root.attributes]
+        .filter(a => !ROOT_ONLY_ATTRS.has(a.name.toLowerCase()) && !a.name.includes(':') && !a.name.startsWith('xmlns'))
+        .map(a => ` ${a.name}="${escapeAttr(a.value)}"`)
+        .join('');
+    const markup = carried ? `<g${carried}>${inner}</g>` : inner;
 
     return { markup, viewBox };
+}
+
+function escapeAttr(value) {
+    return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
 }
 
 // Raster overlays (PNG/WebP) and picked images are embedded as PNG/JPEG

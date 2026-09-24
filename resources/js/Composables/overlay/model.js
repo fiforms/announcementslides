@@ -71,7 +71,7 @@ export function createQr(elements, qr) {
     const size = 320;
     return {
         ...base(elements, 'qr', { x: CANVAS.w - size - 60, y: CANVAS.h - size - 60, w: size, h: size }),
-        ...qr, // data, target, foreground, background, radius, ecl, markup, viewBox
+        ...qr, // data, target, foreground, background, radius, symbol, symbolColor, markup, viewBox
     };
 }
 
