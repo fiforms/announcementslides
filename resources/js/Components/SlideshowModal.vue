@@ -339,7 +339,7 @@ const handleShow = () => {
                             :alt="`${currentSlide.title} overlay`"
                             class="absolute inset-0 h-full w-full object-contain"
                         />
-                        <WidgetLayer v-if="currentSlide.overlay_widgets?.length" :widgets="currentSlide.overlay_widgets" />
+                        <WidgetLayer v-if="currentSlide.overlay_widgets?.length" :widgets="currentSlide.overlay_widgets" :linger-ms="1100" />
                     </div>
                 </transition>
 

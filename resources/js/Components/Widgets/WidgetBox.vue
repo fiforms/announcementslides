@@ -12,6 +12,10 @@ const props = defineProps({
     placement: { type: Object, required: true },
     entryUrl: { type: String, required: true },
     mode: { type: String, default: 'live' },
+    // Keep the widget alive this long after unmount, so a parent's leave
+    // transition (which only holds back the root DOM node, not child
+    // components) can fade it out instead of it vanishing at once.
+    lingerMs: { type: Number, default: 0 },
 });
 
 const { locale } = useI18n();
@@ -24,7 +28,11 @@ onMounted(() => {
         mode: props.mode, locale: locale.value, location: page.props.widgetLocation ?? null,
     });
 });
-onBeforeUnmount(() => handle?.dispose());
+onBeforeUnmount(() => {
+    const h = handle;
+    if (props.lingerMs > 0) setTimeout(() => h?.dispose(), props.lingerMs);
+    else h?.dispose();
+});
 </script>
 
 <template>

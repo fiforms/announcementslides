@@ -13,6 +13,8 @@ const props = defineProps({
     // unsaved widget elements merged with their catalog entry_url.
     widgets: { type: Array, default: () => [] },
     mode: { type: String, default: 'live' },
+    // Passed to each WidgetBox; see there.
+    lingerMs: { type: Number, default: 0 },
 });
 
 const root = ref(null);
@@ -53,7 +55,7 @@ function key(p) {
                 width: `${CANVAS.w}px`, height: `${CANVAS.h}px`,
                 transform: `scale(${fit.scale})`,
             }">
-            <WidgetBox v-for="p in placements" :key="key(p)" :placement="p" :entry-url="p.entry_url" :mode="mode" />
+            <WidgetBox v-for="p in placements" :key="key(p)" :placement="p" :entry-url="p.entry_url" :mode="mode" :linger-ms="lingerMs" />
         </div>
     </div>
 </template>
