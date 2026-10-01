@@ -9,11 +9,13 @@ use App\Models\SlideAnnouncer;
 use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerPairingCode;
 use App\Models\SlideAnnouncerRelease;
+use App\Support\SlideAnnouncerVideoReceiver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
+
 
 class EntitySlideAnnouncerController extends Controller
 {
@@ -158,13 +160,18 @@ class EntitySlideAnnouncerController extends Controller
             'language_id' => 'sometimes|nullable|exists:languages,id',
             'update_channel' => 'sometimes|in:stable,testing,developer',
             'auto_update_enabled' => 'sometimes|boolean',
-            // Fleet-wide force-disable for SRT Sink — the passphrase itself
-            // is never admin-settable here, only device-reported (see
-            // SlideAnnouncerHeartbeatController::store()).
+            // Fleet-wide force-disable for the LAN Video Receiver.
             'srt_sink_enabled' => 'sometimes|boolean',
             'settings' => 'sometimes|array',
+            // Receiver mode/passphrases/multicast — synced down to the
+            // device by revision; see App\Support\SlideAnnouncerVideoReceiver.
+            ...SlideAnnouncerVideoReceiver::rules(),
         ]);
 
+        if (isset($data['srt_sink_config'])) {
+            SlideAnnouncerVideoReceiver::applyWebEdit($slideAnnouncer, $data['srt_sink_config']);
+        }
+        unset($data['srt_sink_config']);
         $slideAnnouncer->update($data);
 
         return back()->with('success', 'Device updated.');
@@ -209,6 +216,8 @@ class EntitySlideAnnouncerController extends Controller
             'auto_update_enabled' => $device->auto_update_enabled,
             'srt_sink_enabled' => $device->srt_sink_enabled,
             'srt_sink_passphrase' => $device->srt_sink_passphrase,
+            'srt_sink_config' => $device->srt_sink_config,
+            'srt_sink_config_pending' => SlideAnnouncerVideoReceiver::pending($device),
             'hostname' => $device->hostname,
             'settings' => $device->settings,
             'last_seen_at' => $device->last_seen_at?->toIso8601String(),

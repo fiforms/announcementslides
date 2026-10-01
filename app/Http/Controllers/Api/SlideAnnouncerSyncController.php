@@ -5,7 +5,9 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Support\SlideAnnouncerVideoReceiver;
 use Illuminate\Http\Request;
+
 
 class SlideAnnouncerSyncController extends Controller
 {
@@ -56,6 +58,10 @@ class SlideAnnouncerSyncController extends Controller
                     ->map(fn (Slide $slide) => $this->slideEntry($slide)),
             ]),
             'settings' => $device->settings ?? [],
+            // Same push as the heartbeat response's — carried here too so a
+            // web edit reaches the device within one sync (~60s) rather
+            // than one heartbeat (5 min). See App\Support\SlideAnnouncerVideoReceiver.
+            'srt_sink_config' => SlideAnnouncerVideoReceiver::push($device),
         ]);
     }
 

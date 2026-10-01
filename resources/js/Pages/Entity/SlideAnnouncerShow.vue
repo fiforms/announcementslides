@@ -18,12 +18,24 @@ const props = defineProps({
 // the on-device Settings PIN gate (4-6 digits, optional) — same treatment.
 const { interval_seconds, settings_pin, ...otherSettings } = props.device.settings ?? {};
 
+// LAN Video Receiver settings, as last reported by the device (or a web
+// edit it hasn't applied yet) — synced both ways by revision, see
+// App\Support\SlideAnnouncerVideoReceiver. Null until the device runs an
+// app version that reports them.
+const receiver = props.device.srt_sink_config ?? {};
+
 const form = useForm({
     name: props.device.name,
     language_id: props.device.language_id ?? '',
     update_channel: props.device.update_channel,
     auto_update_enabled: props.device.auto_update_enabled,
     srt_sink_enabled: props.device.srt_sink_enabled,
+    rx_mode: receiver.mode ?? 'srt',
+    rx_passphrase: receiver.passphrase || props.device.srt_sink_passphrase || '',
+    rx_multicast_group: receiver.multicast_group || '',
+    rx_multicast_port: receiver.multicast_port ?? 5000,
+    rx_multicast_passphrase: receiver.multicast_passphrase || '',
+    rx_encryption_bits: receiver.rist_encryption_bits ?? 128,
     interval_seconds: interval_seconds ?? 10,
     settings_pin: settings_pin ?? '',
     settings_text: JSON.stringify(otherSettings, null, 2),
@@ -62,6 +74,14 @@ function submit() {
         update_channel: data.update_channel,
         auto_update_enabled: data.auto_update_enabled,
         srt_sink_enabled: data.srt_sink_enabled,
+        srt_sink_config: {
+            mode: data.rx_mode,
+            passphrase: data.rx_passphrase || null,
+            multicast_group: data.rx_multicast_group || null,
+            multicast_port: data.rx_multicast_port === '' ? null : Number(data.rx_multicast_port),
+            multicast_passphrase: data.rx_multicast_passphrase || null,
+            rist_encryption_bits: Number(data.rx_encryption_bits),
+        },
         settings: {
             ...settings,
             interval_seconds: Number(data.interval_seconds),
@@ -82,17 +102,33 @@ function formatDate(iso) {
     return iso ? new Date(iso).toLocaleString() : 'Never';
 }
 
-function copyPassphrase() {
-    if (props.device.srt_sink_passphrase) navigator.clipboard?.writeText(props.device.srt_sink_passphrase);
+const isRist = computed(() => form.rx_mode !== 'srt');
+const isMulticast = computed(() => form.rx_mode === 'rist_multicast');
+const ristSupported = computed(() => receiver.rist_supported !== false);
+
+// Same alphabet/length as the device's own generate_passphrase().
+function generatePassphrase() {
+    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const bytes = crypto.getRandomValues(new Uint32Array(10));
+    form.rx_passphrase = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
 }
 
-// Mirrors slideannouncer/local-app/backend/srt_sink.py's connect_url() —
-// same port/mode/latency, built here instead of round-tripping to the
-// device, since the server already has both hostname and passphrase from
-// the device's own heartbeat reports.
+// Mirrors slideannouncer/local-app/backend/srt_sink.py's sender_url(): the
+// URL to configure a sender (OBS, vMix, an encoder) with. Built from the
+// form's current values so it previews an unsaved change; latency/buffer
+// are device-side tuning, taken from the device's last report.
 const connectUrl = computed(() => {
-    if (!props.device.hostname || !props.device.srt_sink_passphrase) return null;
-    return `srt://${props.device.hostname}.local:7002?mode=caller&latency=120000&passphrase=${encodeURIComponent(props.device.srt_sink_passphrase)}`;
+    const latencyMs = receiver.srt_latency_ms ?? 120;
+    const bufferMs = receiver.rist_buffer_ms ?? 500;
+    if (form.rx_mode === 'srt') {
+        if (!props.device.hostname || !form.rx_passphrase) return null;
+        return `srt://${props.device.hostname}.local:${receiver.srt_port ?? 7002}?mode=caller&latency=${latencyMs * 1000}&passphrase=${encodeURIComponent(form.rx_passphrase)}`;
+    }
+    const [host, port, secret] = isMulticast.value
+        ? [form.rx_multicast_group, form.rx_multicast_port, form.rx_multicast_passphrase]
+        : [props.device.hostname && `${props.device.hostname}.local`, receiver.rist_port ?? 5000, form.rx_passphrase];
+    if (!host || !secret) return null;
+    return `rist://${host}:${port}?secret=${encodeURIComponent(secret)}&aes-type=${form.rx_encryption_bits}&buffer=${bufferMs}`;
 });
 
 const qrDataUrl = ref(null);
@@ -220,35 +256,103 @@ function copyConnectUrl() {
                     <p class="mt-1 text-xs text-gray-500">How long each slide stays on screen before switching to the next.</p>
                 </div>
 
-                <div class="rounded-lg border border-gray-200 p-4 space-y-2">
+                <!-- LAN Video Receiver — mode/passphrases sync down to the device
+                     (and device-side edits sync back up); see
+                     App\Support\SlideAnnouncerVideoReceiver. -->
+                <div class="rounded-lg border border-gray-200 p-4 space-y-4">
+                    <div>
+                        <h3 class="text-sm font-medium text-gray-900">LAN Video Receiver</h3>
+                        <p class="text-xs text-gray-500">
+                            Lets a video switcher or encoder on this church's network (OBS, vMix, etc.) send a live feed
+                            to this device over SRT or RIST. It also has to be switched on in the device's own
+                            Settings &gt; Advanced.
+                        </p>
+                    </div>
+
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input v-model="form.srt_sink_enabled" type="checkbox"
                             class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                        Allow SRT video sink
+                        Allow the LAN video receiver
                     </label>
-                    <p class="text-xs text-gray-500">
-                        Lets a video-switcher on this church's network push a live video feed directly to this device
-                        over SRT (still requires the device's own on-device Settings toggle to also be on).
-                        Unchecking this force-disables it fleet-wide, overriding the device's own toggle.
-                    </p>
-                    <div v-if="device.srt_sink_passphrase" class="flex items-center gap-2 pt-1">
-                        <span class="text-xs text-gray-500">Passphrase:</span>
-                        <code class="rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-800">{{ device.srt_sink_passphrase }}</code>
-                        <button type="button" @click="copyPassphrase" class="text-xs font-medium text-indigo-600 hover:text-indigo-800">
-                            Copy
-                        </button>
+                    <p class="-mt-3 text-xs text-gray-500">Unchecking force-disables it, overriding the device's own switch.</p>
+
+                    <div v-if="device.srt_sink_config_pending" class="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        Saved — waiting for the device to apply these settings (it checks in about once a minute).
                     </div>
-                    <p v-else class="text-xs text-gray-400">
-                        Not generated yet — the device creates this itself the first time SRT Sink is enabled there.
+                    <div v-if="receiver.apply_error" class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
+                        The device couldn't apply the last change: {{ receiver.apply_error }}
+                    </div>
+                    <p v-if="receiver.local_enabled === false" class="text-xs text-gray-500">
+                        Currently switched off on the device itself (Settings &gt; Advanced).
                     </p>
-                    <div v-if="connectUrl" class="flex items-start gap-2 pt-1">
-                        <span class="text-xs text-gray-500 whitespace-nowrap pt-1">Connect With:</span>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Mode</label>
+                            <select v-model="form.rx_mode" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="srt">SRT</option>
+                                <option value="rist_unicast" :disabled="!ristSupported">RIST Unicast</option>
+                                <option value="rist_multicast" :disabled="!ristSupported">RIST Multicast</option>
+                            </select>
+                            <p v-if="!ristSupported" class="mt-1 text-xs text-gray-500">This device's software doesn't support RIST.</p>
+                            <p v-if="form.errors['srt_sink_config.mode']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.mode'] }}</p>
+                        </div>
+                        <div v-if="isRist">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Encryption</label>
+                            <select v-model="form.rx_encryption_bits" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option :value="128">AES-128</option>
+                                <option :value="256">AES-256</option>
+                            </select>
+                            <p class="mt-1 text-xs text-gray-500">Must match the sender's.</p>
+                        </div>
+                    </div>
+
+                    <!-- SRT / RIST Unicast: the device listens, senders connect to it. -->
+                    <div v-if="!isMulticast">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Passphrase</label>
+                        <div class="flex gap-2">
+                            <input v-model="form.rx_passphrase" type="text" autocomplete="off" spellcheck="false"
+                                class="flex-1 font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <button type="button" @click="generatePassphrase"
+                                class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">Generate</button>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">10–79 characters, no spaces. Shared by SRT and RIST Unicast.</p>
+                        <p v-if="form.errors['srt_sink_config.passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.passphrase'] }}</p>
+                    </div>
+
+                    <!-- RIST Multicast: the device joins the group the sender transmits to. -->
+                    <div v-else class="grid grid-cols-1 sm:grid-cols-[1fr_8rem] gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Multicast IP</label>
+                            <input v-model="form.rx_multicast_group" type="text" placeholder="239.1.2.3" autocomplete="off"
+                                class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="form.errors['srt_sink_config.multicast_group']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.multicast_group'] }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">UDP Port</label>
+                            <input v-model="form.rx_multicast_port" type="number" min="1024" max="65534" step="2"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="form.errors['srt_sink_config.multicast_port']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.multicast_port'] }}</p>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Passphrase</label>
+                            <input v-model="form.rx_multicast_passphrase" type="text" autocomplete="off" spellcheck="false"
+                                placeholder="Must match the sender's" class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="form.errors['srt_sink_config.multicast_passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.multicast_passphrase'] }}</p>
+                        </div>
+                        <p class="sm:col-span-2 text-xs text-amber-700">
+                            Multicast over WiFi is not recommended — connect this device by Ethernet.
+                        </p>
+                    </div>
+
+                    <div v-if="connectUrl" class="flex items-start gap-2">
+                        <span class="text-xs text-gray-500 whitespace-nowrap pt-1">{{ isMulticast ? 'Sender URL:' : 'Connect With:' }}</span>
                         <code class="flex-1 min-w-0 break-all rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-800">{{ connectUrl }}</code>
                         <button type="button" @click="copyConnectUrl" class="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800">
                             Copy
                         </button>
                     </div>
-                    <img v-if="qrDataUrl" :src="qrDataUrl" alt="Connect With QR code" class="mt-2 rounded border border-gray-200" width="180" height="180" />
+                    <img v-if="qrDataUrl" :src="qrDataUrl" alt="Connect With QR code" class="rounded border border-gray-200" width="180" height="180" />
                 </div>
 
                 <div>

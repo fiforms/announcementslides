@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerRelease;
+use App\Support\SlideAnnouncerVideoReceiver;
 use Illuminate\Http\Request;
 
 class SlideAnnouncerHeartbeatController extends Controller
@@ -39,6 +40,10 @@ class SlideAnnouncerHeartbeatController extends Controller
             // dashboard can build the same "Connect With" srt:// URL the
             // device's own Settings > Video Receiver screen shows.
             'hostname' => 'nullable|string|max:255',
+            // The device's full LAN Video Receiver settings plus the last
+            // web-edit revision it applied — absent from older app versions.
+            // See App\Support\SlideAnnouncerVideoReceiver.
+            'srt_sink_config' => 'nullable|array',
         ]);
 
         $device = $request->user();
@@ -54,6 +59,11 @@ class SlideAnnouncerHeartbeatController extends Controller
             'srt_sink_passphrase' => $data['srt_sink_passphrase'] ?? $device->srt_sink_passphrase,
             'hostname' => $data['hostname'] ?? $device->hostname,
         ]);
+
+        if (isset($data['srt_sink_config'])) {
+            SlideAnnouncerVideoReceiver::absorbReport($device, $data['srt_sink_config']);
+            $device->save();
+        }
 
         SlideAnnouncerHeartbeat::create([
             'slide_announcer_id' => $device->id,
@@ -105,6 +115,10 @@ class SlideAnnouncerHeartbeatController extends Controller
             // Settings toggle; see slideannouncer/local-app/backend/srt_sink.py's
             // effective_enabled() for how the device folds this in.
             'srt_sink_enabled' => $device->srt_sink_enabled,
+            // Receiver settings edited on the Slide Announcer page, with the
+            // revision the device uses to tell a new edit from one it's
+            // already applied. Also sent with every slide sync.
+            'srt_sink_config' => SlideAnnouncerVideoReceiver::push($device),
         ]);
     }
 
