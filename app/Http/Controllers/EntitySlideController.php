@@ -100,6 +100,30 @@ class EntitySlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
+    public function upscaleMedia(Request $request, Entity $entity, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeMediaAction($request, $entity, $slide);
+        $this->upscaleMediaForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image upscaled.');
+    }
+
+    public function setMediaVersion(Request $request, Entity $entity, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeMediaAction($request, $entity, $slide);
+        $this->switchMediaVersionForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image version changed.');
+    }
+
+    private function authorizeMediaAction(Request $request, Entity $entity, Slide $slide): void
+    {
+        $user = $request->user();
+        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
+        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
+        abort_unless($slide->entity_id === $entity->id, 404);
+    }
+
     public function archive(Request $request, Entity $entity, Slide $slide)
     {
         $user = $request->user();

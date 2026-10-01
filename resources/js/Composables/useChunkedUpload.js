@@ -55,22 +55,53 @@ export function useChunkedUpload(options = {}) {
         return result;
     }
 
+    // `files` entries are Files, or { file, upscale: { model, original } } for an
+    // image upscaled in the browser: `file` is the upscaled JPEG, and `original`
+    // (a File) is uploaded too, so the server can keep it for undoing the upscale.
     async function upload(files, payload) {
+        const items = files.map(f => (f instanceof Blob ? { file: f } : f));
+
         isUploading.value  = true;
         uploadError.value  = null;
-        fileProgress.value = files.map(f => ({ name: f.name, progress: 0, done: false }));
+        fileProgress.value = items.map(({ file }) => ({ name: file.name, progress: 0, done: false }));
 
         const completedUploads = [];
         const mediaType = payload?.media_type ?? 'slide';
 
         try {
-            for (let fi = 0; fi < files.length; fi++) {
-                const file     = files[fi];
-                const uploadId = crypto.randomUUID();
+            for (let fi = 0; fi < items.length; fi++) {
+                const { file, upscale } = items[fi];
+                const original = upscale?.original ?? null;
+                const totalBytes = file.size + (original?.size ?? 0);
+                let mainPct = 0;
+                let originalPct = 0;
+                const report = () => {
+                    fileProgress.value[fi].progress = Math.round(
+                        ((mainPct / 100) * file.size + (originalPct / 100) * (original?.size ?? 0)) / totalBytes * 100,
+                    );
+                };
 
-                const assembled = await uploadChunks(file, uploadId, mediaType, (pct) => {
-                    fileProgress.value[fi].progress = pct;
+                const assembled = await uploadChunks(file, crypto.randomUUID(), mediaType, (pct) => {
+                    mainPct = pct;
+                    report();
                 });
+
+                if (original) {
+                    const assembledOriginal = await uploadChunks(original, crypto.randomUUID(), mediaType, (pct) => {
+                        originalPct = pct;
+                        report();
+                    });
+                    assembled.upscale = {
+                        model: upscale.model,
+                        original: {
+                            filename:          assembledOriginal.filename,
+                            disk_path:         assembledOriginal.disk_path,
+                            original_filename: assembledOriginal.original_filename,
+                            file_size:         assembledOriginal.file_size,
+                            mime_type:         assembledOriginal.mime_type,
+                        },
+                    };
+                }
 
                 fileProgress.value[fi].done = true;
                 completedUploads.push(assembled);

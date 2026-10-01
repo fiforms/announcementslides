@@ -76,4 +76,31 @@ return [
             'mimes' => ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/svg+xml'],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI upscaling
+    |--------------------------------------------------------------------------
+    |
+    | Images are upscaled 2x in the uploader's browser (UpscalerJS) when they
+    | fit within max_* and are at least min_* — see App\Support\UpscalerSettings
+    | and resources/js/Composables/useUpscaler.js. The admin-editable options
+    | (model, JPEG quality, …) live in the app_settings table; `models` is the
+    | catalog the admin page offers. `key` is the folder the weights are
+    | served from (public/upscaler-models/, copied from node_modules by the
+    | Vite build), and must match the keys in useUpscaler.js.
+    |
+    */
+    'upscale' => [
+        'min_width'  => 960,
+        'min_height' => 540,
+        'max_width'  => 1920,
+        'max_height' => 1080,
+        'models' => [
+            'default-model'  => ['label' => 'Default (UpscalerJS)', 'size' => '1.6 MB',  'note' => 'Small and fast, a light ESRGAN. Fine for clean graphics.'],
+            'esrgan-slim'    => ['label' => 'ESRGAN Slim',          'size' => '0.9 MB',  'note' => 'Fastest and lowest quality; for slow computers.'],
+            'esrgan-medium'  => ['label' => 'ESRGAN Medium',        'size' => '2.7 MB',  'note' => 'Good balance of speed and detail.'],
+            'esrgan-thick'   => ['label' => 'ESRGAN Thick',         'size' => '28 MB',   'note' => 'Best detail, but a large download and slow, especially without a good GPU.'],
+        ],
+    ],
 ];

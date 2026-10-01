@@ -169,6 +169,20 @@ class SlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
+    public function upscaleMedia(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->upscaleMediaForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image upscaled.');
+    }
+
+    public function setMediaVersion(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->switchMediaVersionForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image version changed.');
+    }
+
     public function showOverlay(Slide $slide)
     {
         return $this->showOverlayForSlide($slide);

@@ -7,6 +7,7 @@ use App\Jobs\SyncOverlayThumbnail;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Models\Widget;
+use App\Services\ImageValidationService;
 use App\Services\OverlaySource;
 use App\Services\SvgSanitizer;
 use App\Services\Widgets\OverlayWidgets;
@@ -84,10 +85,116 @@ trait ManagesSlideMedia
             abort(422, 'A slide must keep at least one "slide" media file.');
         }
 
-        Storage::disk('public')->delete(array_filter([$media->disk_path, $media->thumbnail_path]));
+        Storage::disk('public')->delete($media->allFilePaths());
         $media->delete();
 
         SyncOverlayThumbnail::dispatch($slide->id);
+    }
+
+    /**
+     * Makes an in-browser 2x upscale of a slide image its active version.
+     * The browser uploads the result through the chunk endpoint (as for
+     * storeMediaForSlide) and names it here; the file as it was stays on
+     * disk as the 'original' variant so the upscale can be undone. Any
+     * earlier undone upscale is replaced.
+     */
+    private function upscaleMediaForSlide(Request $request, Slide $slide, SlideMedia $media): SlideMedia
+    {
+        abort_unless($media->slide_id === $slide->id, 404);
+
+        $request->validate([
+            'filename'          => ['required', 'string', 'regex:/^[0-9a-f\-]{36}\.jpg$/'],
+            'disk_path'         => ['required', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.jpg$/'],
+            'file_size'         => 'required|integer|min:0',
+            'mime_type'         => ['required', 'string', Rule::in(['image/jpeg'])],
+            'model'             => ['required', 'string', Rule::in(array_keys(config('slides.upscale.models')))],
+        ]);
+
+        $disk = Storage::disk('public');
+        $path = $request->disk_path;
+
+        // Whatever the outcome, the uploaded file must not be left orphaned.
+        $reject = function (string $message) use ($disk, $path) {
+            if (!SlideMedia::where('disk_path', $path)->exists()) {
+                $disk->delete($path);
+            }
+            throw ValidationException::withMessages(['file' => $message]);
+        };
+
+        if (!$media->canBeUpscaled()) {
+            $reject('This file cannot be upscaled.');
+        }
+        if ($media->active_variant === 'upscaled') {
+            $reject('This image is already upscaled.');
+        }
+        if (!$disk->exists($path)) {
+            $reject('Assembled file not found.');
+        }
+        if (SlideMedia::where('disk_path', $path)->exists()) {
+            $reject('That file is already in use.');
+        }
+
+        $validation = app(ImageValidationService::class)
+            ->validate($disk->path($path), 'image/jpeg', $disk->size($path));
+
+        [$w, $h] = [$media->image_width, $media->image_height];
+        if (!$w || !$h) {
+            [$w, $h] = array_slice(@getimagesize($disk->path($media->disk_path)) ?: [null, null], 0, 2);
+        }
+
+        // Exactly twice the current size (a pixel of slack for rounding).
+        if (!$w || !$validation['width']
+            || abs($validation['width'] - 2 * $w) > 2 || abs($validation['height'] - 2 * $h) > 2) {
+            $reject('The upscaled image is not twice the size of the current one.');
+        }
+
+        $original = $media->currentVersion();
+        $upscaled = [
+            'filename'          => basename($path),
+            'original_filename' => $media->original_filename,
+            'disk_path'         => $path,
+            'file_size'         => $disk->size($path),
+            'mime_type'         => 'image/jpeg',
+            'thumbnail_path'    => null,
+            'image_width'       => $validation['width'],
+            'image_height'      => $validation['height'],
+            'validation_issues' => $validation['issues'],
+            'validation_status' => $validation['status'],
+        ];
+
+        // Replacing an earlier (undone) upscale: its files are now unreferenced.
+        $stale = $media->variants['upscaled'] ?? null;
+
+        $media->adoptUpscaled($original, $upscaled, $request->model);
+
+        if ($stale) {
+            $disk->delete(array_filter([$stale['disk_path'] ?? null, $stale['thumbnail_path'] ?? null]));
+        }
+
+        GenerateThumbnail::dispatch($media);
+
+        return $media;
+    }
+
+    /** Undo / redo of an upscale: switches the active version of the file. */
+    private function switchMediaVersionForSlide(Request $request, Slide $slide, SlideMedia $media): SlideMedia
+    {
+        abort_unless($media->slide_id === $slide->id, 404);
+
+        $request->validate(['version' => ['required', Rule::in(['original', 'upscaled'])]]);
+
+        abort_unless($media->hasVariant($request->version), 422, 'That version does not exist.');
+
+        if ($media->switchToVariant($request->version)) {
+            // A version that has been out of use may never have been thumbnailed.
+            if ($media->thumbnail_path) {
+                SyncOverlayThumbnail::dispatch($slide->id);
+            } else {
+                GenerateThumbnail::dispatch($media);
+            }
+        }
+
+        return $media;
     }
 
     /**
@@ -229,6 +336,13 @@ trait ManagesSlideMedia
             'original_filename' => $m->original_filename,
             'file_size'         => $m->file_size,
             'validation_status' => $m->validation_status,
+            'image_width'       => $m->image_width,
+            'image_height'      => $m->image_height,
+            // AI upscaling: which version is showing and which exist.
+            'can_upscale'       => $m->canBeUpscaled(),
+            'active_variant'    => $m->active_variant,
+            'has_original'      => $m->hasVariant('original'),
+            'has_upscaled'      => $m->hasVariant('upscaled'),
         ])->all();
     }
 }

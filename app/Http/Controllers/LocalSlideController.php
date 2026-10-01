@@ -116,6 +116,22 @@ class LocalSlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
+    public function upscaleMedia(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeSlideAction($request, $slide);
+        $this->upscaleMediaForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image upscaled.');
+    }
+
+    public function setMediaVersion(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeSlideAction($request, $slide);
+        $this->switchMediaVersionForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image version changed.');
+    }
+
     public function showOverlay(Request $request, Slide $slide)
     {
         $this->authorizeSlideAction($request, $slide);

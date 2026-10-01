@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Support\UpscalerSettings;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -38,6 +39,8 @@ class HandleInertiaRequests extends Middleware
                 'admin_entities'   => $request->user()?->adminEntities()->get(['entities.id', 'entities.name']) ?? [],
                 'user_entities'    => $request->user()?->entities()->orderBy('name')->get(['entities.id', 'entities.name']) ?? [],
             ],
+            // Options for the in-browser upscaler (uploads and the media manager).
+            'upscaler' => fn () => $request->user() ? UpscalerSettings::forClient() : null,
             'flash' => [
                 'success' => session('success'),
                 'error'   => session('error'),

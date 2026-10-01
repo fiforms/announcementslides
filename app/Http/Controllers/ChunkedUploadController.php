@@ -89,6 +89,17 @@ class ChunkedUploadController extends Controller
             'uploads.*.original_filename' => 'required|string|max:255',
             'uploads.*.file_size'         => 'required|integer|min:0',
             'uploads.*.mime_type'         => ['required', 'string', Rule::in(config('slides.media_types.slide.mimes'))],
+            // An image upscaled in the browser: the upload above is the 2x
+            // JPEG and `original` is the file as the user picked it, kept
+            // so the upscale can be undone.
+            'uploads.*.upscale'                    => 'nullable|array',
+            'uploads.*.upscale.model'              => ['required_with:uploads.*.upscale', 'string', Rule::in(array_keys(config('slides.upscale.models')))],
+            'uploads.*.upscale.original'           => 'required_with:uploads.*.upscale|array',
+            'uploads.*.upscale.original.filename'  => ['required_with:uploads.*.upscale', 'string', 'regex:/^[0-9a-f\-]{36}\.[a-z0-9]+$/'],
+            'uploads.*.upscale.original.disk_path' => ['required_with:uploads.*.upscale', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.[a-z0-9]+$/'],
+            'uploads.*.upscale.original.original_filename' => 'required_with:uploads.*.upscale|string|max:255',
+            'uploads.*.upscale.original.file_size' => 'required_with:uploads.*.upscale|integer|min:0',
+            'uploads.*.upscale.original.mime_type' => ['required_with:uploads.*.upscale', 'string', Rule::in(['image/jpeg', 'image/png', 'image/webp'])],
             'title'                       => 'required|string|max:255',
             'notes'                       => 'nullable|string',
             'text_description'            => 'nullable|string',
@@ -155,14 +166,28 @@ class ChunkedUploadController extends Controller
                 $blocked[$upload['original_filename']] = $validation['issues'];
             }
 
-            $validated[] = [$upload, $validation];
+            $originalValidation = null;
+            if (!empty($upload['upscale'])) {
+                $original = $upload['upscale']['original'];
+                if (!Storage::disk('public')->exists($original['disk_path'])) {
+                    return response()->json(['message' => 'Assembled file not found: ' . $upload['original_filename']], 422);
+                }
+                $originalValidation = $validationService->validate(
+                    Storage::disk('public')->path($original['disk_path']), $original['mime_type'], $original['file_size']
+                );
+            }
+
+            $validated[] = [$upload, $validation, $originalValidation];
         }
 
         if (!empty($blocked)) {
             // Remove the orphaned assembled files — there is no slide record to
             // own them, and the user must upload an acceptable replacement.
             foreach ($request->uploads as $upload) {
-                Storage::disk('public')->delete($upload['disk_path']);
+                Storage::disk('public')->delete(array_filter([
+                    $upload['disk_path'],
+                    $upload['upscale']['original']['disk_path'] ?? null,
+                ]));
             }
 
             return response()->json([
@@ -173,7 +198,7 @@ class ChunkedUploadController extends Controller
 
         $slides = [];
 
-        foreach ($validated as [$upload, $validation]) {
+        foreach ($validated as [$upload, $validation, $originalValidation]) {
             $slide = Slide::create([
                 'title'             => $request->title,
                 'notes'             => $request->notes,
@@ -200,6 +225,27 @@ class ChunkedUploadController extends Controller
                 'validation_issues' => $validation['issues'],
                 'validation_status' => $validation['status'],
             ]);
+
+            if ($originalValidation) {
+                $original = $upload['upscale']['original'];
+                $media->adoptUpscaled(
+                    // The file as the user picked it.
+                    [
+                        'filename'          => $original['filename'],
+                        'original_filename' => $original['original_filename'],
+                        'disk_path'         => $original['disk_path'],
+                        'file_size'         => $original['file_size'],
+                        'mime_type'         => $original['mime_type'],
+                        'thumbnail_path'    => null,
+                        'image_width'       => $originalValidation['width'],
+                        'image_height'      => $originalValidation['height'],
+                        'validation_issues' => $originalValidation['issues'],
+                        'validation_status' => $originalValidation['status'],
+                    ],
+                    $media->currentVersion(),
+                    $upload['upscale']['model'],
+                );
+            }
 
             GenerateThumbnail::dispatch($media);
             $slides[] = $slide;

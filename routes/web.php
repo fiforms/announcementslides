@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\EntityConsoleController;
 use App\Http\Controllers\Admin\SlideAnnouncerConsoleController;
 use App\Http\Controllers\Admin\SlideAnnouncerReleaseController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
+use App\Http\Controllers\Admin\UpscalerSettingsController as AdminUpscalerSettingsController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\WidgetController as AdminWidgetController;
 use App\Http\Controllers\ChunkedUploadController;
@@ -73,6 +74,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{slide}/archive', [MySlideController::class, 'archive'])->name('archive');
         Route::post('/{slide}/media', [MySlideController::class, 'storeMedia'])->name('media.store');
         Route::delete('/{slide}/media/{media}', [MySlideController::class, 'destroyMedia'])->name('media.destroy');
+        Route::post('/{slide}/media/{media}/upscale', [MySlideController::class, 'upscaleMedia'])->name('media.upscale');
+        Route::post('/{slide}/media/{media}/version', [MySlideController::class, 'setMediaVersion'])->name('media.version');
     });
 
     // ── Entity member: entity-scoped slide management (local slides) ────────
@@ -86,6 +89,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{slide}/unshare-nearby', [LocalSlideController::class, 'unshareNearby'])->name('unshare-nearby');
         Route::post('/{slide}/media', [LocalSlideController::class, 'storeMedia'])->name('media.store');
         Route::delete('/{slide}/media/{media}', [LocalSlideController::class, 'destroyMedia'])->name('media.destroy');
+        Route::post('/{slide}/media/{media}/upscale', [LocalSlideController::class, 'upscaleMedia'])->name('media.upscale');
+        Route::post('/{slide}/media/{media}/version', [LocalSlideController::class, 'setMediaVersion'])->name('media.version');
         Route::get('/{slide}/overlay', [LocalSlideController::class, 'showOverlay'])->name('overlay.show');
         Route::put('/{slide}/overlay', [LocalSlideController::class, 'saveOverlay'])->name('overlay.save');
     });
@@ -110,6 +115,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{slide}/archive', [EntitySlideController::class, 'archive'])->name('archive');
         Route::post('/{slide}/media', [EntitySlideController::class, 'storeMedia'])->name('media.store');
         Route::delete('/{slide}/media/{media}', [EntitySlideController::class, 'destroyMedia'])->name('media.destroy');
+        Route::post('/{slide}/media/{media}/upscale', [EntitySlideController::class, 'upscaleMedia'])->name('media.upscale');
+        Route::post('/{slide}/media/{media}/version', [EntitySlideController::class, 'setMediaVersion'])->name('media.version');
     });
 
     // ── Entity leader: paired Slide Announcer devices ───────────────────────
@@ -144,6 +151,8 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/slides/{slide}/unarchive', [AdminSlideController::class, 'unarchive'])->name('slides.unarchive');
     Route::post('/slides/{slide}/media', [AdminSlideController::class, 'storeMedia'])->name('slides.media.store');
     Route::delete('/slides/{slide}/media/{media}', [AdminSlideController::class, 'destroyMedia'])->name('slides.media.destroy');
+    Route::post('/slides/{slide}/media/{media}/upscale', [AdminSlideController::class, 'upscaleMedia'])->name('slides.media.upscale');
+    Route::post('/slides/{slide}/media/{media}/version', [AdminSlideController::class, 'setMediaVersion'])->name('slides.media.version');
     Route::get('/slides/{slide}/overlay', [AdminSlideController::class, 'showOverlay'])->name('slides.overlay.show');
     Route::put('/slides/{slide}/overlay', [AdminSlideController::class, 'saveOverlay'])->name('slides.overlay.save');
 
@@ -162,6 +171,10 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
 
     // ── Slide Announcer fleet console (cross-entity device list) ──────────
     Route::get('/slide-announcers', [SlideAnnouncerConsoleController::class, 'index'])->name('slide-announcers.index');
+
+    // ── In-browser AI upscaler options ────────────────────────────────────
+    Route::get('/upscaler', [AdminUpscalerSettingsController::class, 'index'])->name('upscaler.index');
+    Route::patch('/upscaler', [AdminUpscalerSettingsController::class, 'update'])->name('upscaler.update');
 
     // ── Overlay widgets (admin-installed code packages) ───────────────────
     Route::get('/widgets', [AdminWidgetController::class, 'index'])->name('widgets.index');

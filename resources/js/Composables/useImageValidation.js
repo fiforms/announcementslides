@@ -86,5 +86,11 @@ export function useImageValidation() {
         return { issues, width, height };
     }
 
-    return { validate, getImageDimensions };
+    // Resolution and aspect-ratio issues for a size alone (no file yet) — used
+    // to preview an image as it will be once upscaled.
+    function validateDimensions(width, height) {
+        return [...checkResolution(width, height), ...checkAspectRatio(width, height)];
+    }
+
+    return { validate, validateDimensions, getImageDimensions };
 }

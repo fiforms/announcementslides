@@ -133,6 +133,22 @@ class MySlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
+    public function upscaleMedia(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeOwnership($request, $slide);
+        $this->upscaleMediaForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image upscaled.');
+    }
+
+    public function setMediaVersion(Request $request, Slide $slide, SlideMedia $media)
+    {
+        $this->authorizeOwnership($request, $slide);
+        $this->switchMediaVersionForSlide($request, $slide, $media);
+
+        return back()->with('success', 'Image version changed.');
+    }
+
     private function authorizeOwnership(Request $request, Slide $slide): void
     {
         // Ownership alone is not enough: a user demoted to "viewer" may still own
