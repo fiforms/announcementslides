@@ -13,7 +13,6 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Once;
 use Tests\TestCase;
 
 class WidgetDataTest extends TestCase
@@ -265,7 +264,7 @@ class WidgetDataTest extends TestCase
         $this->get($this->dataUrl('nope'))->assertNotFound();
         Widget::where('slug', 'calendar')->update(['enabled' => false]);
         $this->get($this->dataUrl())->assertNotFound();
-        Once::flush();
+        app()->forgetScopedInstances();
         $this->assertSame([], $this->slide->fresh()->overlay_widgets);
     }
 

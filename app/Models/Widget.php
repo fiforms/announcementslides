@@ -34,14 +34,17 @@ class Widget extends Model
     }
 
     /**
-     * Enabled widgets keyed by slug, loaded once per request — slide
-     * listings resolve every overlay's widgets against this.
+     * Enabled widgets keyed by slug, loaded once per request or queue job —
+     * slide listings and thumbnail jobs resolve every overlay's widgets
+     * against this. A scoped binding (see AppServiceProvider), not once():
+     * the queue worker resets scoped instances between jobs, so a
+     * long-running worker sees widgets installed or toggled after it started.
      *
      * @return array<string, Widget>
      */
     public static function enabledBySlug(): array
     {
-        return once(fn () => static::where('enabled', true)->get()->keyBy('slug')->all());
+        return app('widgets.enabled');
     }
 
     public static function directoryFor(string $slug, string $version): string
