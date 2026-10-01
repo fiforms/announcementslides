@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, provide, ref } from 'vue';
+import { computed, onMounted, provide, ref, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { useI18n } from 'vue-i18n';
@@ -7,8 +7,9 @@ import OverlayCanvas from './OverlayCanvas.vue';
 import OverlayLayerList from './OverlayLayerList.vue';
 import OverlayProperties from './OverlayProperties.vue';
 import QrDialog from './QrDialog.vue';
+import WidgetLayer from '@/Components/Widgets/WidgetLayer.vue';
 import { useOverlayEditor } from '@/Composables/overlay/useOverlayEditor.js';
-import { CANVAS, createImage, createQr, createRect, createSvgImport, createText, fromSource, nextId, toSource } from '@/Composables/overlay/model.js';
+import { CANVAS, createImage, createQr, createRect, createSvgImport, createText, createWidget, fromSource, nextId, toSource } from '@/Composables/overlay/model.js';
 import { compileOverlay } from '@/Composables/overlay/compileOverlay.js';
 import { loadRasterAsDataUri, prepareSvgImport, readFileAs } from '@/Composables/overlay/importSvg.js';
 
@@ -40,6 +41,35 @@ const properties = ref(null);
 const imageInput = ref(null);
 const svgInput = ref(null);
 
+// Installed widgets (from the show response), keyed by slug. The live
+// preview runs the real widget code over the canvas, fetching through the
+// preview endpoint with the current, unsaved parameters.
+const widgetList = ref([]);
+const widgetCatalog = computed(() => Object.fromEntries(widgetList.value.map(w => [w.slug, w])));
+const placeableWidgets = computed(() => widgetList.value.filter(w => w.enabled !== false));
+const widgetMenu = ref(false);
+const widgetPreview = ref(false);
+provide('widgetCatalog', widgetCatalog);
+provide('widgetPreview', widgetPreview);
+
+const hasWidgets = computed(() => editor.elements.value.some(el => el.type === 'widget'));
+const previewWidgets = ref([]);
+let previewTimer = null;
+function refreshPreview() {
+    previewWidgets.value = editor.elements.value
+        .filter(el => el.type === 'widget' && !el.hidden && widgetCatalog.value[el.widget])
+        .map(el => ({
+            id: el.id, widget: el.widget, x: el.x, y: el.y, w: el.w, h: el.h, opacity: el.opacity,
+            params: { ...el.params }, entry_url: widgetCatalog.value[el.widget].entry_url,
+        }));
+}
+// Debounced so typing a URL doesn't remount (and refetch) on every key.
+watch(() => widgetPreview.value && JSON.stringify(editor.elements.value.filter(el => el.type === 'widget')), () => {
+    clearTimeout(previewTimer);
+    if (!widgetPreview.value) { previewWidgets.value = []; return; }
+    previewTimer = setTimeout(refreshPreview, 600);
+});
+
 const primary = computed(() => props.slide.media?.find(m => m.media_type === 'slide'));
 const backgroundUrl = computed(() => {
     if (!primary.value) return props.slide.file_url;
@@ -56,6 +86,7 @@ function routeFor(name) {
 onMounted(async () => {
     try {
         const { data } = await axios.get(routeFor(props.showRoute));
+        widgetList.value = data.widgets ?? [];
         if (data.source && data.overlay?.svg) {
             editor.reset(fromSource(data.source, data.overlay.svg));
         } else {
@@ -132,6 +163,11 @@ async function onSvgPicked(evt) {
     } catch {
         error.value = t('overlay_editor.import_failed');
     }
+}
+
+function addWidget(entry) {
+    widgetMenu.value = false;
+    editor.add(createWidget(editor.elements.value, entry));
 }
 
 function applyQr(qr) {
@@ -238,6 +274,23 @@ const toolButton = 'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-
                 <button type="button" :class="toolButton" @click="addRect">{{ t('overlay_editor.add_rect') }}</button>
                 <button type="button" :class="toolButton" @click="imageInput.click()">{{ t('overlay_editor.add_image') }}</button>
                 <button type="button" :class="toolButton" @click="svgInput.click()">{{ t('overlay_editor.import_svg') }}</button>
+                <div v-if="placeableWidgets.length" class="relative">
+                    <button type="button" :class="toolButton" @click="widgetMenu = !widgetMenu">{{ t('overlay_editor.add_widget') }} ▾</button>
+                    <div v-if="widgetMenu" class="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
+                        <button v-for="w in placeableWidgets" :key="w.slug" type="button"
+                            class="flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left hover:bg-gray-50"
+                            @click="addWidget(w)">
+                            <img :src="w.icon_url" alt="" class="h-8 w-8 shrink-0 object-contain" />
+                            <span class="min-w-0">
+                                <span class="block text-sm font-medium text-gray-800">{{ w.name }}</span>
+                                <span v-if="w.description" class="block truncate text-xs text-gray-500">{{ w.description }}</span>
+                            </span>
+                        </button>
+                    </div>
+                </div>
+                <label v-if="hasWidgets" class="flex items-center gap-1 text-sm text-gray-700">
+                    <input v-model="widgetPreview" type="checkbox" class="rounded" /> {{ t('overlay_editor.widget_live_preview') }}
+                </label>
                 <input ref="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" class="hidden" @change="onImagePicked" />
                 <input ref="svgInput" type="file" accept="image/svg+xml,.svg" class="hidden" @change="onSvgPicked" />
 
@@ -258,8 +311,12 @@ const toolButton = 'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-
 
             <div class="flex flex-col gap-4 lg:flex-row">
                 <div class="min-w-0 flex-1">
-                    <OverlayCanvas :background-url="backgroundUrl" @edit-selected="editSelected" />
+                    <div class="relative">
+                        <OverlayCanvas :background-url="backgroundUrl" @edit-selected="editSelected" />
+                        <WidgetLayer v-if="widgetPreview && previewWidgets.length" :widgets="previewWidgets" mode="editor" class="rounded-lg" />
+                    </div>
                     <p class="mt-1 text-xs text-gray-400">{{ t('overlay_editor.canvas_hint') }}</p>
+                    <p v-if="hasWidgets" class="mt-0.5 text-xs text-gray-400">{{ t('overlay_editor.widget_hint') }}</p>
                 </div>
                 <div class="w-full shrink-0 space-y-5 lg:w-72">
                     <OverlayLayerList />

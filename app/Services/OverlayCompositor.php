@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\SlideMedia;
+use App\Models\Widget;
 use GdImage;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +22,10 @@ use Symfony\Component\Process\Process;
  * optional — without it, SVG overlays are simply skipped (flatten() returns
  * false and callers fall back to the base alone) rather than failing;
  * PNG/WebP overlays are unaffected either way.
+ *
+ * Live widgets can't run here, so each placement is drawn as a static
+ * stand-in — the widget's preview image if its manifest has one, else its
+ * icon — fitted into the widget's box.
  */
 class OverlayCompositor
 {
@@ -73,6 +78,7 @@ class OverlayCompositor
 
         $this->drawContained($canvas, $base);
         $this->drawContained($canvas, $overlaySrc);
+        $this->drawWidgetStandIns($canvas, $overlay);
 
         $dir = dirname($destPath);
         if (!is_dir($dir)) {
@@ -154,5 +160,44 @@ class OverlayCompositor
         $destY = (int) round(($canvasHeight - $destHeight) / 2);
 
         imagecopyresampled($canvas, $src, $destX, $destY, 0, 0, $destWidth, $destHeight, $srcWidth, $srcHeight);
+    }
+
+    /**
+     * Draws each widget placement's preview/icon into its box. Boxes are in
+     * the overlay's 1920×1080 space, which is object-contained onto the
+     * canvas exactly like the overlay image itself.
+     */
+    private function drawWidgetStandIns(GdImage $canvas, SlideMedia $overlay): void
+    {
+        $placements = $overlay->overlay_settings['widgets'] ?? [];
+        if (!$placements) {
+            return;
+        }
+        $widgets = Widget::enabledBySlug();
+
+        $scale = min(imagesx($canvas) / 1920, imagesy($canvas) / 1080);
+        $offsetX = (imagesx($canvas) - 1920 * $scale) / 2;
+        $offsetY = (imagesy($canvas) - 1080 * $scale) / 2;
+
+        foreach ($placements as $p) {
+            $widget = $widgets[$p['widget'] ?? ''] ?? null;
+            $bytes = $widget?->readFile($widget->manifest['preview'] ?? $widget->manifest['icon']);
+            $image = $bytes ? @imagecreatefromstring($bytes) : false;
+            if (!$image) {
+                continue;
+            }
+
+            $boxW = $p['w'] * $scale;
+            $boxH = $p['h'] * $scale;
+            $fit = min($boxW / imagesx($image), $boxH / imagesy($image));
+            $w = max(1, (int) round(imagesx($image) * $fit));
+            $h = max(1, (int) round(imagesy($image) * $fit));
+            $x = (int) round($offsetX + $p['x'] * $scale + ($boxW - $w) / 2);
+            $y = (int) round($offsetY + $p['y'] * $scale + ($boxH - $h) / 2);
+
+            imagealphablending($image, true);
+            imagecopyresampled($canvas, $image, $x, $y, 0, 0, $w, $h, imagesx($image), imagesy($image));
+            imagedestroy($image);
+        }
     }
 }

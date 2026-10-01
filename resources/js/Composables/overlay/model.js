@@ -91,8 +91,29 @@ export function createSvgImport(elements, { markup, viewBox }, locked = true) {
     };
 }
 
+// A live widget (admin-installed code, see WidgetLayer.vue). It isn't part
+// of the compiled SVG at all — the server validates its params on save and
+// stores the placement in overlay_settings for the players to mount above
+// the overlay image. `entry` is the widget's catalog entry from the
+// editor's show response.
+export function createWidget(elements, entry) {
+    const w = Math.min(CANVAS.w, entry.default_size?.w ?? 400);
+    const h = Math.min(CANVAS.h, entry.default_size?.h ?? 300);
+    const params = Object.fromEntries(Object.entries(entry.parameters ?? {}).map(([key, p]) => [
+        key, p.default ?? (p.type === 'boolean' ? false : p.type === 'number' ? null : ''),
+    ]));
+    return {
+        ...base(elements, 'widget', { x: Math.round((CANVAS.w - w) / 2), y: Math.round((CANVAS.h - h) / 2), w, h }),
+        widget: entry.slug,
+        aspectLocked: !!entry.aspect_locked,
+        params,
+    };
+}
+
 export function cloneElements(elements) {
-    return elements.map(el => ({ ...el }));
+    // Widget params are a nested object; copy it so undo snapshots don't
+    // share it with the live element.
+    return elements.map(el => (el.params ? { ...el, params: { ...el.params } } : { ...el }));
 }
 
 // The JSON embedded into the SVG: everything except heavy fields.
@@ -118,6 +139,9 @@ function upgrade(el) {
     if (BACKGROUND_OPACITY_TYPES.has(el.type) && el.backgroundOpacity === undefined) {
         el.backgroundOpacity = el.opacity ?? 1;
         el.opacity = 1;
+    }
+    if (el.type === 'widget' && (typeof el.params !== 'object' || el.params === null || Array.isArray(el.params))) {
+        el.params = {};
     }
     if (el.type === 'qr' && el.markup) {
         el.markup = el.markup.replace(/^<rect\b[^>]*?(\/>|>\s*<\/rect>)/, '');

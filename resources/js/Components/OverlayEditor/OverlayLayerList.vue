@@ -4,12 +4,14 @@ import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
 const editor = inject('overlayEditor');
+const widgetCatalog = inject('widgetCatalog', null);
 
 // Top of the list = front-most layer.
 const rows = computed(() => [...editor.elements.value].reverse());
 
 function label(el) {
     if (el.type === 'text') return (el.text || '').split('\n')[0].slice(0, 30) || t('overlay_editor.type_text');
+    if (el.type === 'widget') return widgetCatalog?.value?.[el.widget]?.name ?? el.widget;
     return t(`overlay_editor.type_${el.type.replace('-', '_')}`);
 }
 

@@ -11,7 +11,8 @@
         "slide_announcers": "Dispositivos anunciadores",
         "slide_announcer_releases": "Versiones del anunciador",
         "view_public_site": "Ver sitio público",
-        "qr_code": "Creador de códigos QR"
+        "qr_code": "Creador de códigos QR",
+        "widgets": "Widgets"
     },
     "auth": {
         "email": "Correo electrónico",
@@ -359,7 +360,15 @@
         "qr_failed": "No se pudo generar un código para esta dirección.",
         "qr_insert": "Insertar",
         "qr_update": "Actualizar",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "add_widget": "Widget",
+        "type_widget": "Widget",
+        "widget_live_preview": "Vista previa en vivo",
+        "widget_hint": "Los widgets siempre aparecen encima de las demás capas y se ejecutan en vivo cuando se muestra la diapositiva.",
+        "widget_missing": "Widget no instalado ({slug})",
+        "widget_missing_hint": "El widget \"{slug}\" ya no está instalado. Quita esta capa para guardar la superposición.",
+        "widget_disabled_hint": "Un administrador desactivó este widget, así que no se mostrará en las pantallas hasta que se vuelva a activar.",
+        "widget_allowed_urls": "Las direcciones permitidas comienzan con: {list}"
     },
     "qr_code": {
         "title": "Creador de códigos QR",

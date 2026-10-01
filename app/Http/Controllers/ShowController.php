@@ -308,6 +308,7 @@ class ShowController extends Controller
             'thumbnail_url' => $slide->thumbnail_url,
             'overlay_url' => $slide->overlay_url,
             'overlay_mime_type' => $slide->overlay_mime_type,
+            'overlay_widgets' => $slide->overlay_widgets,
             'status' => $slide->status,
             'share_nearby' => $slide->share_nearby,
             'publish_at' => $slide->publish_at?->toIso8601String(),

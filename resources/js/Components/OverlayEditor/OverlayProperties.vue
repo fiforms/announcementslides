@@ -10,6 +10,8 @@ const { t } = useI18n();
 const editor = inject('overlayEditor');
 const textArea = ref(null);
 const el = computed(() => editor.selected.value);
+const widgetCatalog = inject('widgetCatalog', null);
+const widget = computed(() => el.value?.type === 'widget' ? widgetCatalog?.value?.[el.value.widget] ?? null : null);
 
 // Text, QR codes and rectangles fade only their background (and only have
 // the slider while they have one); images and imported artwork fade whole.
@@ -119,6 +121,37 @@ const labelCls = 'block text-[11px] font-medium text-gray-600 mb-0.5';
         </template>
 
         <p v-else-if="el.type === 'svg-import'" class="text-[11px] text-gray-500">{{ t('overlay_editor.imported_hint') }}</p>
+
+        <template v-else-if="el.type === 'widget'">
+            <p v-if="!widget" class="rounded-md bg-red-50 px-2 py-1 text-[11px] text-red-700">
+                {{ t('overlay_editor.widget_missing_hint', { slug: el.widget }) }}
+            </p>
+            <template v-else>
+                <p v-if="widget.description" class="text-[11px] text-gray-500">{{ widget.description }}</p>
+                <p v-if="widget.enabled === false" class="rounded-md bg-amber-50 px-2 py-1 text-[11px] text-amber-800">
+                    {{ t('overlay_editor.widget_disabled_hint') }}
+                </p>
+                <div v-for="(p, key) in widget.parameters" :key="key">
+                    <label v-if="p.type !== 'boolean'" :class="labelCls">{{ p.label ?? key }}</label>
+                    <select v-if="p.type === 'enum'" v-model="el.params[key]" :class="input">
+                        <option v-for="o in p.options" :key="o" :value="o">{{ o }}</option>
+                    </select>
+                    <textarea v-else-if="p.type === 'text'" v-model="el.params[key]" rows="3" :maxlength="p.maxLength" :class="input" />
+                    <input v-else-if="p.type === 'color'" v-model="el.params[key]" type="color" class="h-7 w-full" />
+                    <input v-else-if="p.type === 'number'" v-model.number="el.params[key]" type="number"
+                        :min="p.min" :max="p.max" :step="p.step ?? 'any'" :class="input" />
+                    <label v-else-if="p.type === 'boolean'" class="flex items-center gap-1 text-xs">
+                        <input v-model="el.params[key]" type="checkbox" class="rounded" /> {{ p.label ?? key }}
+                    </label>
+                    <input v-else v-model.trim="el.params[key]" :type="p.type === 'url' ? 'url' : 'text'"
+                        :maxlength="p.maxLength" :placeholder="p.type === 'url' ? 'https://…' : null" :class="input" />
+                    <p v-if="p.help" class="mt-0.5 text-[11px] text-gray-500">{{ p.help }}</p>
+                    <p v-if="p.type === 'url' && p.allow?.length" class="mt-0.5 break-all text-[11px] text-gray-400">
+                        {{ t('overlay_editor.widget_allowed_urls', { list: p.allow.join(', ') }) }}
+                    </p>
+                </div>
+            </template>
+        </template>
     </div>
     <p v-else class="text-xs text-gray-400">{{ t('overlay_editor.select_hint') }}</p>
 </template>

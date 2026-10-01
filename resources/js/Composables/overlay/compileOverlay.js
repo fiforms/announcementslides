@@ -118,6 +118,8 @@ export function compileElement(el) {
         case 'svg-import':
             inner = `${nestedSvgOpen(el)}${el.markup ?? ''}</svg>`;
             break;
+        // Widgets are mounted live by the players (from overlay_settings),
+        // never baked into the SVG; type 'widget' falls through to ''.
         default:
             return '';
     }

@@ -11,7 +11,8 @@
         "slide_announcers": "Announcer Devices",
         "slide_announcer_releases": "Announcer Releases",
         "view_public_site": "View Public Site",
-        "qr_code": "QR Code Creator"
+        "qr_code": "QR Code Creator",
+        "widgets": "Widgets"
     },
     "auth": {
         "email": "Email",
@@ -359,7 +360,15 @@
         "qr_failed": "Couldn't generate a code for this address.",
         "qr_insert": "Insert",
         "qr_update": "Update",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "add_widget": "Widget",
+        "type_widget": "Widget",
+        "widget_live_preview": "Live widget preview",
+        "widget_hint": "Widgets always appear above the other layers, and run live when the slide is shown.",
+        "widget_missing": "Widget not installed ({slug})",
+        "widget_missing_hint": "The \"{slug}\" widget is no longer installed. Remove this layer to save the overlay.",
+        "widget_disabled_hint": "An administrator has turned this widget off, so it won't show on screens until it's turned back on.",
+        "widget_allowed_urls": "Allowed addresses start with: {list}"
     },
     "qr_code": {
         "title": "QR Code Creator",

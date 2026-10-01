@@ -6,8 +6,11 @@ use App\Jobs\GenerateThumbnail;
 use App\Jobs\SyncOverlayThumbnail;
 use App\Models\Slide;
 use App\Models\SlideMedia;
+use App\Models\Widget;
 use App\Services\OverlaySource;
 use App\Services\SvgSanitizer;
+use App\Services\Widgets\OverlayWidgets;
+use App\Services\Widgets\WidgetPackageException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -114,21 +117,29 @@ trait ManagesSlideMedia
      * editor and hasn't been modified since (see OverlaySource). Otherwise
      * the overlay content is returned inline — sanitized SVG markup or a
      * raster data URI — so the editor can keep it as a fixed base layer
-     * without a cross-origin fetch from the storage disk.
+     * without a cross-origin fetch from the storage disk. `widgets` is the
+     * catalog of installed widgets the editor can place.
      */
     private function showOverlayForSlide(Slide $slide): JsonResponse
     {
         $media = $slide->overlayMedia;
         $disk = Storage::disk('public');
 
+        // Installed, enabled widgets the editor can place (plus any already
+        // on this overlay, so a disabled one still shows its placeholder).
+        $widgets = Widget::orderBy('name')->get()
+            ->filter(fn (Widget $w) => $w->enabled || collect($media?->overlay_settings['widgets'] ?? [])->contains('widget', $w->slug))
+            ->map(fn (Widget $w) => $w->editorResource() + ['enabled' => $w->enabled])
+            ->values();
+
         if (!$media || !$disk->exists($media->disk_path)) {
-            return response()->json(['source' => null, 'overlay' => null]);
+            return response()->json(['source' => null, 'overlay' => null, 'widgets' => $widgets]);
         }
 
         $bytes = $disk->get($media->disk_path);
 
         if ($media->mime_type !== 'image/svg+xml') {
-            return response()->json(['source' => null, 'overlay' => [
+            return response()->json(['source' => null, 'widgets' => $widgets, 'overlay' => [
                 'mime_type' => $media->mime_type,
                 'data_uri'  => 'data:' . $media->mime_type . ';base64,' . base64_encode($bytes),
             ]]);
@@ -140,13 +151,16 @@ trait ManagesSlideMedia
         return response()->json([
             'source'  => $svg === null ? null : $extracted['source'],
             'overlay' => $svg === null ? null : ['mime_type' => 'image/svg+xml', 'svg' => $svg],
+            'widgets' => $widgets,
         ]);
     }
 
     /**
      * Saves the overlay editor's output as the slide's (single) overlay:
      * the compiled SVG is sanitized, the editor source embedded into it, and
-     * any previous overlay rows/files replaced.
+     * any previous overlay rows/files replaced. Widget layers aren't in the
+     * SVG at all — they're validated and stored in overlay_settings, which
+     * the players read (see OverlayWidgets).
      */
     private function saveOverlayForSlide(Request $request, Slide $slide): SlideMedia
     {
@@ -158,6 +172,12 @@ trait ManagesSlideMedia
         $source = json_decode($request->input('source'), true);
         if (!is_array($source) || !is_int($source['v'] ?? null) || !is_array($source['elements'] ?? null)) {
             throw ValidationException::withMessages(['source' => 'The overlay source is malformed.']);
+        }
+
+        try {
+            [$source, $overlaySettings] = app(OverlayWidgets::class)->fromSource($source);
+        } catch (WidgetPackageException $e) {
+            throw ValidationException::withMessages(['source' => $e->errors]);
         }
 
         $clean = app(SvgSanitizer::class)->sanitize($request->input('svg'));
@@ -173,7 +193,7 @@ trait ManagesSlideMedia
 
         $old = $slide->media()->where('media_type', 'slide-overlay')->get();
 
-        $media = DB::transaction(function () use ($slide, $old, $filename, $diskPath, $svg) {
+        $media = DB::transaction(function () use ($slide, $old, $filename, $diskPath, $svg, $overlaySettings) {
             $old->each->delete();
 
             return $slide->media()->create([
@@ -183,6 +203,7 @@ trait ManagesSlideMedia
                 'disk_path'         => $diskPath,
                 'file_size'         => strlen($svg),
                 'mime_type'         => 'image/svg+xml',
+                'overlay_settings'  => $overlaySettings['widgets'] ? $overlaySettings : null,
             ]);
         });
 

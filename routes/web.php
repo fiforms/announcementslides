@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\SlideAnnouncerConsoleController;
 use App\Http\Controllers\Admin\SlideAnnouncerReleaseController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Admin\WidgetController as AdminWidgetController;
 use App\Http\Controllers\ChunkedUploadController;
 use App\Http\Controllers\EntityController;
 use App\Http\Controllers\EntitySlideAnnouncerController;
@@ -16,6 +17,8 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShowController;
 use App\Http\Controllers\SlideController;
 use App\Http\Controllers\SubmitSlideController;
+use App\Http\Controllers\WidgetAssetController;
+use App\Http\Controllers\WidgetDataController;
 use App\Http\Middleware\EnsureAdmin;
 use Illuminate\Support\Facades\Route;
 
@@ -28,6 +31,14 @@ Route::get('/slides/{slide}/media/{media}/download', [SlideController::class, 'd
 Route::get('/slides/download-zip', [SlideController::class, 'downloadZip'])->name('slides.download-zip');
 Route::get('/slides/download-pptx', [SlideController::class, 'downloadPowerPoint'])->name('slides.download-pptx');
 Route::get('/slides/{slide}', [SlideController::class, 'index'])->name('slides.show');
+
+// Overlay widgets: bundle files (only those in the installed manifest), and
+// server-fetched data for a saved placement — never a caller-supplied URL.
+// Public because public slides' widgets run for guests too.
+Route::get('/widget-assets/{slug}/{version}/{path}', [WidgetAssetController::class, 'show'])
+    ->where('path', '.*')->name('widgets.asset');
+Route::get('/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'show'])
+    ->middleware('throttle:120,1')->name('widget-data.show');
 
 // ── Auth (Breeze) ─────────────────────────────────────────────────────────────
 
@@ -110,6 +121,10 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::delete('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'destroy'])->name('destroy');
     });
 
+    // ── Overlay editor: live widget preview with unsaved parameters ────────
+    Route::post('/widget-data/preview', [WidgetDataController::class, 'preview'])
+        ->middleware('throttle:30,1')->name('widget-data.preview');
+
     // ── Viewer: pending slide submission ───────────────────────────────────
     Route::get('/submit', [SubmitSlideController::class, 'index'])->name('slides.submit');
 });
@@ -147,6 +162,12 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
 
     // ── Slide Announcer fleet console (cross-entity device list) ──────────
     Route::get('/slide-announcers', [SlideAnnouncerConsoleController::class, 'index'])->name('slide-announcers.index');
+
+    // ── Overlay widgets (admin-installed code packages) ───────────────────
+    Route::get('/widgets', [AdminWidgetController::class, 'index'])->name('widgets.index');
+    Route::post('/widgets', [AdminWidgetController::class, 'store'])->name('widgets.store');
+    Route::patch('/widgets/{widget}', [AdminWidgetController::class, 'update'])->name('widgets.update');
+    Route::delete('/widgets/{widget}', [AdminWidgetController::class, 'destroy'])->name('widgets.destroy');
 
     // ── Slide Announcer releases (OS bundles + local-app archives) ────────
     Route::prefix('slide-announcer-releases')->name('slide-announcer-releases.')->group(function () {

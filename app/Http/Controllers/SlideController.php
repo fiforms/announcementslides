@@ -399,6 +399,7 @@ class SlideController extends Controller
             'thumbnail_url'     => $slide->thumbnail_url,
             'overlay_url'       => $slide->overlay_url,
             'overlay_mime_type' => $slide->overlay_mime_type,
+            'overlay_widgets'   => $slide->overlay_widgets,
             'publish_at'        => $slide->publish_at?->toIso8601String(),
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'original_filename' => $slide->original_filename,

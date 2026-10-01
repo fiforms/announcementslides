@@ -82,7 +82,8 @@ function onPointerMove(evt) {
     h = Math.max(MIN_SIZE, h);
 
     const el = editor.find(gesture.id);
-    const keepAspect = el.type === 'qr' || (ASPECT_LOCKED.has(el.type) !== evt.shiftKey);
+    const lockedType = el.type === 'widget' ? !!el.aspectLocked : ASPECT_LOCKED.has(el.type);
+    const keepAspect = el.type === 'qr' || (lockedType !== evt.shiftKey);
     if (keepAspect) {
         const ratio = orig.w / orig.h;
         if (handle === 'n' || handle === 's') w = h * ratio;

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Entity;
 use App\Models\User;
+use App\Services\Widgets\OverlayWidgets;
 
 class Slide extends Model
 {
@@ -199,6 +200,15 @@ class Slide extends Model
     public function getOverlayMimeTypeAttribute(): ?string
     {
         return $this->overlayMedia?->mime_type;
+    }
+
+    /**
+     * Live widgets placed on the overlay (enabled ones only), for players to
+     * mount above the overlay image — see OverlayWidgets::forPlayer().
+     */
+    public function getOverlayWidgetsAttribute(): array
+    {
+        return app(OverlayWidgets::class)->forPlayer($this->overlayMedia);
     }
 
     public function getOriginalFilenameAttribute(): ?string

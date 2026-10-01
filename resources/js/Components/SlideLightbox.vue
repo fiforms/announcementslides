@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch } from 'vue';
+import WidgetLayer from '@/Components/Widgets/WidgetLayer.vue';
 
 const props = defineProps({
     slide: { type: Object, default: null },
@@ -102,6 +103,7 @@ async function copy(text, field) {
                         :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
                     <img v-if="slide.overlay_url" :src="slide.overlay_url" :alt="`${slide.title} overlay`"
                         class="pointer-events-none absolute inset-0 h-full w-full object-contain" />
+                    <WidgetLayer v-if="slide.overlay_widgets?.length" :key="slide.id" :widgets="slide.overlay_widgets" />
                 </div>
 
                 <!-- Description / link / attached files -->
