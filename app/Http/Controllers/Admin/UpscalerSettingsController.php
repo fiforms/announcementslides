@@ -37,6 +37,7 @@ class UpscalerSettingsController extends Controller
             'model'          => ['required', Rule::in(array_keys(config('slides.upscale.models')))],
             'jpeg_quality'   => 'required|integer|min:60|max:100',
             'patch_size'     => ['required', 'integer', Rule::in(UpscalerSettings::PATCH_SIZES)],
+            'downscale_oversized' => 'required|boolean',
         ]);
 
         UpscalerSettings::save($data);

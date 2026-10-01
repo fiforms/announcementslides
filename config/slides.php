@@ -79,8 +79,11 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | AI upscaling
+    | AI upscaling and downscaling
     |--------------------------------------------------------------------------
+    |
+    | Oversized images (beyond `downscale`) are shrunk to fit it, also in the
+    | browser, using a plain canvas — see resources/js/Composables/useImageResize.js.
     |
     | Images are upscaled 2x in the uploader's browser (UpscalerJS) when they
     | fit within max_* and are at least min_* — see App\Support\UpscalerSettings
@@ -91,6 +94,12 @@ return [
     | Vite build), and must match the keys in useUpscaler.js.
     |
     */
+    'downscale' => [
+        // Images larger than this are shrunk to fit it (3840×2160 = 4K) in the browser.
+        'max_width'  => 3840,
+        'max_height' => 2160,
+    ],
+
     'upscale' => [
         'min_width'  => 960,
         'min_height' => 540,

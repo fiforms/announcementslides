@@ -55,7 +55,7 @@ class SlideMedia extends Model
         return str_starts_with($this->mime_type, 'video/');
     }
 
-    // ── AI upscaling: original / upscaled versions ───────────────────────────
+    // ── Browser resizing (AI upscale / downscale): original / resized versions ───────────────────────────
 
     /** The columns that describe a version of the file (see the variants migration). */
     public const VERSION_FIELDS = [
@@ -63,8 +63,8 @@ class SlideMedia extends Model
         'thumbnail_path', 'image_width', 'image_height', 'validation_issues', 'validation_status',
     ];
 
-    /** Whether the browser may be asked to upscale this file (not GIF/SVG/video/PDF). */
-    public function canBeUpscaled(): bool
+    /** Whether the browser may be asked to resize (upscale/downscale) this file (not GIF/SVG/video/PDF). */
+    public function canBeResized(): bool
     {
         return $this->media_type === 'slide'
             && in_array($this->mime_type, ['image/jpeg', 'image/png', 'image/webp'], true);
@@ -95,7 +95,7 @@ class SlideMedia extends Model
 
         $variants = $this->variants;
         if ($this->active_variant) {
-            // Merged over the old snapshot so extras like upscale_model survive.
+            // Merged over the old snapshot so extras like kind/model survive.
             $variants[$this->active_variant] = $this->currentVersion() + $variants[$this->active_variant];
         }
 
@@ -108,16 +108,23 @@ class SlideMedia extends Model
     }
 
     /**
-     * Makes an upscaled file the active version. $original is the snapshot
-     * of the file as it was (kept for undo); $upscaled is the new file's
-     * columns (VERSION_FIELDS).
+     * Makes a browser-resized file (an AI upscale or a downscale, per $kind —
+     * see ImageResize) the active version. $original is the snapshot of the
+     * file as it was (kept for undo); $resized is the new file's columns
+     * (VERSION_FIELDS); $model names the upscaler model, for upscales.
      */
-    public function adoptUpscaled(array $original, array $upscaled, string $model): void
+    public function adoptResized(array $original, array $resized, string $kind, ?string $model = null): void
     {
-        $this->forceFill($upscaled + [
-            'variants'       => ['original' => $original, 'upscaled' => $upscaled + ['upscale_model' => $model]],
-            'active_variant' => 'upscaled',
+        $this->forceFill($resized + [
+            'variants'       => ['original' => $original, 'resized' => $resized + ['kind' => $kind, 'model' => $model]],
+            'active_variant' => 'resized',
         ])->save();
+    }
+
+    /** 'upscale' or 'downscale' for the stored resized version, if any. */
+    public function resizedKind(): ?string
+    {
+        return $this->variants['resized']['kind'] ?? null;
     }
 
     /** Every file this row owns: both versions' files and thumbnails. */

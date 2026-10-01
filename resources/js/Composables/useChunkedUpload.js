@@ -55,9 +55,10 @@ export function useChunkedUpload(options = {}) {
         return result;
     }
 
-    // `files` entries are Files, or { file, upscale: { model, original } } for an
-    // image upscaled in the browser: `file` is the upscaled JPEG, and `original`
-    // (a File) is uploaded too, so the server can keep it for undoing the upscale.
+    // `files` entries are Files, or { file, resize: { kind, model, original } } for
+    // an image resized in the browser (kind 'upscale' or 'downscale'): `file` is
+    // the resulting JPEG, and `original` (a File) is uploaded too, so the server
+    // can keep it for undoing the resize.
     async function upload(files, payload) {
         const items = files.map(f => (f instanceof Blob ? { file: f } : f));
 
@@ -70,8 +71,8 @@ export function useChunkedUpload(options = {}) {
 
         try {
             for (let fi = 0; fi < items.length; fi++) {
-                const { file, upscale } = items[fi];
-                const original = upscale?.original ?? null;
+                const { file, resize } = items[fi];
+                const original = resize?.original ?? null;
                 const totalBytes = file.size + (original?.size ?? 0);
                 let mainPct = 0;
                 let originalPct = 0;
@@ -91,8 +92,9 @@ export function useChunkedUpload(options = {}) {
                         originalPct = pct;
                         report();
                     });
-                    assembled.upscale = {
-                        model: upscale.model,
+                    assembled.resize = {
+                        kind:  resize.kind,
+                        model: resize.model ?? null,
                         original: {
                             filename:          assembledOriginal.filename,
                             disk_path:         assembledOriginal.disk_path,

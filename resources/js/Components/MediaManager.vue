@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload';
 import { upscaleImage, upscaleIneligibility, ineligibleMessage, useUpscalerSettings } from '@/Composables/useUpscaler';
+import { downscaleImage, exceedsDownscaleLimit } from '@/Composables/useImageResize';
 
 const props = defineProps({
     slide: { type: Object, required: true },
@@ -11,20 +12,20 @@ const props = defineProps({
     destroyRoute: { type: String, required: true },
     routeParams: { type: Object, default: () => ({}) },
     reloadOnly: { type: Array, default: () => ['slide'] },
-    // The routes that upscale a media file and switch between its original and
-    // upscaled versions. By convention they sit beside the store route
-    // ('x.media.store' -> 'x.media.upscale' / 'x.media.version').
-    upscaleRoute: { type: String, default: null },
+    // The routes that resize (AI-upscale / downscale) a media file and switch
+    // between its original and resized versions. By convention they sit beside
+    // the store route ('x.media.store' -> 'x.media.resize' / 'x.media.version').
+    resizeRoute: { type: String, default: null },
     versionRoute: { type: String, default: null },
 });
 
 const upscaler = useUpscalerSettings();
-const upscaleRouteName = computed(() => props.upscaleRoute ?? props.storeRoute.replace(/store$/, 'upscale'));
+const resizeRouteName = computed(() => props.resizeRoute ?? props.storeRoute.replace(/store$/, 'resize'));
 const versionRouteName = computed(() => props.versionRoute ?? props.storeRoute.replace(/store$/, 'version'));
 
-// Upscales in progress, by media id: { progress, error }
-const upscaling = ref({});
-let upscaleAbort = null;
+// Resizes in progress, by media id: { kind, progress, error }
+const resizing = ref({});
+let resizeAbort = null;
 
 const selectedType = ref(props.mediaTypes[0]?.value ?? 'slide-overlay');
 const fileInput = ref(null);
@@ -70,53 +71,72 @@ async function onFileSelected(event) {
     if (fileInput.value) fileInput.value.value = '';
 }
 
-function upscaleBlocked(media) {
-    return upscaleIneligibility(media.image_width, media.image_height, upscaler);
+// What resizing, if any, applies to this image at its current size: shrink it
+// if it's beyond 4K, AI-upscale it if it's small enough. Returns
+// { kind } when it can be done, { kind, blocked: 'reason' } when it's
+// the right kind but not currently possible, or null.
+function resizeOptionFor(media) {
+    if (!upscaler || !media.can_resize || media.active_variant === 'resized') return null;
+
+    if (exceedsDownscaleLimit(media.image_width, media.image_height, upscaler)) {
+        return { kind: 'downscale' };
+    }
+    if (!upscaler.enabled) return null;
+
+    const blocked = upscaleIneligibility(media.image_width, media.image_height, upscaler);
+    // Between the upscale and 4K limits there's nothing to offer at all.
+    return blocked === 'too-large' ? null : { kind: 'upscale', blocked };
 }
 
-function canOfferUpscale(media) {
-    return upscaler?.enabled && media.can_upscale && media.active_variant !== 'upscaled';
-}
+async function resizeMedia(media) {
+    const option = resizeOptionFor(media);
+    if (!option || option.blocked || Object.keys(resizing.value).length) return;
 
-async function upscaleMedia(media) {
-    if (Object.keys(upscaling.value).length) return;
-    upscaling.value = { [media.id]: { progress: 0, error: null } };
-    const state = upscaling.value[media.id];
-    upscaleAbort = new AbortController();
+    const isUpscale = option.kind === 'upscale';
+    resizing.value = { [media.id]: { kind: option.kind, progress: 0, error: null } };
+    const state = resizing.value[media.id];
+    resizeAbort = new AbortController();
 
     try {
         const response = await fetch(media.file_url);
         if (!response.ok) throw new Error('The image could not be downloaded.');
+        const source = await response.blob();
 
-        const result = await upscaleImage(await response.blob(), {
-            model: upscaler.model,
-            quality: upscaler.jpeg_quality,
-            patchSize: upscaler.patch_size,
-            onProgress: (p) => { state.progress = Math.round(p * 100); },
-            signal: upscaleAbort.signal,
-        });
+        const result = isUpscale
+            ? await upscaleImage(source, {
+                model: upscaler.model,
+                quality: upscaler.jpeg_quality,
+                patchSize: upscaler.patch_size,
+                onProgress: (p) => { state.progress = Math.round(p * 100); },
+                signal: resizeAbort.signal,
+            })
+            : await downscaleImage(source, upscaler.downscale.max, { quality: upscaler.jpeg_quality });
 
         state.progress = 100;
         const name = (media.original_filename ?? 'slide').replace(/\.[^/.]+$/, '') + '.jpg';
         const uploader = useChunkedUpload({
-            finalizeRoute: upscaleRouteName.value,
+            finalizeRoute: resizeRouteName.value,
             finalizeRouteParams: { ...props.routeParams, slide: props.slide.id, media: media.id },
-            buildFinalizePayload: (completed) => ({ ...completed[0], model: upscaler.model }),
+            buildFinalizePayload: (completed) => ({
+                ...completed[0],
+                kind: option.kind,
+                model: isUpscale ? upscaler.model : null,
+            }),
         });
         const saved = await uploader.upload([new File([result.blob], name, { type: 'image/jpeg' })], { media_type: media.media_type });
         if (!saved) throw new Error(uploader.uploadError.value);
 
         router.reload({ only: props.reloadOnly });
     } catch (err) {
-        if (err.code !== 'aborted') state.error = err.message || 'Upscaling failed.';
+        if (err.code !== 'aborted') state.error = err.message || 'Resizing failed.';
     } finally {
-        if (!state.error) upscaling.value = {};
-        upscaleAbort = null;
+        if (!state.error) resizing.value = {};
+        resizeAbort = null;
     }
 }
 
-function cancelUpscale() {
-    upscaleAbort?.abort();
+function cancelResize() {
+    resizeAbort?.abort();
 }
 
 function switchVersion(media, version) {
@@ -153,44 +173,51 @@ function removeMedia(media) {
                     <p class="truncate text-xs text-gray-500">
                         {{ media.original_filename }} · {{ formatBytes(media.file_size) }}
                         <template v-if="media.image_width"> · {{ media.image_width }}×{{ media.image_height }}</template>
-                        <span v-if="media.active_variant === 'upscaled'"
-                            class="ml-1 rounded bg-purple-100 px-1.5 py-0.5 font-medium text-purple-700">AI upscaled</span>
+                        <span v-if="media.active_variant === 'resized'"
+                            class="ml-1 rounded px-1.5 py-0.5 font-medium"
+                            :class="media.resized_kind === 'downscale' ? 'bg-sky-100 text-sky-700' : 'bg-purple-100 text-purple-700'">
+                            {{ media.resized_kind === 'downscale' ? 'Downscaled to 4K' : 'AI upscaled' }}
+                        </span>
                     </p>
-                    <div v-if="upscaling[media.id]" class="mt-1">
-                        <template v-if="upscaling[media.id].error">
-                            <p class="text-xs text-red-600">{{ upscaling[media.id].error }}
-                                <button type="button" class="underline" @click="upscaling = {}">Dismiss</button>
+                    <div v-if="resizing[media.id]" class="mt-1">
+                        <template v-if="resizing[media.id].error">
+                            <p class="text-xs text-red-600">{{ resizing[media.id].error }}
+                                <button type="button" class="underline" @click="resizing = {}">Dismiss</button>
                             </p>
                         </template>
                         <template v-else>
                             <div class="flex justify-between text-xs text-gray-500">
-                                <span>{{ upscaling[media.id].progress >= 100 ? 'Uploading…' : `Upscaling… ${upscaling[media.id].progress}%` }}</span>
-                                <button v-if="upscaling[media.id].progress < 100" type="button" class="text-red-600 hover:underline" @click="cancelUpscale">Cancel</button>
+                                <span>{{ resizing[media.id].progress >= 100 ? 'Uploading…' : resizing[media.id].kind === 'upscale' ? `Upscaling… ${resizing[media.id].progress}%` : 'Downscaling…' }}</span>
+                                <button v-if="resizing[media.id].kind === 'upscale' && resizing[media.id].progress < 100" type="button" class="text-red-600 hover:underline" @click="cancelResize">Cancel</button>
                             </div>
                             <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
                                 <div class="h-full rounded-full bg-purple-500 transition-all duration-200"
-                                    :style="{ width: upscaling[media.id].progress + '%' }" />
+                                    :style="{ width: resizing[media.id].progress + '%' }" />
                             </div>
                         </template>
                     </div>
                 </div>
-                <template v-if="!upscaling[media.id]">
-                    <button v-if="media.active_variant === 'upscaled'" type="button" @click="switchVersion(media, 'original')"
+                <template v-if="!resizing[media.id]">
+                    <button v-if="media.active_variant === 'resized'" type="button" @click="switchVersion(media, 'original')"
                         title="Go back to the image as it was uploaded"
                         class="rounded-lg border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50">
-                        Undo upscale
+                        Undo {{ media.resized_kind ?? 'resize' }}
                     </button>
-                    <template v-else-if="canOfferUpscale(media)">
-                        <button v-if="media.has_upscaled" type="button" @click="switchVersion(media, 'upscaled')"
-                            title="Use the upscaled version again"
+                    <template v-else-if="resizeOptionFor(media)">
+                        <button v-if="media.has_resized" type="button" @click="switchVersion(media, 'resized')"
+                            title="Use the resized version again"
                             class="rounded-lg border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50">
-                            Redo upscale
+                            Redo {{ media.resized_kind ?? 'resize' }}
                         </button>
-                        <button type="button" @click="upscaleMedia(media)"
-                            :disabled="!!upscaleBlocked(media) || Object.keys(upscaling).length > 0"
-                            :title="upscaleBlocked(media) ? ineligibleMessage(upscaleBlocked(media), upscaler) : 'Double the resolution with AI (the original is kept)'"
+                        <button type="button" @click="resizeMedia(media)"
+                            :disabled="!!resizeOptionFor(media).blocked || Object.keys(resizing).length > 0"
+                            :title="resizeOptionFor(media).blocked
+                                ? ineligibleMessage(resizeOptionFor(media).blocked, upscaler)
+                                : resizeOptionFor(media).kind === 'upscale'
+                                    ? 'Double the resolution with AI (the original is kept)'
+                                    : 'Shrink to fit 4K (the original is kept)'"
                             class="rounded-lg border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:cursor-not-allowed">
-                            {{ media.has_upscaled ? 'Upscale again' : 'Upscale 2×' }}
+                            {{ resizeOptionFor(media).kind === 'upscale' ? (media.has_resized ? 'Upscale again' : 'Upscale 2×') : (media.has_resized ? 'Downscale again' : 'Downscale to 4K') }}
                         </button>
                     </template>
                 </template>

@@ -10,6 +10,7 @@ use App\Models\Widget;
 use App\Services\ImageValidationService;
 use App\Services\OverlaySource;
 use App\Services\SvgSanitizer;
+use App\Support\ImageResize;
 use App\Services\Widgets\OverlayWidgets;
 use App\Services\Widgets\WidgetPackageException;
 use Illuminate\Http\JsonResponse;
@@ -92,24 +93,27 @@ trait ManagesSlideMedia
     }
 
     /**
-     * Makes an in-browser 2x upscale of a slide image its active version.
-     * The browser uploads the result through the chunk endpoint (as for
-     * storeMediaForSlide) and names it here; the file as it was stays on
-     * disk as the 'original' variant so the upscale can be undone. Any
-     * earlier undone upscale is replaced.
+     * Makes an in-browser resize of a slide image its active version: an AI
+     * 2x upscale of a small image, or a downscale of one larger than 4K
+     * (`kind`, see ImageResize). The browser uploads the result through the
+     * chunk endpoint (as for storeMediaForSlide) and names it here; the file
+     * as it was stays on disk as the 'original' variant so the resize can be
+     * undone. Any earlier undone resize is replaced.
      */
-    private function upscaleMediaForSlide(Request $request, Slide $slide, SlideMedia $media): SlideMedia
+    private function resizeMediaForSlide(Request $request, Slide $slide, SlideMedia $media): SlideMedia
     {
         abort_unless($media->slide_id === $slide->id, 404);
 
         $request->validate([
+            'kind'              => ['required', Rule::in(ImageResize::kinds())],
             'filename'          => ['required', 'string', 'regex:/^[0-9a-f\-]{36}\.jpg$/'],
             'disk_path'         => ['required', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.jpg$/'],
             'file_size'         => 'required|integer|min:0',
             'mime_type'         => ['required', 'string', Rule::in(['image/jpeg'])],
-            'model'             => ['required', 'string', Rule::in(array_keys(config('slides.upscale.models')))],
+            'model'             => ['required_if:kind,' . ImageResize::UPSCALE, 'nullable', 'string', Rule::in(array_keys(config('slides.upscale.models')))],
         ]);
 
+        $kind = $request->kind;
         $disk = Storage::disk('public');
         $path = $request->disk_path;
 
@@ -121,11 +125,11 @@ trait ManagesSlideMedia
             throw ValidationException::withMessages(['file' => $message]);
         };
 
-        if (!$media->canBeUpscaled()) {
-            $reject('This file cannot be upscaled.');
+        if (!$media->canBeResized()) {
+            $reject('This file cannot be resized.');
         }
-        if ($media->active_variant === 'upscaled') {
-            $reject('This image is already upscaled.');
+        if ($media->active_variant === 'resized') {
+            $reject('This image has already been resized.');
         }
         if (!$disk->exists($path)) {
             $reject('Assembled file not found.');
@@ -142,14 +146,20 @@ trait ManagesSlideMedia
             [$w, $h] = array_slice(@getimagesize($disk->path($media->disk_path)) ?: [null, null], 0, 2);
         }
 
-        // Exactly twice the current size (a pixel of slack for rounding).
-        if (!$w || !$validation['width']
-            || abs($validation['width'] - 2 * $w) > 2 || abs($validation['height'] - 2 * $h) > 2) {
-            $reject('The upscaled image is not twice the size of the current one.');
+        // Exactly the size the kind calls for (a pixel of slack for rounding).
+        $target = $w && $h ? ImageResize::target($kind, $w, $h) : null;
+        if (!$target) {
+            $reject($kind === ImageResize::DOWNSCALE ? 'This image is not larger than 4K.' : 'The image could not be read.');
+        }
+        if (!$validation['width']
+            || abs($validation['width'] - $target[0]) > 2 || abs($validation['height'] - $target[1]) > 2) {
+            $reject($kind === ImageResize::DOWNSCALE
+                ? 'The downscaled image is not the expected size.'
+                : 'The upscaled image is not twice the size of the current one.');
         }
 
         $original = $media->currentVersion();
-        $upscaled = [
+        $resized = [
             'filename'          => basename($path),
             'original_filename' => $media->original_filename,
             'disk_path'         => $path,
@@ -162,10 +172,10 @@ trait ManagesSlideMedia
             'validation_status' => $validation['status'],
         ];
 
-        // Replacing an earlier (undone) upscale: its files are now unreferenced.
-        $stale = $media->variants['upscaled'] ?? null;
+        // Replacing an earlier (undone) resize: its files are now unreferenced.
+        $stale = $media->variants['resized'] ?? null;
 
-        $media->adoptUpscaled($original, $upscaled, $request->model);
+        $media->adoptResized($original, $resized, $kind, $kind === ImageResize::UPSCALE ? $request->model : null);
 
         if ($stale) {
             $disk->delete(array_filter([$stale['disk_path'] ?? null, $stale['thumbnail_path'] ?? null]));
@@ -176,12 +186,12 @@ trait ManagesSlideMedia
         return $media;
     }
 
-    /** Undo / redo of an upscale: switches the active version of the file. */
+    /** Undo / redo of a resize: switches the active version of the file. */
     private function switchMediaVersionForSlide(Request $request, Slide $slide, SlideMedia $media): SlideMedia
     {
         abort_unless($media->slide_id === $slide->id, 404);
 
-        $request->validate(['version' => ['required', Rule::in(['original', 'upscaled'])]]);
+        $request->validate(['version' => ['required', Rule::in(['original', 'resized'])]]);
 
         abort_unless($media->hasVariant($request->version), 422, 'That version does not exist.');
 
@@ -338,11 +348,13 @@ trait ManagesSlideMedia
             'validation_status' => $m->validation_status,
             'image_width'       => $m->image_width,
             'image_height'      => $m->image_height,
-            // AI upscaling: which version is showing and which exist.
-            'can_upscale'       => $m->canBeUpscaled(),
+            // Browser resizing (AI upscale / downscale): which version is
+            // showing, which exist, and what kind the resized one is.
+            'can_resize'        => $m->canBeResized(),
             'active_variant'    => $m->active_variant,
             'has_original'      => $m->hasVariant('original'),
-            'has_upscaled'      => $m->hasVariant('upscaled'),
+            'has_resized'       => $m->hasVariant('resized'),
+            'resized_kind'      => $m->resizedKind(),
         ])->all();
     }
 }

@@ -10,6 +10,7 @@ use App\Models\GlobalShowTemplate;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Services\ImageValidationService;
+use App\Support\ImageResize;
 use App\Support\SortZones;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -89,17 +90,18 @@ class ChunkedUploadController extends Controller
             'uploads.*.original_filename' => 'required|string|max:255',
             'uploads.*.file_size'         => 'required|integer|min:0',
             'uploads.*.mime_type'         => ['required', 'string', Rule::in(config('slides.media_types.slide.mimes'))],
-            // An image upscaled in the browser: the upload above is the 2x
-            // JPEG and `original` is the file as the user picked it, kept
-            // so the upscale can be undone.
-            'uploads.*.upscale'                    => 'nullable|array',
-            'uploads.*.upscale.model'              => ['required_with:uploads.*.upscale', 'string', Rule::in(array_keys(config('slides.upscale.models')))],
-            'uploads.*.upscale.original'           => 'required_with:uploads.*.upscale|array',
-            'uploads.*.upscale.original.filename'  => ['required_with:uploads.*.upscale', 'string', 'regex:/^[0-9a-f\-]{36}\.[a-z0-9]+$/'],
-            'uploads.*.upscale.original.disk_path' => ['required_with:uploads.*.upscale', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.[a-z0-9]+$/'],
-            'uploads.*.upscale.original.original_filename' => 'required_with:uploads.*.upscale|string|max:255',
-            'uploads.*.upscale.original.file_size' => 'required_with:uploads.*.upscale|integer|min:0',
-            'uploads.*.upscale.original.mime_type' => ['required_with:uploads.*.upscale', 'string', Rule::in(['image/jpeg', 'image/png', 'image/webp'])],
+            // An image resized in the browser (AI-upscaled, or downscaled from
+            // beyond 4K): the upload above is the resulting JPEG and `original`
+            // is the file as the user picked it, kept so the resize can be undone.
+            'uploads.*.resize'                     => 'nullable|array',
+            'uploads.*.resize.kind'                => ['required_with:uploads.*.resize', Rule::in(ImageResize::kinds())],
+            'uploads.*.resize.model'               => ['nullable', 'string', Rule::in(array_keys(config('slides.upscale.models')))],
+            'uploads.*.resize.original'            => 'required_with:uploads.*.resize|array',
+            'uploads.*.resize.original.filename'   => ['required_with:uploads.*.resize', 'string', 'regex:/^[0-9a-f\-]{36}\.[a-z0-9]+$/'],
+            'uploads.*.resize.original.disk_path'  => ['required_with:uploads.*.resize', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.[a-z0-9]+$/'],
+            'uploads.*.resize.original.original_filename' => 'required_with:uploads.*.resize|string|max:255',
+            'uploads.*.resize.original.file_size'  => 'required_with:uploads.*.resize|integer|min:0',
+            'uploads.*.resize.original.mime_type'  => ['required_with:uploads.*.resize', 'string', Rule::in(['image/jpeg', 'image/png', 'image/webp'])],
             'title'                       => 'required|string|max:255',
             'notes'                       => 'nullable|string',
             'text_description'            => 'nullable|string',
@@ -167,8 +169,8 @@ class ChunkedUploadController extends Controller
             }
 
             $originalValidation = null;
-            if (!empty($upload['upscale'])) {
-                $original = $upload['upscale']['original'];
+            if (!empty($upload['resize'])) {
+                $original = $upload['resize']['original'];
                 if (!Storage::disk('public')->exists($original['disk_path'])) {
                     return response()->json(['message' => 'Assembled file not found: ' . $upload['original_filename']], 422);
                 }
@@ -186,7 +188,7 @@ class ChunkedUploadController extends Controller
             foreach ($request->uploads as $upload) {
                 Storage::disk('public')->delete(array_filter([
                     $upload['disk_path'],
-                    $upload['upscale']['original']['disk_path'] ?? null,
+                    $upload['resize']['original']['disk_path'] ?? null,
                 ]));
             }
 
@@ -227,8 +229,8 @@ class ChunkedUploadController extends Controller
             ]);
 
             if ($originalValidation) {
-                $original = $upload['upscale']['original'];
-                $media->adoptUpscaled(
+                $original = $upload['resize']['original'];
+                $media->adoptResized(
                     // The file as the user picked it.
                     [
                         'filename'          => $original['filename'],
@@ -243,7 +245,8 @@ class ChunkedUploadController extends Controller
                         'validation_status' => $originalValidation['status'],
                     ],
                     $media->currentVersion(),
-                    $upload['upscale']['model'],
+                    $upload['resize']['kind'],
+                    $upload['resize']['model'] ?? null,
                 );
             }
 

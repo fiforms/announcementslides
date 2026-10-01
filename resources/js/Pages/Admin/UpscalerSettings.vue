@@ -176,6 +176,20 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
+                <label class="flex items-start gap-3 border-t border-gray-100 pt-6">
+                    <input v-model="form.downscale_oversized" type="checkbox"
+                        class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                    <span>
+                        <span class="block text-sm font-medium text-gray-900">
+                            Shrink images larger than {{ limits.downscale.max.w }}×{{ limits.downscale.max.h }} (4K)
+                        </span>
+                        <span class="block text-xs text-gray-500">
+                            Oversized images are downscaled in the uploader's browser to fit 4K (no AI, same JPEG quality as above)
+                            and the original is kept so it can be undone. Independent of "Enable upscaling".
+                        </span>
+                    </span>
+                </label>
+
                 <div class="flex items-center gap-3">
                     <button type="submit" :disabled="form.processing"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">

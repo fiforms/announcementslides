@@ -13,7 +13,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
-class UpscaleMediaTest extends TestCase
+class ResizeMediaTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -65,10 +65,10 @@ class UpscaleMediaTest extends TestCase
         Storage::disk('public')->put("slides/{$uuid}.jpg", $bytes);
 
         return $this->actingAs($this->admin)->post(
-            route('admin.slides.media.upscale', [$this->slide, $this->media]),
+            route('admin.slides.media.resize', [$this->slide, $this->media]),
             [
                 'filename' => "{$uuid}.jpg", 'disk_path' => "slides/{$uuid}.jpg", 'file_size' => strlen($bytes),
-                'mime_type' => 'image/jpeg', 'model' => $model,
+                'mime_type' => 'image/jpeg', 'kind' => 'upscale', 'model' => $model,
             ],
         );
     }
@@ -78,13 +78,13 @@ class UpscaleMediaTest extends TestCase
         $this->uploadUpscaled(2560, 1440)->assertSessionHasNoErrors();
 
         $m = $this->media->fresh();
-        $this->assertSame('upscaled', $m->active_variant);
+        $this->assertSame('resized', $m->active_variant);
         $this->assertSame('slides/22222222-2222-2222-2222-222222222222.jpg', $m->disk_path);
         $this->assertSame('image/jpeg', $m->mime_type);
         $this->assertSame(2560, $m->image_width);
         $this->assertNull($m->thumbnail_path);
         $this->assertSame('slides/11111111-1111-1111-1111-111111111111.png', $m->variants['original']['disk_path']);
-        $this->assertSame('esrgan-medium', $m->variants['upscaled']['upscale_model']);
+        $this->assertSame('esrgan-medium', $m->variants['resized']['model']);
         Storage::disk('public')->assertExists('slides/11111111-1111-1111-1111-111111111111.png');
         Queue::assertPushed(GenerateThumbnail::class);
     }
@@ -113,14 +113,14 @@ class UpscaleMediaTest extends TestCase
         $this->assertSame('slides/11111111-1111-1111-1111-111111111111.png', $m->disk_path);
         $this->assertSame(1280, $m->image_width);
         $this->assertSame('thumbs/orig.jpg', $m->thumbnail_path);
-        $this->assertSame('thumbs/up.jpg', $m->variants['upscaled']['thumbnail_path']);
+        $this->assertSame('thumbs/up.jpg', $m->variants['resized']['thumbnail_path']);
 
-        $switch('upscaled')->assertSessionHasNoErrors();
+        $switch('resized')->assertSessionHasNoErrors();
         $m = $this->media->fresh();
-        $this->assertSame('upscaled', $m->active_variant);
+        $this->assertSame('resized', $m->active_variant);
         $this->assertSame(2560, $m->image_width);
         $this->assertSame('thumbs/up.jpg', $m->thumbnail_path);
-        $this->assertSame('esrgan-medium', $m->variants['upscaled']['upscale_model']);
+        $this->assertSame('esrgan-medium', $m->variants['resized']['model']);
         Queue::assertPushed(SyncOverlayThumbnail::class);
     }
 
@@ -135,7 +135,7 @@ class UpscaleMediaTest extends TestCase
 
         $m = $this->media->fresh();
         $this->assertSame('slides/33333333-3333-3333-3333-333333333333.jpg', $m->disk_path);
-        $this->assertSame('esrgan-thick', $m->variants['upscaled']['upscale_model']);
+        $this->assertSame('esrgan-thick', $m->variants['resized']['model']);
         Storage::disk('public')->assertMissing('slides/22222222-2222-2222-2222-222222222222.jpg');
     }
 
@@ -167,32 +167,33 @@ class UpscaleMediaTest extends TestCase
         Storage::disk('public')->put("slides/{$uuid}.jpg", $this->jpeg(2560, 1440));
 
         $this->actingAs($other)->post(
-            route('my-slides.media.upscale', [$this->slide, $this->media]),
-            ['filename' => "{$uuid}.jpg", 'disk_path' => "slides/{$uuid}.jpg", 'file_size' => 10, 'mime_type' => 'image/jpeg', 'model' => 'esrgan-slim']
+            route('my-slides.media.resize', [$this->slide, $this->media]),
+            ['filename' => "{$uuid}.jpg", 'disk_path' => "slides/{$uuid}.jpg", 'file_size' => 10, 'mime_type' => 'image/jpeg', 'kind' => 'upscale', 'model' => 'esrgan-slim']
         )->assertForbidden();
     }
 
     public function test_videos_and_gifs_are_not_upscalable(): void
     {
         $this->media->update(['mime_type' => 'image/gif']);
-        $this->assertFalse($this->media->fresh()->canBeUpscaled());
+        $this->assertFalse($this->media->fresh()->canBeResized());
         $this->media->update(['mime_type' => 'video/mp4']);
-        $this->assertFalse($this->media->fresh()->canBeUpscaled());
+        $this->assertFalse($this->media->fresh()->canBeResized());
     }
 
     public function test_admin_can_save_upscaler_settings_and_others_cannot(): void
     {
         $this->actingAs($this->admin)->patch(route('admin.upscaler.update'), [
-            'enabled' => true, 'auto_on_upload' => false, 'model' => 'esrgan-slim', 'jpeg_quality' => 90, 'patch_size' => 32,
+            'enabled' => true, 'auto_on_upload' => false, 'model' => 'esrgan-slim', 'jpeg_quality' => 90, 'patch_size' => 32, 'downscale_oversized' => false,
         ])->assertSessionHasNoErrors();
 
         $s = UpscalerSettings::all();
         $this->assertSame('esrgan-slim', $s['model']);
         $this->assertFalse($s['auto_on_upload']);
+        $this->assertFalse($s['downscale_oversized']);
         $this->assertSame(90, $s['jpeg_quality']);
 
         $this->actingAs($this->admin)->patch(route('admin.upscaler.update'), [
-            'enabled' => true, 'auto_on_upload' => true, 'model' => 'bogus', 'jpeg_quality' => 90, 'patch_size' => 64,
+            'enabled' => true, 'auto_on_upload' => true, 'model' => 'bogus', 'jpeg_quality' => 90, 'patch_size' => 64, 'downscale_oversized' => true,
         ])->assertSessionHasErrors('model');
 
         $this->actingAs(User::factory()->create(['role' => 'viewer']))
@@ -213,7 +214,7 @@ class UpscaleMediaTest extends TestCase
             'uploads' => [[
                 'filename' => "{$up}.jpg", 'disk_path' => "slides/{$up}.jpg", 'original_filename' => 'poster.jpg',
                 'file_size' => strlen($bytes), 'mime_type' => 'image/jpeg',
-                'upscale' => ['model' => 'esrgan-medium', 'original' => [
+                'resize' => ['kind' => 'upscale', 'model' => 'esrgan-medium', 'original' => [
                     'filename' => "{$orig}.png", 'disk_path' => "slides/{$orig}.png", 'original_filename' => 'poster.png',
                     'file_size' => 1, 'mime_type' => 'image/png',
                 ]],
@@ -221,9 +222,72 @@ class UpscaleMediaTest extends TestCase
         ])->assertOk();
 
         $m = SlideMedia::where('filename', "{$up}.jpg")->firstOrFail();
-        $this->assertSame('upscaled', $m->active_variant);
+        $this->assertSame('resized', $m->active_variant);
         $this->assertSame("slides/{$orig}.png", $m->variants['original']['disk_path']);
         $this->assertSame('poster.png', $m->variants['original']['original_filename']);
         $this->assertSame(2560, $m->image_width);
+    }
+
+    private function uploadResized(string $kind, int $w, int $h, string $uuid = '99999999-9999-9999-9999-999999999999')
+    {
+        $bytes = $this->jpeg($w, $h);
+        Storage::disk('public')->put("slides/{$uuid}.jpg", $bytes);
+
+        return $this->actingAs($this->admin)->post(
+            route('admin.slides.media.resize', [$this->slide, $this->media]),
+            ['filename' => "{$uuid}.jpg", 'disk_path' => "slides/{$uuid}.jpg", 'file_size' => strlen($bytes), 'mime_type' => 'image/jpeg', 'kind' => $kind],
+        );
+    }
+
+    public function test_an_image_larger_than_4k_can_be_downscaled_to_fit_and_undone(): void
+    {
+        $this->media->update(['image_width' => 7680, 'image_height' => 3840]);
+        // 7680x3840 fits 3840x2160 at 0.5 → 3840x1920.
+        $this->uploadResized('downscale', 3840, 1920)->assertSessionHasNoErrors();
+
+        $m = $this->media->fresh();
+        $this->assertSame('resized', $m->active_variant);
+        $this->assertSame('downscale', $m->resizedKind());
+        $this->assertNull($m->variants['resized']['model']);
+        $this->assertSame('slides/11111111-1111-1111-1111-111111111111.png', $m->variants['original']['disk_path']);
+
+        $this->actingAs($this->admin)->post(route('admin.slides.media.version', [$this->slide, $this->media]), ['version' => 'original']);
+        $this->assertSame(7680, $this->media->fresh()->image_width);
+    }
+
+    public function test_downscaling_rejects_an_image_that_is_not_oversized_or_the_wrong_size(): void
+    {
+        // 1280x720 is not larger than 4K.
+        $this->uploadResized('downscale', 640, 360)->assertSessionHasErrors('file');
+        $this->assertNull($this->media->fresh()->active_variant);
+
+        $this->media->update(['image_width' => 7680, 'image_height' => 3840]);
+        $this->uploadResized('downscale', 3000, 1500, '99999999-9999-9999-9999-99999999999a')->assertSessionHasErrors('file');
+    }
+
+    public function test_image_resize_targets(): void
+    {
+        $this->assertSame([2560, 1440], \App\Support\ImageResize::target('upscale', 1280, 720));
+        $this->assertSame([3840, 2160], \App\Support\ImageResize::target('downscale', 7680, 4320));
+        $this->assertSame([3840, 1920], \App\Support\ImageResize::target('downscale', 5760, 2880));
+        $this->assertSame([1620, 2160], \App\Support\ImageResize::target('downscale', 2700, 3600));
+        $this->assertNull(\App\Support\ImageResize::target('downscale', 3840, 2160));
+    }
+
+    public function test_migration_renames_existing_upscaled_variants(): void
+    {
+        $this->media->forceFill([
+            'active_variant' => 'upscaled',
+            'variants' => ['original' => ['disk_path' => 'a'], 'upscaled' => ['disk_path' => 'b', 'upscale_model' => 'esrgan-slim']],
+        ])->save();
+
+        (include database_path('migrations/2026_10_02_000001_rename_upscaled_variant_to_resized.php'))->up();
+
+        $m = $this->media->fresh();
+        $this->assertSame('resized', $m->active_variant);
+        $this->assertArrayNotHasKey('upscaled', $m->variants);
+        $this->assertSame('upscale', $m->variants['resized']['kind']);
+        $this->assertSame('esrgan-slim', $m->variants['resized']['model']);
+        $this->assertArrayNotHasKey('upscale_model', $m->variants['resized']);
     }
 }

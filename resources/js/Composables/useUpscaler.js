@@ -89,6 +89,22 @@ function canvasToBlob(canvas, quality) {
 }
 
 /**
+ * Encodes a canvas as JPEG at `quality` (0–100), stepping the quality down
+ * (to a floor of 80) while the result is over `maxBytes`. Shared with
+ * useImageResize.js. Returns { blob, quality } (quality as actually used).
+ */
+export async function encodeJpeg(canvas, quality, maxBytes = MAX_BYTES) {
+    let q = quality / 100;
+    let blob = await canvasToBlob(canvas, q);
+    while (maxBytes && blob.size > maxBytes && q > MIN_QUALITY) {
+        q = Math.max(MIN_QUALITY, q - 0.03);
+        blob = await canvasToBlob(canvas, q);
+    }
+
+    return { blob, quality: Math.round(q * 100) };
+}
+
+/**
  * Upscales an image Blob/File 2x and returns { blob, width, height, ms, quality }
  * with `blob` a JPEG. Options: model (key), quality (0–100), patchSize,
  * onProgress(0..1), signal (AbortSignal), maxBytes (null to skip the size cap).
@@ -142,14 +158,9 @@ export async function upscaleImage(source, { model, quality = 98, patchSize = 64
         tensor.dispose();
     }
 
-    let q = quality / 100;
-    let blob = await canvasToBlob(output, q);
-    while (maxBytes && blob.size > maxBytes && q > MIN_QUALITY) {
-        q = Math.max(MIN_QUALITY, q - 0.03);
-        blob = await canvasToBlob(output, q);
-    }
+    const { blob, quality: usedQuality } = await encodeJpeg(output, quality, maxBytes);
 
-    return { blob, width: output.width, height: output.height, ms: performance.now() - started, quality: Math.round(q * 100) };
+    return { blob, width: output.width, height: output.height, ms: performance.now() - started, quality: usedQuality };
 }
 
 /** The shared `upscaler` Inertia prop (null when signed out), or null. */

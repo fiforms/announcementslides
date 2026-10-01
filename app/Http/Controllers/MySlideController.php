@@ -133,12 +133,12 @@ class MySlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
-    public function upscaleMedia(Request $request, Slide $slide, SlideMedia $media)
+    public function resizeMedia(Request $request, Slide $slide, SlideMedia $media)
     {
         $this->authorizeOwnership($request, $slide);
-        $this->upscaleMediaForSlide($request, $slide, $media);
+        $this->resizeMediaForSlide($request, $slide, $media);
 
-        return back()->with('success', 'Image upscaled.');
+        return back()->with('success', 'Image resized.');
     }
 
     public function setMediaVersion(Request $request, Slide $slide, SlideMedia $media)

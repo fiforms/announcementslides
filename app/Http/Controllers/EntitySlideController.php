@@ -100,12 +100,12 @@ class EntitySlideController extends Controller
         return back()->with('success', 'Media removed.');
     }
 
-    public function upscaleMedia(Request $request, Entity $entity, Slide $slide, SlideMedia $media)
+    public function resizeMedia(Request $request, Entity $entity, Slide $slide, SlideMedia $media)
     {
         $this->authorizeMediaAction($request, $entity, $slide);
-        $this->upscaleMediaForSlide($request, $slide, $media);
+        $this->resizeMediaForSlide($request, $slide, $media);
 
-        return back()->with('success', 'Image upscaled.');
+        return back()->with('success', 'Image resized.');
     }
 
     public function setMediaVersion(Request $request, Entity $entity, Slide $slide, SlideMedia $media)

@@ -17,6 +17,9 @@ class UpscalerSettings
         'model'          => 'esrgan-medium',
         'jpeg_quality'   => 98,
         'patch_size'     => 64,
+        // Not an upscaler option as such, but it lives on the same page and
+        // shares the JPEG quality: shrink images larger than 4K on upload.
+        'downscale_oversized' => true,
     ];
 
     public const PATCH_SIZES = [32, 64, 96, 128];
@@ -51,6 +54,10 @@ class UpscalerSettings
             'model'          => $s['model'],
             'jpeg_quality'   => $s['jpeg_quality'],
             'patch_size'     => $s['patch_size'],
+            'downscale'      => [
+                'enabled' => $s['downscale_oversized'],
+                'max'     => ['w' => config('slides.downscale.max_width'), 'h' => config('slides.downscale.max_height')],
+            ],
             'min'            => ['w' => $limits['min_width'], 'h' => $limits['min_height']],
             'max'            => ['w' => $limits['max_width'], 'h' => $limits['max_height']],
         ];
