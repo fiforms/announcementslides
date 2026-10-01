@@ -26,6 +26,14 @@ class GenerateThumbnail implements ShouldQueue
         $thumbRelPath = 'thumbs/' . pathinfo($this->media->filename, PATHINFO_FILENAME) . '.jpg';
         $thumbFullPath = $disk->path($thumbRelPath);
 
+        // SVG is an image/* type GD can't decode. It needs no thumbnail of
+        // its own (it renders directly), but an SVG overlay still has to
+        // refresh the slide's flattened composite.
+        if ($this->media->mime_type === 'image/svg+xml') {
+            SyncOverlayThumbnail::dispatch($this->media->slide_id);
+            return;
+        }
+
         if ($this->media->isImage()) {
             $this->generateImageThumbnail($sourcePath, $thumbFullPath);
         } elseif ($this->media->isVideo()) {
@@ -40,15 +48,19 @@ class GenerateThumbnail implements ShouldQueue
 
     private function generateImageThumbnail(string $source, string $dest): void
     {
-        [$origWidth, $origHeight, $type] = getimagesize($source);
+        $info = @getimagesize($source);
+        if (! $info || ! $info[0] || ! $info[1]) {
+            return; // not a decodable raster image — leave it without a thumbnail
+        }
+        [$origWidth, $origHeight, $type] = $info;
 
         $thumbWidth  = 600;
         $thumbHeight = (int) ($origHeight * $thumbWidth / $origWidth);
 
         $src = match ($type) {
-            IMAGETYPE_JPEG => imagecreatefromjpeg($source),
-            IMAGETYPE_PNG  => imagecreatefrompng($source),
-            IMAGETYPE_WEBP => imagecreatefromwebp($source),
+            IMAGETYPE_JPEG => @imagecreatefromjpeg($source),
+            IMAGETYPE_PNG  => @imagecreatefrompng($source),
+            IMAGETYPE_WEBP => @imagecreatefromwebp($source),
             default        => null,
         };
 

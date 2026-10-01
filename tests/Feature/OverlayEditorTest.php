@@ -133,7 +133,7 @@ class OverlayEditorTest extends TestCase
 
     public function test_no_overlay_returns_nulls(): void
     {
-        $this->show()->assertOk()->assertExactJson(['source' => null, 'overlay' => null]);
+        $this->show()->assertOk()->assertExactJson(['source' => null, 'overlay' => null, 'widgets' => []]);
     }
 
     public function test_other_users_cannot_access_the_overlay(): void

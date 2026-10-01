@@ -73,7 +73,7 @@ function removeMedia(media) {
         <ul class="divide-y divide-gray-100 rounded-lg border border-gray-200">
             <li v-for="media in slide.media" :key="media.id"
                 class="flex items-center gap-3 px-3 py-2">
-                <img v-if="media.thumbnail_url" :src="media.thumbnail_url" class="h-10 w-16 rounded object-cover bg-slate-100" />
+                <img v-if="media.thumbnail_url || media.mime_type === 'image/svg+xml'" :src="media.thumbnail_url || media.file_url" class="h-10 w-16 rounded object-cover bg-slate-100" />
                 <div v-else class="h-10 w-16 rounded bg-slate-100 flex items-center justify-center text-[10px] text-gray-400">
                     {{ media.mime_type?.split('/')?.[1] ?? 'file' }}
                 </div>
