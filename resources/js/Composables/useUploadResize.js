@@ -3,14 +3,15 @@ import { useImageValidation } from '@/Composables/useImageValidation.js';
 import {
     upscaleImage, upscaleIneligibility, useUpscalerSettings,
 } from '@/Composables/useUpscaler.js';
-import { downscaleImage, downscaledSize, exceedsDownscaleLimit } from '@/Composables/useImageResize.js';
+import { downscaleImage, downscaledSize, exceedsDownscaleLimit, exceedsFileSizeLimit } from '@/Composables/useImageResize.js';
 
 const RESIZABLE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /**
  * Browser-side resizing for an upload form's selected files: images beyond 4K
- * are shrunk to fit it, small ones are AI-upscaled 2x (both per the admin
- * settings — see useUpscaler.js / useImageResize.js). The form calls:
+ * are shrunk to fit it, small ones are AI-upscaled 2x, and files over the size
+ * limit are re-encoded as JPEG (all per the admin settings — see
+ * useUpscaler.js / useImageResize.js). The form calls:
  *
  *   setFiles(files, validations)  when files are chosen (validations from
  *                                 useImageValidation, parallel to files)
@@ -37,16 +38,28 @@ export function useUploadResize() {
         const none = { kind: null, eligible: false, reason: null, enabled: false };
         if (!settings || !RESIZABLE_TYPES.includes(file.type) || !validation?.width) return none;
 
-        const base = { status: null, progress: 0, note: null };
+        const base = { status: null, progress: 0, note: null, fileSize: file.size };
 
         // Beyond 4K: shrink it (on by default; the checkbox lets them keep it).
         if (exceedsDownscaleLimit(validation.width, validation.height, settings)) {
             return { ...base, kind: 'downscale', eligible: true, reason: null, enabled: true };
         }
 
-        if (!settings.enabled) return none;
-        const reason = upscaleIneligibility(validation.width, validation.height, settings);
-        return { ...base, kind: 'upscale', eligible: !reason, reason, enabled: !reason && settings.auto_on_upload };
+        let reason = 'disabled';
+        if (settings.enabled) {
+            reason = upscaleIneligibility(validation.width, validation.height, settings);
+            if (!reason) {
+                return { ...base, kind: 'upscale', eligible: true, reason: null, enabled: settings.auto_on_upload };
+            }
+        }
+
+        // Right size but too heavy (e.g. a big PNG): re-encode as JPEG.
+        if (exceedsFileSizeLimit(file.size, settings)) {
+            return { ...base, kind: 'compress', eligible: true, reason: null, enabled: true };
+        }
+
+        // Too small to upscale: say so (only that reason is shown).
+        return settings.enabled ? { ...base, kind: 'upscale', eligible: false, reason, enabled: false } : none;
     }
 
     function setFiles(files, fileValidations) {
@@ -70,6 +83,7 @@ export function useUploadResize() {
         const kind = infos.value[i]?.kind;
         if (!v?.width || !v?.height) return null;
         if (kind === 'upscale') return { width: v.width * 2, height: v.height * 2 };
+        if (kind === 'compress') return { width: v.width, height: v.height };
         if (kind === 'downscale') return downscaledSize(v.width, v.height, settings.downscale.max);
         return null;
     }
@@ -82,7 +96,10 @@ export function useUploadResize() {
         const size = infos.value[i]?.enabled ? sizeFor(i) : null;
         if (!size) return v.issues;
 
-        const sizeIssues = v.issues.filter(m => !m.startsWith('Low resolution') && !m.startsWith('High resolution') && !m.startsWith('Aspect ratio'));
+        // A resized file is re-encoded under the size limit too, so the original's
+        // "too large" doesn't apply either.
+        const sizeIssues = v.issues.filter(m => !m.startsWith('Low resolution') && !m.startsWith('High resolution')
+            && !m.startsWith('Aspect ratio') && !m.startsWith('File too large'));
         return [...validateDimensions(size.width, size.height), ...sizeIssues];
     }
 
@@ -119,14 +136,24 @@ export function useUploadResize() {
                             onProgress: (p) => { info.progress = Math.round(p * 100); },
                             signal: abort.signal,
                         })
-                        : await downscaleImage(file, settings.downscale.max, { quality: settings.jpeg_quality });
+                        : await downscaleImage(file, info.kind === 'downscale' ? settings.downscale.max : null, { quality: settings.jpeg_quality });
+
+                    // Re-encoding that doesn't help (an already-tight JPEG) isn't worth keeping.
+                    if (info.kind === 'compress' && result.blob.size >= file.size) {
+                        items.push(file);
+                        info.status = 'done';
+                        info.note = 'Re-encoding would not make this file smaller, so the original will be uploaded.';
+                        continue;
+                    }
 
                     items.push({
                         file: new File([result.blob], file.name.replace(/\.[^/.]+$/, '') + '.jpg', { type: 'image/jpeg' }),
                         resize: { kind: info.kind, model: isUpscale ? settings.model : null, original: file },
                     });
                     info.status = 'done';
-                    info.note = `${isUpscale ? 'Upscaled' : 'Downscaled'} to ${result.width}×${result.height}.`;
+                    info.note = info.kind === 'compress'
+                        ? `Converted to JPEG (${(file.size / 1048576).toFixed(1)} MB → ${(result.blob.size / 1048576).toFixed(1)} MB).`
+                        : `${isUpscale ? 'Upscaled' : 'Downscaled'} to ${result.width}×${result.height}.`;
                 } catch (err) {
                     if (err.code === 'aborted') {
                         info.status = null;

@@ -3,8 +3,9 @@
 namespace App\Support;
 
 /**
- * The size rules for resizing a slide image in the browser: an AI upscale
- * doubles it, a downscale fits it within the 4K limit (aspect ratio kept).
+ * The rules for resizing a slide image in the browser: an AI upscale doubles
+ * it, a downscale fits it within the 4K limit (aspect ratio kept), and a
+ * compress re-encodes a too-heavy (over 5 MB) file as JPEG at the same size.
  * The browser does the work (see useUpscaler.js / useImageResize.js); the
  * server uses this only to check that an uploaded result is what was asked.
  */
@@ -12,10 +13,11 @@ class ImageResize
 {
     public const UPSCALE = 'upscale';
     public const DOWNSCALE = 'downscale';
+    public const COMPRESS = 'compress';
 
     public static function kinds(): array
     {
-        return [self::UPSCALE, self::DOWNSCALE];
+        return [self::UPSCALE, self::DOWNSCALE, self::COMPRESS];
     }
 
     public static function exceedsLimit(int $w, int $h): bool
@@ -28,6 +30,10 @@ class ImageResize
     {
         if ($kind === self::UPSCALE) {
             return [$w * 2, $h * 2];
+        }
+
+        if ($kind === self::COMPRESS) {
+            return [$w, $h];
         }
 
         if (!self::exceedsLimit($w, $h)) {

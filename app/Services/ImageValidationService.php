@@ -7,7 +7,7 @@ class ImageValidationService
     private const MIN_RESOLUTION_MP = 2;
     private const MAX_RESOLUTION_MP = 8.5;
     private const MIN_FILE_SIZE = 80 * 1024;
-    private const MAX_FILE_SIZE = 5 * 1024 * 1024;
+    public const MAX_FILE_SIZE = 5 * 1024 * 1024;
     private const TARGET_ASPECT_RATIO = 16 / 9;
     private const ASPECT_RATIO_TOLERANCE = 0.02;
 

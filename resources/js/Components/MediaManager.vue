@@ -3,7 +3,7 @@ import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload';
 import { upscaleImage, upscaleIneligibility, ineligibleMessage, useUpscalerSettings } from '@/Composables/useUpscaler';
-import { downscaleImage, exceedsDownscaleLimit } from '@/Composables/useImageResize';
+import { downscaleImage, exceedsDownscaleLimit, exceedsFileSizeLimit } from '@/Composables/useImageResize';
 
 const props = defineProps({
     slide: { type: Object, required: true },
@@ -71,21 +71,26 @@ async function onFileSelected(event) {
     if (fileInput.value) fileInput.value.value = '';
 }
 
-// What resizing, if any, applies to this image at its current size: shrink it
-// if it's beyond 4K, AI-upscale it if it's small enough. Returns
-// { kind } when it can be done, { kind, blocked: 'reason' } when it's
-// the right kind but not currently possible, or null.
+// What resizing, if any, applies to this image as it is now: shrink it if it's
+// beyond 4K, AI-upscale it if it's small enough, or re-encode it as JPEG if
+// it's over the file-size limit. Returns { kind } when it can be done,
+// { kind, blocked: 'reason' } when it's the right kind but not currently
+// possible, or null.
 function resizeOptionFor(media) {
     if (!upscaler || !media.can_resize || media.active_variant === 'resized') return null;
 
     if (exceedsDownscaleLimit(media.image_width, media.image_height, upscaler)) {
         return { kind: 'downscale' };
     }
-    if (!upscaler.enabled) return null;
 
-    const blocked = upscaleIneligibility(media.image_width, media.image_height, upscaler);
-    // Between the upscale and 4K limits there's nothing to offer at all.
-    return blocked === 'too-large' ? null : { kind: 'upscale', blocked };
+    if (upscaler.enabled) {
+        const blocked = upscaleIneligibility(media.image_width, media.image_height, upscaler);
+        if (!blocked || blocked === 'too-small') return { kind: 'upscale', blocked };
+    }
+
+    if (exceedsFileSizeLimit(media.file_size, upscaler)) return { kind: 'compress' };
+
+    return null;
 }
 
 async function resizeMedia(media) {
@@ -110,7 +115,11 @@ async function resizeMedia(media) {
                 onProgress: (p) => { state.progress = Math.round(p * 100); },
                 signal: resizeAbort.signal,
             })
-            : await downscaleImage(source, upscaler.downscale.max, { quality: upscaler.jpeg_quality });
+            : await downscaleImage(source, option.kind === 'downscale' ? upscaler.downscale.max : null, { quality: upscaler.jpeg_quality });
+
+        if (option.kind === 'compress' && result.blob.size >= media.file_size) {
+            throw new Error('Re-encoding as JPEG would not make this file smaller.');
+        }
 
         state.progress = 100;
         const name = (media.original_filename ?? 'slide').replace(/\.[^/.]+$/, '') + '.jpg';
@@ -175,8 +184,8 @@ function removeMedia(media) {
                         <template v-if="media.image_width"> · {{ media.image_width }}×{{ media.image_height }}</template>
                         <span v-if="media.active_variant === 'resized'"
                             class="ml-1 rounded px-1.5 py-0.5 font-medium"
-                            :class="media.resized_kind === 'downscale' ? 'bg-sky-100 text-sky-700' : 'bg-purple-100 text-purple-700'">
-                            {{ media.resized_kind === 'downscale' ? 'Downscaled to 4K' : 'AI upscaled' }}
+                            :class="media.resized_kind === 'upscale' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700'">
+                            {{ { downscale: 'Downscaled to 4K', compress: 'Converted to JPEG', upscale: 'AI upscaled' }[media.resized_kind] }}
                         </span>
                     </p>
                     <div v-if="resizing[media.id]" class="mt-1">
@@ -187,7 +196,7 @@ function removeMedia(media) {
                         </template>
                         <template v-else>
                             <div class="flex justify-between text-xs text-gray-500">
-                                <span>{{ resizing[media.id].progress >= 100 ? 'Uploading…' : resizing[media.id].kind === 'upscale' ? `Upscaling… ${resizing[media.id].progress}%` : 'Downscaling…' }}</span>
+                                <span>{{ resizing[media.id].progress >= 100 ? 'Uploading…' : resizing[media.id].kind === 'upscale' ? `Upscaling… ${resizing[media.id].progress}%` : resizing[media.id].kind === 'compress' ? 'Converting…' : 'Downscaling…' }}</span>
                                 <button v-if="resizing[media.id].kind === 'upscale' && resizing[media.id].progress < 100" type="button" class="text-red-600 hover:underline" @click="cancelResize">Cancel</button>
                             </div>
                             <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
@@ -213,11 +222,13 @@ function removeMedia(media) {
                             :disabled="!!resizeOptionFor(media).blocked || Object.keys(resizing).length > 0"
                             :title="resizeOptionFor(media).blocked
                                 ? ineligibleMessage(resizeOptionFor(media).blocked, upscaler)
-                                : resizeOptionFor(media).kind === 'upscale'
-                                    ? 'Double the resolution with AI (the original is kept)'
-                                    : 'Shrink to fit 4K (the original is kept)'"
+                                : { upscale: 'Double the resolution with AI (the original is kept)',
+                                    downscale: 'Shrink to fit 4K (the original is kept)',
+                                    compress: 'Re-encode as JPEG to get under the file-size limit (the original is kept)' }[resizeOptionFor(media).kind]"
                             class="rounded-lg border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:cursor-not-allowed">
-                            {{ resizeOptionFor(media).kind === 'upscale' ? (media.has_resized ? 'Upscale again' : 'Upscale 2×') : (media.has_resized ? 'Downscale again' : 'Downscale to 4K') }}
+                            {{ { upscale: media.has_resized ? 'Upscale again' : 'Upscale 2×',
+                                downscale: media.has_resized ? 'Downscale again' : 'Downscale to 4K',
+                                compress: media.has_resized ? 'Compress again' : 'Compress to JPEG' }[resizeOptionFor(media).kind] }}
                         </button>
                     </template>
                 </template>

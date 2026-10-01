@@ -22,11 +22,17 @@ defineEmits(['update:enabled', 'cancel']);
                 class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
                 @change="$emit('update:enabled', $event.target.checked)" />
             <span>
-                {{ info.kind === 'upscale' ? 'Upscale 2× with AI' : 'Downscale to fit 4K' }}
-                <span v-if="size && validation" class="text-gray-400">
-                    ({{ validation.width }}×{{ validation.height }} → {{ size.width }}×{{ size.height }};
-                    the original is kept)
-                </span>
+                <template v-if="info.kind === 'compress'">
+                    Convert to JPEG to reduce the file size
+                    <span class="text-gray-400">({{ (info.fileSize / 1048576).toFixed(1) }} MB; the original is kept)</span>
+                </template>
+                <template v-else>
+                    {{ info.kind === 'upscale' ? 'Upscale 2× with AI' : 'Downscale to fit 4K' }}
+                    <span v-if="size && validation" class="text-gray-400">
+                        ({{ validation.width }}×{{ validation.height }} → {{ size.width }}×{{ size.height }};
+                        the original is kept)
+                    </span>
+                </template>
             </span>
         </label>
         <p v-else-if="info.reason === 'too-small'" class="text-gray-400">
@@ -44,7 +50,7 @@ defineEmits(['update:enabled', 'cancel']);
                         :style="{ width: info.progress + '%' }" />
                 </div>
             </template>
-            <p v-else class="text-gray-500">Downscaling…</p>
+            <p v-else class="text-gray-500">{{ info.kind === 'compress' ? 'Converting…' : 'Downscaling…' }}</p>
         </div>
         <p v-else-if="info.note" :class="info.status === 'failed' ? 'text-amber-700' : 'text-green-700'">
             {{ info.note }}

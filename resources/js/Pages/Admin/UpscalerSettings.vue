@@ -181,11 +181,12 @@ onBeforeUnmount(() => {
                         class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
                     <span>
                         <span class="block text-sm font-medium text-gray-900">
-                            Shrink images larger than {{ limits.downscale.max.w }}×{{ limits.downscale.max.h }} (4K)
+                            Shrink oversized images: larger than {{ limits.downscale.max.w }}×{{ limits.downscale.max.h }} (4K) or over 5 MB
                         </span>
                         <span class="block text-xs text-gray-500">
-                            Oversized images are downscaled in the uploader's browser to fit 4K (no AI, same JPEG quality as above)
-                            and the original is kept so it can be undone. Independent of "Enable upscaling".
+                            Images beyond 4K are downscaled to fit it, and files over 5 MB (such as a large PNG) are
+                            re-encoded as JPEG, both in the uploader's browser (no AI, same JPEG quality as above).
+                            The original is kept so it can be undone. Independent of "Enable upscaling".
                         </span>
                     </span>
                 </label>

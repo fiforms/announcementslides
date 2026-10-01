@@ -94,8 +94,8 @@ trait ManagesSlideMedia
 
     /**
      * Makes an in-browser resize of a slide image its active version: an AI
-     * 2x upscale of a small image, or a downscale of one larger than 4K
-     * (`kind`, see ImageResize). The browser uploads the result through the
+     * 2x upscale of a small image, a downscale of one larger than 4K, or a
+     * JPEG re-encode of one over the file-size limit (`kind`, see ImageResize). The browser uploads the result through the
      * chunk endpoint (as for storeMediaForSlide) and names it here; the file
      * as it was stays on disk as the 'original' variant so the resize can be
      * undone. Any earlier undone resize is replaced.
@@ -151,11 +151,17 @@ trait ManagesSlideMedia
         if (!$target) {
             $reject($kind === ImageResize::DOWNSCALE ? 'This image is not larger than 4K.' : 'The image could not be read.');
         }
+        if ($kind === ImageResize::COMPRESS && $media->file_size <= ImageValidationService::MAX_FILE_SIZE) {
+            $reject('This file is not over the size limit.');
+        }
+        if ($kind === ImageResize::COMPRESS && $disk->size($path) >= $media->file_size) {
+            $reject('The compressed file is not smaller than the original.');
+        }
         if (!$validation['width']
             || abs($validation['width'] - $target[0]) > 2 || abs($validation['height'] - $target[1]) > 2) {
-            $reject($kind === ImageResize::DOWNSCALE
-                ? 'The downscaled image is not the expected size.'
-                : 'The upscaled image is not twice the size of the current one.');
+            $reject($kind === ImageResize::UPSCALE
+                ? 'The upscaled image is not twice the size of the current one.'
+                : 'The resized image is not the expected size.');
         }
 
         $original = $media->currentVersion();

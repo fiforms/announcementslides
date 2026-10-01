@@ -272,6 +272,7 @@ class ResizeMediaTest extends TestCase
         $this->assertSame([3840, 1920], \App\Support\ImageResize::target('downscale', 5760, 2880));
         $this->assertSame([1620, 2160], \App\Support\ImageResize::target('downscale', 2700, 3600));
         $this->assertNull(\App\Support\ImageResize::target('downscale', 3840, 2160));
+        $this->assertSame([1920, 1080], \App\Support\ImageResize::target('compress', 1920, 1080));
     }
 
     public function test_migration_renames_existing_upscaled_variants(): void
@@ -289,5 +290,48 @@ class ResizeMediaTest extends TestCase
         $this->assertSame('upscale', $m->variants['resized']['kind']);
         $this->assertSame('esrgan-slim', $m->variants['resized']['model']);
         $this->assertArrayNotHasKey('upscale_model', $m->variants['resized']);
+    }
+
+    public function test_an_overweight_png_can_be_compressed_to_a_smaller_jpeg_and_undone(): void
+    {
+        $this->media->update(['image_width' => 1920, 'image_height' => 1080, 'file_size' => 8 * 1024 * 1024]);
+        // The stored file is tiny, so a same-size JPEG is smaller than the claimed 8 MB.
+        $this->uploadResized('compress', 1920, 1080)->assertSessionHasNoErrors();
+
+        $m = $this->media->fresh();
+        $this->assertSame('resized', $m->active_variant);
+        $this->assertSame('compress', $m->resizedKind());
+        $this->assertSame('image/jpeg', $m->mime_type);
+        $this->assertSame(1920, $m->image_width);
+        $this->assertSame(8 * 1024 * 1024, $m->variants['original']['file_size']);
+
+        $this->actingAs($this->admin)->post(route('admin.slides.media.version', [$this->slide, $this->media]), ['version' => 'original']);
+        $this->assertSame('image/png', $this->media->fresh()->mime_type);
+    }
+
+    public function test_compress_is_refused_for_a_file_under_the_limit(): void
+    {
+        // The 1280x720 PNG is nowhere near 5 MB.
+        $this->uploadResized('compress', 1280, 720)->assertSessionHasErrors('file');
+
+        $this->assertNull($this->media->fresh()->active_variant);
+        Storage::disk('public')->assertMissing('slides/99999999-9999-9999-9999-999999999999.jpg');
+    }
+
+    public function test_compress_is_refused_when_the_result_is_not_smaller(): void
+    {
+        $this->media->update(['file_size' => 5 * 1024 * 1024 + 1]);
+
+        // A valid JPEG padded past the claimed original size.
+        $uuid = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+        $bytes = $this->jpeg(1280, 720) . str_repeat("\0", 5 * 1024 * 1024 + 100);
+        Storage::disk('public')->put("slides/{$uuid}.jpg", $bytes);
+
+        $this->actingAs($this->admin)->post(
+            route('admin.slides.media.resize', [$this->slide, $this->media]),
+            ['filename' => "{$uuid}.jpg", 'disk_path' => "slides/{$uuid}.jpg", 'file_size' => strlen($bytes), 'mime_type' => 'image/jpeg', 'kind' => 'compress'],
+        )->assertSessionHasErrors('file');
+
+        $this->assertNull($this->media->fresh()->active_variant);
     }
 }

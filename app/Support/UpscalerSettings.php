@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\AppSetting;
+use App\Services\ImageValidationService;
 
 /**
  * The admin-editable options for in-browser AI upscaling, stored in
@@ -18,7 +19,8 @@ class UpscalerSettings
         'jpeg_quality'   => 98,
         'patch_size'     => 64,
         // Not an upscaler option as such, but it lives on the same page and
-        // shares the JPEG quality: shrink images larger than 4K on upload.
+        // shares the JPEG quality: shrink images larger than 4K, and
+        // re-encode files over the size limit, on upload.
         'downscale_oversized' => true,
     ];
 
@@ -55,7 +57,8 @@ class UpscalerSettings
             'jpeg_quality'   => $s['jpeg_quality'],
             'patch_size'     => $s['patch_size'],
             'downscale'      => [
-                'enabled' => $s['downscale_oversized'],
+                'enabled'   => $s['downscale_oversized'],
+                'max_bytes' => ImageValidationService::MAX_FILE_SIZE,
                 'max'     => ['w' => config('slides.downscale.max_width'), 'h' => config('slides.downscale.max_height')],
             ],
             'min'            => ['w' => $limits['min_width'], 'h' => $limits['min_height']],

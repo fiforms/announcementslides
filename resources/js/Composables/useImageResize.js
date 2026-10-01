@@ -1,15 +1,23 @@
 import { encodeJpeg } from '@/Composables/useUpscaler.js';
 
-// Downscaling images larger than 4K, in the browser. No AI involved: the
-// image is drawn onto a hidden canvas at the smaller size and encoded as a
-// JPEG, which the caller uploads in place of the original (the server keeps
-// the original — see SlideMedia variants). The limit is the shared
-// `upscaler` prop's `downscale.max` ({ w, h }), from config('slides.downscale').
+// Downscaling images larger than 4K, and re-encoding files over the size
+// limit, in the browser. No AI involved: the image is drawn onto a hidden
+// canvas (at the smaller size, or unchanged) and encoded as a JPEG, which the
+// caller uploads in place of the original (the server keeps the original —
+// see SlideMedia variants). The limits are the shared `upscaler` prop's
+// `downscale.max` ({ w, h }) and `downscale.max_bytes`, from the server's
+// config('slides.downscale') and ImageValidationService.
 
 /** Whether an image of this size is over the limit and should be shrunk. */
 export function exceedsDownscaleLimit(width, height, settings) {
     const d = settings?.downscale;
     return !!(d?.enabled && width && height && (width > d.max.w || height > d.max.h));
+}
+
+/** Whether a file is over the size limit (and, if it's an image, worth re-encoding). */
+export function exceedsFileSizeLimit(bytes, settings) {
+    const d = settings?.downscale;
+    return !!(d?.enabled && bytes > d.max_bytes);
 }
 
 /**
@@ -22,7 +30,8 @@ export function downscaledSize(width, height, max) {
 }
 
 /**
- * Shrinks an image Blob/File to fit within `max` ({ w, h }) and returns
+ * Shrinks an image Blob/File to fit within `max` ({ w, h }) — or, with a null
+ * `max`, keeps its size and only re-encodes it — and returns
  * { blob, width, height, quality } with `blob` a JPEG. Transparent areas are
  * flattened onto white (JPEG has no alpha). Options: quality (0–100),
  * maxBytes (null to skip the size cap, see encodeJpeg).
@@ -35,7 +44,7 @@ export async function downscaleImage(source, max, { quality = 98, maxBytes } = {
         throw new Error('The image could not be read.');
     }
 
-    const { width, height } = downscaledSize(bitmap.width, bitmap.height, max);
+    const { width, height } = max ? downscaledSize(bitmap.width, bitmap.height, max) : bitmap;
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
