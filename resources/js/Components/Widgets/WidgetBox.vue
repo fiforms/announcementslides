@@ -1,5 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import { mountWidget } from '@/Composables/widgets/widgetHost.js';
 
@@ -14,11 +15,14 @@ const props = defineProps({
 });
 
 const { locale } = useI18n();
+const page = usePage();
 const el = ref(null);
 let handle = null;
 
 onMounted(() => {
-    handle = mountWidget(el.value, props.placement, props.entryUrl, { mode: props.mode, locale: locale.value });
+    handle = mountWidget(el.value, props.placement, props.entryUrl, {
+        mode: props.mode, locale: locale.value, location: page.props.widgetLocation ?? null,
+    });
 });
 onBeforeUnmount(() => handle?.dispose());
 </script>

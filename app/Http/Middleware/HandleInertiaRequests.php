@@ -2,7 +2,9 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Widget;
 use App\Support\UpscalerSettings;
+use App\Support\WidgetLocation;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -41,6 +43,9 @@ class HandleInertiaRequests extends Middleware
             ],
             // Options for the in-browser upscaler (uploads and the media manager).
             'upscaler' => fn () => $request->user() ? UpscalerSettings::forClient() : null,
+            // Overlay widgets' api.location (see WidgetLocation) — only
+            // looked up when any widget is installed.
+            'widgetLocation' => fn () => Widget::enabledBySlug() ? WidgetLocation::forRequest($request) : null,
             'flash' => [
                 'success' => session('success'),
                 'error'   => session('error'),

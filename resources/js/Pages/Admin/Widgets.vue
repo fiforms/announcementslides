@@ -8,7 +8,26 @@ import AdminLayout from '@/Layouts/AdminLayout.vue';
 // decision — the page puts what it can reach (its upstream hosts) up front.
 const props = defineProps({
     widgets: { type: Array, default: () => [] },
+    defaultLocation: { type: Object, default: null },
 });
+
+// Site-wide fallback for widgets' api.location (App\Support\WidgetLocation).
+const locationForm = useForm({
+    name: props.defaultLocation?.name ?? '',
+    latitude: props.defaultLocation?.latitude ?? '',
+    longitude: props.defaultLocation?.longitude ?? '',
+});
+
+function saveLocation() {
+    locationForm.patch(route('admin.widgets.location'), { preserveScroll: true });
+}
+
+function clearLocation() {
+    locationForm.name = '';
+    locationForm.latitude = '';
+    locationForm.longitude = '';
+    saveLocation();
+}
 
 const upload = useForm({ package: null });
 const fileInput = ref(null);
@@ -92,6 +111,46 @@ function formatTime(seconds) {
                 </form>
                 <ul v-if="upload.errors.package" class="list-disc space-y-0.5 pl-5 text-sm text-red-600">
                     <li v-for="(msg, i) in [].concat(upload.errors.package)" :key="i">{{ msg }}</li>
+                </ul>
+            </div>
+
+            <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
+                <h2 class="text-lg font-semibold text-gray-900">Default location</h2>
+                <p class="text-sm text-gray-600">
+                    Widgets that follow each screen's location (for example a Weather widget with its ZIP code left
+                    blank) use the screen's church's location. Screens whose church has no coordinates, and pages with no
+                    church, use this location instead. Leave it empty to show nothing there.
+                </p>
+                <form class="grid gap-3 sm:grid-cols-[2fr_1fr_1fr_auto]" @submit.prevent="saveLocation">
+                    <label class="block text-sm">
+                        <span class="font-medium text-gray-700">Place name</span>
+                        <input v-model="locationForm.name" type="text" maxlength="80" placeholder="City, State"
+                            class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm" />
+                    </label>
+                    <label class="block text-sm">
+                        <span class="font-medium text-gray-700">Latitude</span>
+                        <input v-model="locationForm.latitude" type="number" step="any" min="-90" max="90" placeholder="e.g. 40.7128"
+                            class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm" />
+                    </label>
+                    <label class="block text-sm">
+                        <span class="font-medium text-gray-700">Longitude</span>
+                        <input v-model="locationForm.longitude" type="number" step="any" min="-180" max="180" placeholder="e.g. -74.0060"
+                            class="mt-1 block w-full rounded-lg border-gray-300 text-sm shadow-sm" />
+                    </label>
+                    <div class="flex items-end gap-2">
+                        <button type="submit" :disabled="locationForm.processing"
+                            class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                            Save
+                        </button>
+                        <button v-if="defaultLocation" type="button" :disabled="locationForm.processing"
+                            class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            @click="clearLocation">
+                            Clear
+                        </button>
+                    </div>
+                </form>
+                <ul v-if="Object.keys(locationForm.errors).length" class="list-disc pl-5 text-sm text-red-600">
+                    <li v-for="(msg, field) in locationForm.errors" :key="field">{{ msg }}</li>
                 </ul>
             </div>
 

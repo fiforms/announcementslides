@@ -9,6 +9,7 @@ use App\Services\Widgets\UrlPolicy;
 use App\Services\Widgets\WidgetDataService;
 use App\Services\Widgets\WidgetInstaller;
 use App\Services\Widgets\WidgetPackageException;
+use App\Support\WidgetLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -29,6 +30,7 @@ class WidgetController extends Controller
         $usage = $this->usageCounts();
 
         return Inertia::render('Admin/Widgets', [
+            'defaultLocation' => WidgetLocation::default(),
             'widgets' => Widget::with('installer')->orderBy('name')->get()->map(fn (Widget $w) => [
                 'id'          => $w->id,
                 'slug'        => $w->slug,
@@ -139,6 +141,27 @@ class WidgetController extends Controller
         $widget->save();
 
         return back()->with('success', "Saved {$widget->name}.");
+    }
+
+    /**
+     * The site-wide fallback for widgets' api.location, used by screens
+     * whose church has no coordinates (and by pages with no church).
+     */
+    public function updateLocation(Request $request): RedirectResponse
+    {
+        $data = $request->validate([
+            'name'      => 'nullable|required_with:latitude,longitude|string|max:80',
+            'latitude'  => 'nullable|required_with:name|numeric|between:-90,90',
+            'longitude' => 'nullable|required_with:name|numeric|between:-180,180',
+        ]);
+
+        WidgetLocation::saveDefault(empty($data['name']) ? null : [
+            'name'      => trim($data['name']),
+            'latitude'  => round((float) $data['latitude'], 4),
+            'longitude' => round((float) $data['longitude'], 4),
+        ]);
+
+        return back()->with('success', empty($data['name']) ? 'Default location cleared.' : 'Default location saved.');
     }
 
     public function destroy(Widget $widget, WidgetInstaller $installer): RedirectResponse

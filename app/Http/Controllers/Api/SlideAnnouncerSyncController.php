@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Services\Widgets\OverlayWidgets;
+use App\Support\WidgetLocation;
 use App\Support\SlideAnnouncerVideoReceiver;
 use Illuminate\Http\Request;
 
@@ -66,6 +67,9 @@ class SlideAnnouncerSyncController extends Controller
             'widgets' => app(OverlayWidgets::class)->bundlesFor(
                 $shows->flatMap(fn ($show) => $show['slides']->flatMap(fn ($slide) => $slide['widgets']))->all()
             ),
+            // This screen's location for widgets' api.location — its
+            // church's, else the site default (App\Support\WidgetLocation).
+            'location' => WidgetLocation::for($device->entity),
             'settings' => $device->settings ?? [],
             // Same push as the heartbeat response's — carried here too so a
             // web edit reaches the device within one sync (~60s) rather

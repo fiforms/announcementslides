@@ -178,6 +178,7 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
 
     // ── Overlay widgets (admin-installed code packages) ───────────────────
     Route::get('/widgets', [AdminWidgetController::class, 'index'])->name('widgets.index');
+    Route::patch('/widgets/location', [AdminWidgetController::class, 'updateLocation'])->name('widgets.location');
     Route::post('/widgets', [AdminWidgetController::class, 'store'])->name('widgets.store');
     Route::patch('/widgets/{widget}', [AdminWidgetController::class, 'update'])->name('widgets.update');
     Route::delete('/widgets/{widget}', [AdminWidgetController::class, 'destroy'])->name('widgets.destroy');

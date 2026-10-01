@@ -43,7 +43,7 @@ function storageFor(prefix) {
 // `placement` is a saved placement from the server (live mode: has
 // data_url) or an unsaved editor element (editor mode: fetches go through
 // the preview endpoint with its current params).
-export function createApi(placement, { mode, locale }) {
+export function createApi(placement, { mode, locale, location = null }) {
     // Runtime args (e.g. a forecast's lat/lon) travel as ?args[name]=value;
     // the server checks them against the endpoint's declared `args`.
     function withArgs(url, args) {
@@ -80,6 +80,10 @@ export function createApi(placement, { mode, locale }) {
         // 'invalid_args', 'rate_limited', 'upstream_status').
         fetch: mode === 'editor' ? fetchPreview : fetchLive,
         storage: storageFor(`as-widget:${placement.widget}:${placement.id}:`),
+        // Where the screen is: { name, latitude, longitude, source } — the
+        // page's church, else the site default (App\Support\WidgetLocation),
+        // else null. `source` is 'entity' or 'default'.
+        location: location ? Object.freeze({ ...location }) : null,
     });
 }
 
