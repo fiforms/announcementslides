@@ -6,7 +6,10 @@ import SlideCard from '@/Components/SlideCard.vue';
 import DropZone from '@/Components/DropZone.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
+import ResizeOption from '@/Components/ResizeOption.vue';
 import { useImageValidation } from '@/Composables/useImageValidation.js';
+import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
+import { useUploadResize } from '@/Composables/useUploadResize.js';
 
 const props = defineProps({
     current:   { type: Array, default: () => [] },
@@ -24,11 +27,10 @@ const newShowName = ref('');
 
 // ── Upload form ────────────────────────────────────────────────────────────────
 
-// Must stay below upload_max_filesize in php.ini (default 2 MB).
-// .htaccess raises it to 8 MB for Apache; for nginx/artisan-serve, set upload_max_filesize=8M.
-const CHUNK_SIZE = 1.5 * 1024 * 1024; // 1.5 MB — safe under the 2 MB default
-
 const { validate: validateImage } = useImageValidation();
+const { isUploading, uploadError, fileProgress, overallProgress, upload } = useChunkedUpload();
+const resize = useUploadResize();
+const busy = computed(() => isUploading.value || resize.isResizing.value);
 
 const showUploadPanel = ref(false);
 const selectedFiles   = ref([]);
@@ -46,15 +48,6 @@ const form = useForm({
     status:           'published',
 });
 
-// Chunked upload state
-const isUploading     = ref(false);
-const uploadError     = ref(null);
-const fileProgress    = ref([]); // [{ name, progress: 0-100, done: bool }]
-const overallProgress = computed(() => {
-    if (!fileProgress.value.length) return 0;
-    return Math.round(fileProgress.value.reduce((sum, f) => sum + f.progress, 0) / fileProgress.value.length);
-});
-
 async function onFilesSelected(files) {
     selectedFiles.value = files;
 
@@ -66,6 +59,7 @@ async function onFilesSelected(files) {
     }));
 
     fileValidations.value = await Promise.all(files.map(f => validateImage(f)));
+    resize.setFiles(files, fileValidations.value);
 
     if (!form.title && files.length === 1) {
         form.title = files[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -75,6 +69,8 @@ async function onFilesSelected(files) {
 function removeFile(index) {
     selectedFiles.value.splice(index, 1);
     filePreviews.value.splice(index, 1);
+    fileValidations.value.splice(index, 1);
+    resize.removeFile(index);
 }
 
 function formatBytes(bytes) {
@@ -82,104 +78,48 @@ function formatBytes(bytes) {
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
-function csrfToken() {
-    return document.querySelector('meta[name="csrf-token"]')?.content ?? '';
-}
-
-async function uploadChunks(file, uploadId, onProgress) {
-    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
-    let result = null;
-
-    for (let i = 0; i < totalChunks; i++) {
-        const start = i * CHUNK_SIZE;
-        const chunk = file.slice(start, start + CHUNK_SIZE);
-
-        const fd = new FormData();
-        fd.append('upload_id',    uploadId);
-        fd.append('chunk_index',  i);
-        fd.append('total_chunks', totalChunks);
-        fd.append('filename',     file.name);
-        fd.append('mime_type',    file.type);
-        fd.append('chunk',        chunk, `chunk_${i}`);
-
-        const { data } = await window.axios.post(route('uploads.chunk'), fd, {
-            headers: { 'X-CSRF-TOKEN': csrfToken() },
-        });
-
-        onProgress(Math.round(((i + 1) / totalChunks) * 100));
-
-        if (data.status === 'complete') {
-            result = data;
-        }
-    }
-
-    return result;
-}
-
 async function submitUpload() {
     if (!selectedFiles.value.length || !form.title) return;
 
-    isUploading.value  = true;
-    uploadError.value  = null;
-    fileProgress.value = selectedFiles.value.map(f => ({ name: f.name, progress: 0, done: false }));
+    const payload = {
+        title:            form.title,
+        notes:            form.notes,
+        text_description: form.text_description,
+        link:             form.link || null,
+        language_id:      form.language_id || null,
+        publish_at:       form.publish_at,
+        expires_at:       form.expires_at,
+        status:           form.status,
+        add_to_show:      addToShow.value,
+    };
 
-    const completedUploads = [];
-
-    try {
-        for (let fi = 0; fi < selectedFiles.value.length; fi++) {
-            const file     = selectedFiles.value[fi];
-            const uploadId = crypto.randomUUID();
-
-            const assembled = await uploadChunks(file, uploadId, (pct) => {
-                fileProgress.value[fi].progress = pct;
-            });
-
-            fileProgress.value[fi].done = true;
-            completedUploads.push(assembled);
+    if (addToShow.value === 'separate') {
+        if (targetShowId.value) {
+            payload.global_template_id = targetShowId.value;
+        } else {
+            payload.new_show_name = newShowName.value;
         }
-
-        const payload = {
-            uploads:          completedUploads,
-            title:            form.title,
-            notes:            form.notes,
-            text_description: form.text_description,
-            link:             form.link || null,
-            language_id:      form.language_id || null,
-            publish_at:       form.publish_at,
-            expires_at:       form.expires_at,
-            status:           form.status,
-            add_to_show:      addToShow.value,
-        };
-
-        if (addToShow.value === 'separate') {
-            if (targetShowId.value) {
-                payload.global_template_id = targetShowId.value;
-            } else {
-                payload.new_show_name = newShowName.value;
-            }
-        }
-
-        await window.axios.post(route('uploads.finalize'), payload, {
-            headers: { 'X-CSRF-TOKEN': csrfToken() },
-        });
-
-        router.visit(route('admin.slides.index'), {
-            onSuccess: () => {
-                form.reset();
-                selectedFiles.value  = [];
-                filePreviews.value   = [];
-                fileProgress.value   = [];
-                addToShow.value      = 'main';
-                targetShowId.value   = '';
-                newShowName.value    = '';
-                showUploadPanel.value = false;
-            },
-        });
-    } catch (err) {
-        uploadError.value = err.response?.data?.message ?? 'Upload failed. Please try again.';
-    } finally {
-        isUploading.value = false;
     }
+
+    // Resize what's marked (shrink beyond 4K / AI-upscale small), then upload.
+    const items = await resize.prepare(selectedFiles.value);
+    if (!items) return;
+
+    if (!await upload(items, payload)) return;
+
+    router.visit(route('admin.slides.index'), {
+        onSuccess: () => {
+            form.reset();
+            selectedFiles.value  = [];
+            filePreviews.value   = [];
+            fileValidations.value = [];
+            resize.reset();
+            addToShow.value      = 'main';
+            targetShowId.value   = '';
+            newShowName.value    = '';
+            showUploadPanel.value = false;
+        },
+    });
 }
 
 // ── Slide actions ─────────────────────────────────────────────────────────────
@@ -284,7 +224,7 @@ function statusBadge(status) {
                                 <p class="text-sm text-gray-700 truncate">{{ f.name }}</p>
                                 <p class="text-xs text-gray-400">{{ formatBytes(f.size) }}</p>
                             </div>
-                            <button v-if="!isUploading" type="button" @click="removeFile(i)" class="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">
+                            <button v-if="!busy" type="button" @click="removeFile(i)" class="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">
                                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                 </svg>
@@ -292,8 +232,11 @@ function statusBadge(status) {
                         </div>
                         <!-- Validation warnings -->
                         <div v-if="fileValidations[i]" class="mt-2">
-                            <ValidationWarnings :issues="fileValidations[i].issues" />
+                            <ValidationWarnings :issues="resize.issuesFor(i)" />
                         </div>
+                        <ResizeOption :info="resize.infos.value[i]" :validation="fileValidations[i]" :size="resize.sizeFor(i)"
+                            :settings="resize.settings" :busy="busy"
+                            @update:enabled="resize.infos.value[i].enabled = $event" @cancel="resize.cancel" />
                         <!-- Per-file progress bar (shown while uploading) -->
                         <div v-if="isUploading && fileProgress[i]" class="mt-2">
                             <div class="flex justify-between text-xs text-gray-500 mb-1">
@@ -417,11 +360,11 @@ function statusBadge(status) {
                 </div>
 
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" :disabled="isUploading || !selectedFiles.length || !form.title"
+                    <button type="submit" :disabled="busy || !selectedFiles.length || !form.title"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                        {{ isUploading ? `${$t('admin.uploading')} ${overallProgress}%` : $t('upload.btn_upload', { n: selectedFiles.length }) }}
+                        {{ resize.isResizing.value ? 'Resizing…' : isUploading ? `${$t('admin.uploading')} ${overallProgress}%` : $t('upload.btn_upload', { n: selectedFiles.length }) }}
                     </button>
-                    <button type="button" :disabled="isUploading" @click="showUploadPanel = false"
+                    <button type="button" :disabled="busy" @click="showUploadPanel = false"
                         class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                         {{ $t('admin.cancel') }}
                     </button>

@@ -1,11 +1,19 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import DropZone from '@/Components/DropZone.vue';
+import ValidationWarnings from '@/Components/ValidationWarnings.vue';
+import ResizeOption from '@/Components/ResizeOption.vue';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
+import { useImageValidation } from '@/Composables/useImageValidation.js';
+import { useUploadResize } from '@/Composables/useUploadResize.js';
 
 const { isUploading, uploadError, fileProgress, overallProgress, upload } = useChunkedUpload();
+const { validate: validateImage } = useImageValidation();
+const resize = useUploadResize();
+const busy = computed(() => isUploading.value || resize.isResizing.value);
+const fileValidations = ref([]);
 
 const selectedFiles = ref([]);
 const filePreviews  = ref([]);
@@ -20,7 +28,7 @@ const props = defineProps({
     languages: { type: Array, default: () => [] },
 });
 
-function onFilesSelected(files) {
+async function onFilesSelected(files) {
     selectedFiles.value = files;
     filePreviews.value  = files.map(f => ({
         name: f.name,
@@ -30,11 +38,16 @@ function onFilesSelected(files) {
     if (!title.value && files.length === 1) {
         title.value = files[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
     }
+
+    fileValidations.value = await Promise.all(files.map(f => validateImage(f)));
+    resize.setFiles(files, fileValidations.value);
 }
 
 function removeFile(i) {
     selectedFiles.value.splice(i, 1);
     filePreviews.value.splice(i, 1);
+    fileValidations.value.splice(i, 1);
+    resize.removeFile(i);
 }
 
 function formatBytes(bytes) {
@@ -45,7 +58,10 @@ function formatBytes(bytes) {
 async function submit() {
     if (!selectedFiles.value.length || !title.value.trim()) return;
 
-    const result = await upload(selectedFiles.value, {
+    const items = await resize.prepare(selectedFiles.value);
+    if (!items) return;
+
+    const result = await upload(items, {
         title: title.value,
         notes: notes.value,
         text_description: textDescription.value,
@@ -57,6 +73,8 @@ async function submit() {
         submitted.value = true;
         selectedFiles.value = [];
         filePreviews.value  = [];
+        fileValidations.value = [];
+        resize.reset();
         title.value         = '';
         notes.value         = '';
         textDescription.value = '';
@@ -105,13 +123,19 @@ async function submit() {
                                     <p class="text-sm text-gray-700 truncate">{{ f.name }}</p>
                                     <p class="text-xs text-gray-400">{{ formatBytes(f.size) }}</p>
                                 </div>
-                                <button v-if="!isUploading" type="button" @click="removeFile(i)"
+                                <button v-if="!busy" type="button" @click="removeFile(i)"
                                     class="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                                     </svg>
                                 </button>
                             </div>
+                            <div v-if="fileValidations[i]" class="mt-2">
+                                <ValidationWarnings :issues="resize.issuesFor(i)" />
+                            </div>
+                            <ResizeOption :info="resize.infos.value[i]" :validation="fileValidations[i]" :size="resize.sizeFor(i)"
+                                :settings="resize.settings" :busy="busy"
+                                @update:enabled="resize.infos.value[i].enabled = $event" @cancel="resize.cancel" />
                             <div v-if="isUploading && fileProgress[i]" class="mt-2">
                                 <div class="flex justify-between text-xs text-gray-500 mb-1">
                                     <span>{{ fileProgress[i].done ? 'Done' : 'Uploading…' }}</span>
@@ -169,9 +193,9 @@ async function submit() {
                     </div>
 
                     <button type="submit"
-                        :disabled="isUploading || !selectedFiles.length || !title.trim()"
+                        :disabled="busy || !selectedFiles.length || !title.trim()"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                        {{ isUploading ? `Uploading… ${overallProgress}%` : 'Submit for Review' }}
+                        {{ resize.isResizing.value ? 'Resizing…' : isUploading ? `Uploading… ${overallProgress}%` : 'Submit for Review' }}
                     </button>
                 </form>
             </div>
