@@ -6,6 +6,7 @@ import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
 import { useImageValidation } from '@/Composables/useImageValidation.js';
+import { upscaleImage, upscaleIneligibility, ineligibleMessage, useUpscalerSettings } from '@/Composables/useUpscaler.js';
 
 const props = defineProps({
     redirectRoute:     { type: String, required: true },
@@ -22,7 +23,8 @@ const props = defineProps({
 const emit = defineEmits(['success']);
 
 const { isUploading, uploadError, fileProgress, overallProgress, upload } = useChunkedUpload();
-const { validate: validateImage } = useImageValidation();
+const { validate: validateImage, validateDimensions } = useImageValidation();
+const upscalerSettings = useUpscalerSettings();
 
 const selectedFiles = ref([]);
 const filePreviews  = ref([]);
@@ -40,7 +42,37 @@ const addToShow     = ref('main'); // 'main' | 'separate' | 'none'
 const targetShowId  = ref('');
 const newShowName   = ref('');
 
+// Per selected file: whether it can be AI-upscaled 2x and whether it will be,
+// plus the progress of the upscale itself (run on submit, before uploading).
+const fileUpscale   = ref([]); // { eligible, reason, enabled, status, progress, note }
+const isUpscaling   = ref(false);
+let upscaleAbort    = null;
+
+const busy = computed(() => isUploading.value || isUpscaling.value);
 const canSubmit = computed(() => selectedFiles.value.length > 0 && title.value.trim());
+
+const UPSCALABLE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+function upscaleInfoFor(file, validation) {
+    const s = upscalerSettings;
+    if (!s?.enabled || !UPSCALABLE_TYPES.includes(file.type)) {
+        return { eligible: false, reason: null, enabled: false };
+    }
+    const reason = upscaleIneligibility(validation.width, validation.height, s);
+    return { eligible: !reason, reason, enabled: !reason && s.auto_on_upload, status: null, progress: 0, note: null };
+}
+
+// What the warnings should say: for a file that will be upscaled, judge the
+// doubled size rather than the original's.
+function issuesFor(i) {
+    const v = fileValidations.value[i];
+    if (!v) return [];
+    if (fileUpscale.value[i]?.enabled && v.width && v.height) {
+        const sizeIssues = v.issues.filter(m => !m.startsWith('Low resolution') && !m.startsWith('High resolution') && !m.startsWith('Aspect ratio'));
+        return [...validateDimensions(v.width * 2, v.height * 2), ...sizeIssues];
+    }
+    return v.issues;
+}
 
 async function onFilesSelected(files) {
     selectedFiles.value = files;
@@ -52,6 +84,7 @@ async function onFilesSelected(files) {
     }));
 
     fileValidations.value = await Promise.all(files.map(f => validateImage(f)));
+    fileUpscale.value     = files.map((f, i) => upscaleInfoFor(f, fileValidations.value[i]));
 
     if (!title.value && files.length === 1) {
         title.value = files[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
@@ -61,6 +94,68 @@ async function onFilesSelected(files) {
 function removeFile(i) {
     selectedFiles.value.splice(i, 1);
     filePreviews.value.splice(i, 1);
+    fileValidations.value.splice(i, 1);
+    fileUpscale.value.splice(i, 1);
+}
+
+function cancelUpscale() {
+    upscaleAbort?.abort();
+}
+
+// Upscales every file marked for it, one at a time. A failure (no WebGL, out of
+// memory, …) is reported on that file and it uploads as the original instead;
+// only cancelling stops the whole submission. Returns upload items for
+// useChunkedUpload.upload, or null if cancelled.
+async function prepareUploads() {
+    const items = [];
+    isUpscaling.value = true;
+    upscaleAbort = new AbortController();
+
+    try {
+        for (let i = 0; i < selectedFiles.value.length; i++) {
+            const file = selectedFiles.value[i];
+            const info = fileUpscale.value[i];
+
+            if (!info?.enabled) {
+                items.push(file);
+                continue;
+            }
+
+            info.status = 'working';
+            info.progress = 0;
+            info.note = null;
+
+            try {
+                const result = await upscaleImage(file, {
+                    model: upscalerSettings.model,
+                    quality: upscalerSettings.jpeg_quality,
+                    patchSize: upscalerSettings.patch_size,
+                    onProgress: (p) => { info.progress = Math.round(p * 100); },
+                    signal: upscaleAbort.signal,
+                });
+                const name = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+                items.push({
+                    file: new File([result.blob], name, { type: 'image/jpeg' }),
+                    upscale: { model: upscalerSettings.model, original: file },
+                });
+                info.status = 'done';
+                info.note = `Upscaled to ${result.width}×${result.height}.`;
+            } catch (err) {
+                if (err.code === 'aborted') {
+                    info.status = null;
+                    return null;
+                }
+                items.push(file);
+                info.status = 'failed';
+                info.note = `${err.message} The original will be uploaded instead.`;
+            }
+        }
+    } finally {
+        isUpscaling.value = false;
+        upscaleAbort = null;
+    }
+
+    return items;
 }
 
 function formatBytes(bytes) {
@@ -103,13 +198,18 @@ async function submit() {
         }
     }
 
-    const result = await upload(selectedFiles.value, payload);
+    const items = await prepareUploads();
+    if (!items) return;
+
+    const result = await upload(items, payload);
 
     if (result) {
         router.visit(route(props.redirectRoute, props.redirectParams), {
             onSuccess: () => {
                 selectedFiles.value = [];
                 filePreviews.value  = [];
+                fileValidations.value = [];
+                fileUpscale.value   = [];
                 title.value         = '';
                 notes.value         = '';
                 textDescription.value = '';
@@ -152,7 +252,7 @@ async function submit() {
                             <p class="text-sm text-gray-700 truncate">{{ f.name }}</p>
                             <p class="text-xs text-gray-400">{{ formatBytes(f.size) }}</p>
                         </div>
-                        <button v-if="!isUploading" type="button" @click="removeFile(i)"
+                        <button v-if="!busy" type="button" @click="removeFile(i)"
                             class="text-gray-400 hover:text-red-500 transition-colors flex-shrink-0">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
@@ -160,7 +260,37 @@ async function submit() {
                         </button>
                     </div>
                     <div v-if="fileValidations[i]" class="mt-2">
-                        <ValidationWarnings :issues="fileValidations[i].issues" />
+                        <ValidationWarnings :issues="issuesFor(i)" />
+                    </div>
+                    <div v-if="fileUpscale[i]" class="mt-2 text-xs">
+                        <label v-if="fileUpscale[i].eligible && !fileUpscale[i].status" class="flex items-center gap-2 text-gray-700">
+                            <input v-model="fileUpscale[i].enabled" type="checkbox" :disabled="busy"
+                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                            <span>
+                                Upscale 2× with AI
+                                <span class="text-gray-400">
+                                    ({{ fileValidations[i]?.width }}×{{ fileValidations[i]?.height }} →
+                                    {{ (fileValidations[i]?.width ?? 0) * 2 }}×{{ (fileValidations[i]?.height ?? 0) * 2 }};
+                                    the original is kept)
+                                </span>
+                            </span>
+                        </label>
+                        <p v-else-if="fileUpscale[i].reason === 'too-small'" class="text-gray-400">
+                            {{ ineligibleMessage(fileUpscale[i].reason, upscalerSettings) }}
+                        </p>
+                        <div v-if="fileUpscale[i].status === 'working'">
+                            <div class="mb-1 flex justify-between text-gray-500">
+                                <span>Upscaling… {{ fileUpscale[i].progress }}%</span>
+                                <button type="button" @click="cancelUpscale" class="text-red-600 hover:underline">Cancel</button>
+                            </div>
+                            <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+                                <div class="h-full rounded-full bg-purple-500 transition-all duration-200"
+                                    :style="{ width: fileUpscale[i].progress + '%' }" />
+                            </div>
+                        </div>
+                        <p v-else-if="fileUpscale[i].note" :class="fileUpscale[i].status === 'failed' ? 'text-amber-700' : 'text-green-700'">
+                            {{ fileUpscale[i].note }}
+                        </p>
                     </div>
                     <div v-if="isUploading && fileProgress[i]" class="mt-2">
                         <div class="flex justify-between text-xs text-gray-500 mb-1">
@@ -294,9 +424,9 @@ async function submit() {
             </div>
 
             <div class="flex gap-3 pt-2">
-                <button type="submit" :disabled="isUploading || !canSubmit"
+                <button type="submit" :disabled="busy || !canSubmit"
                     class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    {{ isUploading ? `Uploading… ${overallProgress}%` : `Upload ${selectedFiles.length || ''} slide${selectedFiles.length === 1 ? '' : 's'}` }}
+                    {{ isUpscaling ? 'Upscaling…' : isUploading ? `Uploading… ${overallProgress}%` : `Upload ${selectedFiles.length || ''} slide${selectedFiles.length === 1 ? '' : 's'}` }}
                 </button>
             </div>
         </form>

@@ -12,7 +12,8 @@
         "slide_announcer_releases": "Announcer Releases",
         "view_public_site": "View Public Site",
         "qr_code": "QR Code Creator",
-        "widgets": "Widgets"
+        "widgets": "Widgets",
+        "upscaler": "AI Upscaler"
     },
     "auth": {
         "email": "Email",

@@ -12,7 +12,8 @@
         "slide_announcer_releases": "Versiones del anunciador",
         "view_public_site": "Ver sitio público",
         "qr_code": "Creador de códigos QR",
-        "widgets": "Widgets"
+        "widgets": "Widgets",
+        "upscaler": "Escalado con IA"
     },
     "auth": {
         "email": "Correo electrónico",
