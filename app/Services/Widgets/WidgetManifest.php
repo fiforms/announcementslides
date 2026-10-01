@@ -14,6 +14,10 @@ class WidgetManifest
 {
     public const PARAM_TYPES = ['string', 'text', 'url', 'enum', 'color', 'number', 'boolean'];
     public const EXPECT_TYPES = ['ical', 'json', 'text'];
+    // Runtime arguments are supplied by widget code at fetch time (e.g. a
+    // forecast's lat/lon from an earlier geocode), so they get the narrow
+    // types only — never a URL or free text.
+    public const ARG_TYPES = ['string', 'enum', 'number', 'boolean'];
 
     private const KEY = '/^[a-z][a-z0-9_]{0,39}$/';
 
@@ -190,11 +194,32 @@ class WidgetManifest
 
         $errors = [];
         $template = $e['url'];
+
+        $args = $e['args'] ?? [];
+        if (!is_array($args) || ($args !== [] && array_is_list($args))) {
+            $errors[] = "{$where}: \"args\" must be an object.";
+            $args = [];
+        }
+        foreach ($args as $argKey => $arg) {
+            if (!is_array($arg) || !in_array($arg['type'] ?? null, self::ARG_TYPES, true)) {
+                $errors[] = "{$where}: arg \"{$argKey}\" must have a type: " . implode(', ', self::ARG_TYPES) . '.';
+                continue;
+            }
+            if ($arg['type'] === 'string' && !isset($arg['pattern'])) {
+                $errors[] = "{$where}: string arg \"{$argKey}\" needs a \"pattern\".";
+            }
+            $errors = [...$errors, ...array_map(fn ($m) => "{$where}: {$m}", self::validateParam((string) $argKey, $arg))];
+        }
+
         preg_match_all('/\{([a-z0-9_:]+)\}/', $template, $matches);
         foreach ($matches[1] as $placeholder) {
             if (str_starts_with($placeholder, 'secret:')) {
                 if (!isset($settings[substr($placeholder, 7)])) {
                     $errors[] = "{$where}: {{$placeholder}} isn't a declared setting.";
+                }
+            } elseif (str_starts_with($placeholder, 'arg:')) {
+                if (!isset($args[substr($placeholder, 4)])) {
+                    $errors[] = "{$where}: {{$placeholder}} isn't a declared arg.";
                 }
             } elseif (!isset($params[$placeholder])) {
                 $errors[] = "{$where}: {{$placeholder}} isn't a declared parameter.";

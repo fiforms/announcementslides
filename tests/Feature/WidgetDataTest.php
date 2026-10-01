@@ -35,7 +35,10 @@ class WidgetDataTest extends TestCase
         Storage::fake('local');
         Queue::fake();
 
-        $this->dns = ['calendar.google.com' => ['142.250.80.46'], 'api.example.com' => ['93.184.216.34']];
+        $this->dns = [
+            'calendar.google.com' => ['142.250.80.46'], 'api.example.com' => ['93.184.216.34'],
+            'geocoding-api.open-meteo.com' => ['51.161.5.1'], 'api.open-meteo.com' => ['51.161.5.2'],
+        ];
         $test = $this;
         $this->app->instance(HostResolver::class, new class($test) extends HostResolver {
             public function __construct(private $test) {}
@@ -48,6 +51,7 @@ class WidgetDataTest extends TestCase
 
         app(WidgetInstaller::class)->installDirectory(base_path('resources/widgets/calendar'));
         app(WidgetInstaller::class)->installDirectory(base_path('resources/widgets/clock'));
+        app(WidgetInstaller::class)->installDirectory(base_path('resources/widgets/weather'));
 
         $this->user = User::factory()->create();
         $this->entity = Entity::create(['name' => 'Entity A']);
@@ -316,5 +320,66 @@ class WidgetDataTest extends TestCase
 
         $this->actingAs($this->user)->postJson(route('widget-data.preview'), ['params' => ['ics' => 'https://evil.example/x.ics']] + $body)
             ->assertStatus(422)->assertJsonPath('error', 'invalid_params');
+    }
+
+    // ── Runtime args (weather: geocode, then forecast by lat/lon) ────────────
+
+    private function saveWeather(array $params = ['zip' => '90210']): void
+    {
+        $this->saveOverlay([$this->widgetElement($params, ['widget' => 'weather'])])->assertSessionHasNoErrors();
+    }
+
+    public function test_weather_geocodes_the_saved_zip_then_forecasts_by_runtime_args(): void
+    {
+        Http::fake([
+            'geocoding-api.open-meteo.com/*' => Http::response(['results' => [['name' => 'Beverly Hills', 'latitude' => 34.07362, 'longitude' => -118.40036]]]),
+            'api.open-meteo.com/*' => Http::response(['current' => ['temperature_2m' => 79.1]]),
+        ]);
+        $this->saveWeather();
+
+        $this->get($this->dataUrl('geocode'))->assertOk()->assertJsonPath('data.results.0.name', 'Beverly Hills');
+        $this->get($this->dataUrl('forecast') . '?args[lat]=34.07&args[lon]=-118.4')
+            ->assertOk()->assertJsonPath('data.current.temperature_2m', 79.1);
+
+        Http::assertSent(fn ($r) => str_starts_with($r->url(), 'https://geocoding-api.open-meteo.com/v1/search?name=90210&count=1&countryCode=US'));
+        Http::assertSent(fn ($r) => str_starts_with($r->url(), 'https://api.open-meteo.com/v1/forecast?latitude=34.07&longitude=-118.4&')
+            && str_contains($r->url(), 'temperature_unit=fahrenheit'));
+    }
+
+    public function test_runtime_args_are_validated_and_cannot_steer_the_request(): void
+    {
+        Http::fake();
+        $this->saveWeather();
+
+        foreach ([
+            '',                                              // missing
+            '?args[lat]=34&args[lon]=-200',                  // out of range
+            '?args[lat]=abc&args[lon]=1',                    // not a number
+            '?args[lat]=1%26host%3Devil.example&args[lon]=1', // injection attempt
+        ] as $query) {
+            $this->get($this->dataUrl('forecast') . $query)->assertStatus(422)->assertJsonPath('error', 'invalid_args');
+        }
+        Http::assertNothingSent();
+    }
+
+    public function test_args_are_part_of_the_cache_key(): void
+    {
+        Http::fake(['api.open-meteo.com/*' => Http::sequence()->push(['n' => 1])->push(['n' => 2])]);
+        $this->saveWeather();
+
+        $this->get($this->dataUrl('forecast') . '?args[lat]=34.07&args[lon]=-118.4')->assertJsonPath('data.n', 1);
+        $this->get($this->dataUrl('forecast') . '?args[lat]=34.07&args[lon]=-118.4')->assertJsonPath('data.n', 1);
+        $this->get($this->dataUrl('forecast') . '?args[lat]=35.5&args[lon]=-80')->assertJsonPath('data.n', 2);
+        Http::assertSentCount(2);
+    }
+
+    public function test_preview_passes_runtime_args(): void
+    {
+        Http::fake(['api.open-meteo.com/*' => Http::response(['ok' => true])]);
+
+        $this->actingAs($this->user)->postJson(route('widget-data.preview'), [
+            'widget' => 'weather', 'endpoint' => 'forecast', 'params' => ['zip' => '28401'], 'args' => ['lat' => 34.23, 'lon' => -77.94],
+        ])->assertOk()->assertJsonPath('data.ok', true);
+        Http::assertSent(fn ($r) => str_contains($r->url(), 'latitude=34.23&longitude=-77.94'));
     }
 }

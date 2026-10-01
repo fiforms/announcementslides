@@ -44,18 +44,27 @@ function storageFor(prefix) {
 // data_url) or an unsaved editor element (editor mode: fetches go through
 // the preview endpoint with its current params).
 export function createApi(placement, { mode, locale }) {
-    async function fetchLive(endpoint) {
-        const url = placement.data_url.replace('__endpoint__', encodeURIComponent(endpoint));
+    // Runtime args (e.g. a forecast's lat/lon) travel as ?args[name]=value;
+    // the server checks them against the endpoint's declared `args`.
+    function withArgs(url, args) {
+        const query = new URLSearchParams();
+        for (const [k, v] of Object.entries(args ?? {})) query.append(`args[${k}]`, String(v));
+        const qs = query.toString();
+        return qs ? `${url}?${qs}` : url;
+    }
+
+    async function fetchLive(endpoint, args) {
+        const url = withArgs(placement.data_url.replace('__endpoint__', encodeURIComponent(endpoint)), args);
         const res = await fetch(url, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
         const body = await res.json().catch(() => ({}));
         if (!res.ok) throw new WidgetDataError(body.error ?? 'unavailable', res.status);
         return body;
     }
 
-    async function fetchPreview(endpoint) {
+    async function fetchPreview(endpoint, args) {
         try {
             const { data } = await axios.post(route('widget-data.preview'), {
-                widget: placement.widget, endpoint, params: placement.params ?? {},
+                widget: placement.widget, endpoint, params: placement.params ?? {}, args: args ?? {},
             });
             return data;
         } catch (err) {
@@ -66,8 +75,9 @@ export function createApi(placement, { mode, locale }) {
     return Object.freeze({
         mode,
         locale,
-        // Resolves to { data, fetched_at, stale }; rejects with WidgetDataError
-        // (reason e.g. 'not_configured', 'rate_limited', 'upstream_status').
+        // fetch(endpoint, args?) resolves to { data, fetched_at, stale };
+        // rejects with WidgetDataError (reason e.g. 'not_configured',
+        // 'invalid_args', 'rate_limited', 'upstream_status').
         fetch: mode === 'editor' ? fetchPreview : fetchLive,
         storage: storageFor(`as-widget:${placement.widget}:${placement.id}:`),
     });

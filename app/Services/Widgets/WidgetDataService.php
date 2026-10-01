@@ -26,14 +26,16 @@ class WidgetDataService
 
     /**
      * @param  array<string, mixed>  $params  output of WidgetParams::clean()
+     * @param  array<string, mixed>  $args  runtime args from the widget (untrusted; checked
+     *                                      against the endpoint's declared `args`)
      * @return array{data: mixed, fetched_at: int, stale: bool}
      *
      * @throws WidgetFetchException
      */
-    public function get(Widget $widget, string $endpointKey, array $params, string $callerKey): array
+    public function get(Widget $widget, string $endpointKey, array $params, string $callerKey, array $args = []): array
     {
         $endpoint = $widget->manifest['endpoints'][$endpointKey] ?? throw new WidgetFetchException('unknown_endpoint');
-        [$url, $allowHop] = $this->buildUrl($widget, $endpoint, $params);
+        [$url, $allowHop] = $this->buildUrl($widget, $endpoint, $params, $this->cleanArgs($endpoint, $args));
 
         $expect = $endpoint['expect'];
         $ttl = max(config('widgets.fetch.min_ttl'), $endpoint['ttl'] ?? config('widgets.fetch.default_ttl'));
@@ -86,7 +88,34 @@ class WidgetDataService
     /**
      * @return array{0: string, 1: \Closure(string): bool}  URL and redirect rule
      */
-    public function buildUrl(Widget $widget, array $endpoint, array $params): array
+    /**
+     * Declared args only, each validated like a parameter; an arg with no
+     * value and no default makes the request invalid.
+     *
+     * @return array<string, mixed>
+     */
+    private function cleanArgs(array $endpoint, array $args): array
+    {
+        $clean = [];
+        foreach ($endpoint['args'] ?? [] as $key => $def) {
+            $value = $args[$key] ?? $def['default'] ?? null;
+            if ($value === null || $value === '') {
+                throw new WidgetFetchException('invalid_args');
+            }
+            if ($def['type'] === 'boolean' && is_string($value)) {
+                $value = filter_var($value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? $value;
+            }
+            try {
+                $clean[$key] = WidgetParams::cleanOne($key, $def, $value);
+            } catch (WidgetPackageException) {
+                throw new WidgetFetchException('invalid_args');
+            }
+        }
+
+        return $clean;
+    }
+
+    public function buildUrl(Widget $widget, array $endpoint, array $params, array $args = []): array
     {
         $template = $endpoint['url'];
 
@@ -109,16 +138,21 @@ class WidgetDataService
         }
 
         $missing = false;
-        $url = preg_replace_callback('/\{([a-z0-9_:]+)\}/', function ($m) use ($widget, $params, &$missing) {
-            $value = str_starts_with($m[1], 'secret:')
-                ? $widget->setting(substr($m[1], 7))
-                : $params[$m[1]] ?? null;
+        $url = preg_replace_callback('/\{([a-z0-9_:]+)\}/', function ($m) use ($widget, $params, $args, &$missing) {
+            $value = match (true) {
+                str_starts_with($m[1], 'secret:') => $widget->setting(substr($m[1], 7)),
+                str_starts_with($m[1], 'arg:')    => $args[substr($m[1], 4)] ?? null,
+                default                           => $params[$m[1]] ?? null,
+            };
             if ($value === null || $value === '') {
                 $missing = true;
                 return '';
             }
             if (is_bool($value)) {
                 $value = $value ? 'true' : 'false';
+            } elseif (is_float($value)) {
+                // Plain decimal, never PHP's 1.0E-5 notation.
+                $value = rtrim(rtrim(number_format($value, 6, '.', ''), '0'), '.');
             }
 
             return rawurlencode((string) $value);

@@ -208,4 +208,19 @@ class WidgetInstallTest extends TestCase
         $widget->update(['enabled' => false]);
         $this->get($widget->entryUrl())->assertNotFound();
     }
+
+    public function test_endpoint_args_must_be_declared_and_narrowly_typed(): void
+    {
+        $endpoint = fn (array $args, string $url = 'https://api.example.com/v1?lat={arg:lat}') => $this->package(['endpoints' => ['e' => [
+            'url' => $url, 'expect' => 'json', 'args' => $args,
+        ]]]);
+
+        $this->assertRejected(fn () => $this->installZip($this->zip($endpoint([]))), "isn't a declared arg");
+        $this->assertRejected(fn () => $this->installZip($this->zip($endpoint(['lat' => ['type' => 'url']]))), 'must have a type');
+        $this->assertRejected(fn () => $this->installZip($this->zip($endpoint(['lat' => ['type' => 'string']]))), 'needs a "pattern"');
+        $this->assertRejected(fn () => $this->installZip($this->zip($endpoint(['lat' => ['type' => 'number']], 'https://{arg:lat}/v1'))), 'fixed host');
+
+        $ok = $endpoint(['lat' => ['type' => 'number', 'min' => -90, 'max' => 90]]);
+        $this->assertSame('demo', $this->installZip($this->zip($ok))->slug);
+    }
 }

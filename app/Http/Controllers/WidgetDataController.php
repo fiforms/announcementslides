@@ -42,7 +42,7 @@ class WidgetDataController extends Controller
         $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
         abort_unless($widget, 404);
 
-        return $this->respond($widget, $endpoint, $placement['params'] ?? [], $this->callerKey($request));
+        return $this->respond($widget, $endpoint, $placement['params'] ?? [], $this->callerKey($request), $this->args($request->query('args')));
     }
 
     /**
@@ -64,7 +64,7 @@ class WidgetDataController extends Controller
         $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
         abort_unless($widget, 404);
 
-        return $this->respond($widget, $endpoint, $placement['params'] ?? [], 'device:' . $device->id);
+        return $this->respond($widget, $endpoint, $placement['params'] ?? [], 'device:' . $device->id, $this->args($request->query('args')));
     }
 
     public function preview(Request $request): JsonResponse
@@ -76,6 +76,7 @@ class WidgetDataController extends Controller
             'widget'   => 'required|string|max:64',
             'endpoint' => 'required|string|max:64',
             'params'   => 'nullable|array',
+            'args'     => 'nullable|array',
         ]);
         $widget = Widget::where('slug', $request->input('widget'))->where('enabled', true)->first();
         abort_unless($widget, 404);
@@ -86,17 +87,34 @@ class WidgetDataController extends Controller
             return $this->error('invalid_params', 422, $e->errors);
         }
 
-        return $this->respond($widget, $request->input('endpoint'), $params, 'preview:' . $user->id);
+        return $this->respond($widget, $request->input('endpoint'), $params, 'preview:' . $user->id, $this->args($request->input('args')));
     }
 
-    private function respond(Widget $widget, string $endpoint, array $params, string $callerKey): JsonResponse
+    /**
+     * Runtime args as sent by widget code (`?args[lat]=…`): scalars only and
+     * a handful of them; WidgetDataService checks them against the
+     * endpoint's declarations.
+     */
+    private function args(mixed $raw): array
+    {
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        return collect($raw)
+            ->filter(fn ($v, $k) => is_string($k) && (is_scalar($v)) && mb_strlen((string) $v) <= 200)
+            ->take(10)
+            ->all();
+    }
+
+    private function respond(Widget $widget, string $endpoint, array $params, string $callerKey, array $args = []): JsonResponse
     {
         try {
-            $result = $this->data->get($widget, $endpoint, $params, $callerKey);
+            $result = $this->data->get($widget, $endpoint, $params, $callerKey, $args);
         } catch (WidgetFetchException $e) {
             $status = match ($e->reason) {
                 'unknown_endpoint' => 404,
-                'not_configured'   => 422,
+                'not_configured', 'invalid_args' => 422,
                 'rate_limited'     => 429,
                 default            => 502,
             };
