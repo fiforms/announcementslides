@@ -103,7 +103,8 @@ Each audience has its own controller and route group, keeping the scoping rules 
     - every resolved IP must be public, and the connection is pinned to the checked IP;
     - each redirect hop is checked again.
 
-    Limits are in [config/widgets.php](config/widgets.php). The Slide Announcer device doesn't run widgets yet.
+    Limits are in [config/widgets.php](config/widgets.php).
+  - **On Slide Announcer devices.** The shows sync ([SlideAnnouncerSyncController](app/Http/Controllers/Api/SlideAnnouncerSyncController.php)) carries each slide's placements plus the bundles they need. The device mirrors those bundles locally (`slideannouncer/local-app/backend/widgets.py`, served from its own `/media/widgets/`) and proxies `api.fetch()` through its local backend to `/api/slide-announcers/widget-data/…` (`WidgetDataController::device`, token-authenticated, limited to slides the device syncs). It never fetches upstream URLs itself, and it serves the last good response while offline.
 - **Image quality validation:** [ImageValidationService](app/Services/ImageValidationService.php) checks resolution (2–8.5 MP), file size (80 KB–5 MB), and 16:9 aspect ratio (±2%), recording `validation_issues`/`validation_status` on the `SlideMedia` row. Mirrored client-side in [useImageValidation.js](resources/js/Composables/useImageValidation.js) and surfaced via [ValidationWarnings.vue](resources/js/Components/ValidationWarnings.vue). Low-quality global uploads from non-admins are hard-blocked.
 - **Thumbnails:** generated asynchronously by the [GenerateThumbnail](app/Jobs/GenerateThumbnail.php) queued job, which takes a `SlideMedia` (not a `Slide`). (`BuildZipArchive` is a stub for a future async zip path.)
 

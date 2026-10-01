@@ -45,6 +45,28 @@ class WidgetDataController extends Controller
         return $this->respond($widget, $endpoint, $placement['params'] ?? [], $this->callerKey($request));
     }
 
+    /**
+     * The Slide Announcer device's equivalent of show(), authenticated by
+     * its device token (the device's local backend proxies the kiosk's
+     * requests here). A device may read a placement only on a live slide
+     * in one of its own entity's shows — the same set it syncs.
+     */
+    public function device(Request $request, SlideMedia $slideMedia, string $element, string $endpoint): JsonResponse
+    {
+        $device = $request->user();
+        abort_unless($slideMedia->media_type === 'slide-overlay', 404);
+        $synced = Slide::current()->whereKey($slideMedia->slide_id)
+            ->whereHas('shows', fn ($q) => $q->where('entity_id', $device->entity_id))
+            ->exists();
+        abort_unless($synced, 404);
+
+        $placement = OverlayWidgets::placement($slideMedia, $element);
+        $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
+        abort_unless($widget, 404);
+
+        return $this->respond($widget, $endpoint, $placement['params'] ?? [], 'device:' . $device->id);
+    }
+
     public function preview(Request $request): JsonResponse
     {
         $user = $request->user();

@@ -112,6 +112,46 @@ class OverlayWidgets
             ->all();
     }
 
+    /**
+     * Placements for a Slide Announcer device: like forPlayer() but with
+     * no URLs — the device mirrors bundles locally and serves them (and
+     * proxies data) from its own loopback nginx, so it adds its own. The
+     * overlay id rides along for the device's data requests.
+     */
+    public function forDevice(?SlideMedia $overlay): array
+    {
+        $enabled = Widget::enabledBySlug();
+
+        return collect($overlay?->overlay_settings['widgets'] ?? [])
+            ->filter(fn ($p) => isset($enabled[$p['widget'] ?? '']))
+            ->map(fn ($p) => [...$p, 'version' => $enabled[$p['widget']]->version])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * The bundles a device must mirror for these placements: each enabled
+     * widget's current version and every file in it, with download URLs.
+     */
+    public function bundlesFor(array $placements): array
+    {
+        $enabled = Widget::enabledBySlug();
+
+        return collect($placements)->pluck('widget')->unique()
+            ->filter(fn ($slug) => isset($enabled[$slug]))
+            ->map(fn ($slug) => [
+                'slug'    => $slug,
+                'version' => $enabled[$slug]->version,
+                'entry'   => $enabled[$slug]->manifest['entry'],
+                'files'   => collect($enabled[$slug]->files)->map(fn ($path) => [
+                    'path' => $path,
+                    'url'  => $enabled[$slug]->assetUrl($path),
+                ])->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     public static function placement(SlideMedia $overlay, string $elementId): ?array
     {
         return collect($overlay->overlay_settings['widgets'] ?? [])->firstWhere('id', $elementId);

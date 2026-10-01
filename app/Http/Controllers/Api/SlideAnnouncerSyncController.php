@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Services\Widgets\OverlayWidgets;
 use App\Support\SlideAnnouncerVideoReceiver;
 use Illuminate\Http\Request;
 
@@ -46,17 +47,25 @@ class SlideAnnouncerSyncController extends Controller
         $device = $request->user();
         $shows = Show::where('entity_id', $device->entity_id)->get();
 
+        $shows = $shows->map(fn (Show $show) => [
+            'id' => (string) $show->id,
+            'name' => $show->name,
+            'is_main' => $show->is_main,
+            'slides' => Slide::with(['primaryMedia', 'overlayMedia'])
+                ->orderedInShow($show->id)
+                ->current()
+                ->get()
+                ->map(fn (Slide $slide) => $this->slideEntry($slide)),
+        ]);
+
         return response()->json([
-            'shows' => $shows->map(fn (Show $show) => [
-                'id' => (string) $show->id,
-                'name' => $show->name,
-                'is_main' => $show->is_main,
-                'slides' => Slide::with(['primaryMedia', 'overlayMedia'])
-                    ->orderedInShow($show->id)
-                    ->current()
-                    ->get()
-                    ->map(fn (Slide $slide) => $this->slideEntry($slide)),
-            ]),
+            'shows' => $shows,
+            // Every widget bundle the slides above place, for the device to
+            // mirror into its own cache (it never loads code off the server
+            // at display time, so widgets keep working offline).
+            'widgets' => app(OverlayWidgets::class)->bundlesFor(
+                $shows->flatMap(fn ($show) => $show['slides']->flatMap(fn ($slide) => $slide['widgets']))->all()
+            ),
             'settings' => $device->settings ?? [],
             // Same push as the heartbeat response's — carried here too so a
             // web edit reaches the device within one sync (~60s) rather
@@ -75,6 +84,10 @@ class SlideAnnouncerSyncController extends Controller
             'video_playback_mode' => $slide->video_playback_mode,
             'overlay_url' => $slide->overlay_url,
             'overlay_mime_type' => $slide->overlay_mime_type,
+            // Live widgets on the overlay — see App\Services\Widgets. The
+            // overlay's id is what the device's widget-data requests name.
+            'overlay_media_id' => $slide->overlayMedia?->id,
+            'widgets' => app(OverlayWidgets::class)->forDevice($slide->overlayMedia),
             'expires_at' => $slide->expires_at?->toIso8601String(),
         ];
     }
