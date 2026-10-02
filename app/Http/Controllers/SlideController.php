@@ -356,12 +356,6 @@ class SlideController extends Controller
     private function resolveDownloadSlides(Request $request)
     {
         $showId = $request->query('show_id');
-
-        if ($showId) {
-            return Slide::with('primaryMedia')->orderedInShow((int) $showId)->current()->get();
-        }
-
-        $ids = $request->query('ids');
         $languageCode = $request->query('language');
         $languageId = null;
 
@@ -369,6 +363,14 @@ class SlideController extends Controller
             $language = Language::where('abbreviation', $languageCode)->first();
             $languageId = $language?->id;
         }
+
+        if ($showId) {
+            // Same language rule as the dashboard listing, so a download
+            // contains exactly the slides the UI shows.
+            return Slide::with('primaryMedia')->orderedInShow((int) $showId)->current()->language($languageId)->get();
+        }
+
+        $ids = $request->query('ids');
 
         $query = Slide::with('primaryMedia')
             ->current()
