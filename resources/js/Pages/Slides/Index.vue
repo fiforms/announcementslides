@@ -74,6 +74,7 @@ function downloadSelected() {
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
     params.append('language', currentLanguageCode.value);
+    if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
@@ -81,6 +82,7 @@ function downloadAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showId) params.append('show_id', props.showId);
+    if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
@@ -89,6 +91,7 @@ function downloadPowerPointSelected() {
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
     params.append('language', currentLanguageCode.value);
+    if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
 }
 
@@ -96,6 +99,7 @@ function downloadPowerPointAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showId) params.append('show_id', props.showId);
+    if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
 }
 
@@ -104,6 +108,7 @@ function downloadRevelationSelected() {
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
     params.append('language', currentLanguageCode.value);
+    if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-revelation') + `?${params.toString()}`;
 }
 
@@ -111,6 +116,7 @@ function downloadRevelationAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showId) params.append('show_id', props.showId);
+    if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-revelation') + `?${params.toString()}`;
 }
 

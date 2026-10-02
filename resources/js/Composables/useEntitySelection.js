@@ -1,46 +1,27 @@
-import { computed, onMounted } from 'vue';
+import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 
-const STORAGE_KEY = 'currentEntityId';
+// Pages that have no meaning without an entity.
+const ENTITY_ROUTES = ['shows.*', 'slide-announcers.*', 'local-slides.*'];
 
 /**
  * Shared entity-selection state for the top nav (used by both
  * AuthenticatedLayout and PublicLayout, which each render their own copy of
- * the nav). The URL's ?entity_id= is the source of truth for the current
- * page; localStorage remembers the user's last choice (including explicitly
- * picking "Global View") so it carries over to the next page/session where
- * the URL doesn't already specify one.
+ * the nav). The URL's ?entity_id= is the only source of truth: nothing is
+ * remembered between visits, so a URL without one is the Global View.
  */
 export function useEntitySelection(userEntitiesRef) {
     const currentEntityId = computed(() => {
         const param = new URLSearchParams(window.location.search).get('entity_id');
-        if (param) return parseInt(param);
-
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored === 'global') return null;
-        if (stored) {
-            const id = parseInt(stored);
-            if (userEntitiesRef.value.some(e => e.id === id)) return id;
-        }
-
-        return userEntitiesRef.value[0]?.id || null;
+        return param ? parseInt(param) : null;
     });
 
     const currentEntity = computed(() => userEntitiesRef.value.find(e => e.id === currentEntityId.value));
 
-    // If the URL names an entity explicitly, remember it as the new default.
-    onMounted(() => {
-        const param = new URLSearchParams(window.location.search).get('entity_id');
-        if (param) localStorage.setItem(STORAGE_KEY, param);
-    });
-
     // entityId is null for "Global View".
     function selectEntity(entityId) {
-        localStorage.setItem(STORAGE_KEY, entityId ? String(entityId) : 'global');
-
-        // The Show Editor has no meaning without an entity — bounce to the
-        // Announcements view instead of leaving a broken/empty page.
-        if (!entityId && route().current('shows.*')) {
+        // Entity-only pages have no global form — go back to the Announcements view.
+        if (!entityId && ENTITY_ROUTES.some(r => route().current(r))) {
             router.visit(route('slides.index'), { preserveScroll: true });
             return;
         }

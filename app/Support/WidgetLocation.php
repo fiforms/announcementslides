@@ -39,15 +39,15 @@ class WidgetLocation
 
     /**
      * For a web page: the entity the page is about — `?entity_id=` (the
-     * board, Shows, Local Slides), an {entity} route parameter, or the
-     * entity the user last worked in — else the default.
+     * board, Shows, Local Slides) or an {entity} route parameter — else the
+     * default. The URL is the only source: nothing is remembered between
+     * requests, so a bare URL is always the global view.
      */
     public static function forRequest(Request $request): ?array
     {
         $routeEntity = $request->route('entity');
         $id = $request->query('entity_id')
-            ?? ($routeEntity instanceof Entity ? $routeEntity->id : $routeEntity)
-            ?? ($request->hasSession() ? $request->session()->get('current_entity_id') : null);
+            ?? ($routeEntity instanceof Entity ? $routeEntity->id : $routeEntity);
 
         return self::for($id ? Entity::find((int) $id) : null);
     }

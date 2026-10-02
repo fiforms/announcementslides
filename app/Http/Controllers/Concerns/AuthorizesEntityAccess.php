@@ -10,10 +10,9 @@ use Illuminate\Http\RedirectResponse;
  * a site admin)" gate used by every entity-leader-scoped controller
  * (LocalSlideController, ShowController, EntitySlideAnnouncerController).
  * $entityId is read from the `entity_id` query string, matching this
- * codebase's existing convention for entity-scoped routes, falling back to
- * (in order) the last entity_id seen this session, then the user's sole
- * entity if they only lead one — so a bare bookmark/typed URL with no query
- * string doesn't just 403.
+ * codebase's existing convention for entity-scoped routes. Nothing is
+ * remembered between requests; with no query string it falls back to the
+ * user's first entity so a bare bookmark/typed URL doesn't just 403.
  */
 trait AuthorizesEntityAccess
 {
@@ -22,17 +21,8 @@ trait AuthorizesEntityAccess
         $user = $request->user();
         $entityId = (int) $request->query('entity_id');
 
-        if ($entityId) {
-            session(['current_entity_id' => $entityId]);
-        } else {
-            $entityId = (int) session('current_entity_id');
-        }
-
         if (!$entityId) {
-            $memberIds = $user->memberEntityIds();
-            if (count($memberIds) === 1) {
-                $entityId = $memberIds[0];
-            }
+            $entityId = $user->memberEntityIds()[0] ?? 0;
         }
 
         abort_unless(

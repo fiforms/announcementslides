@@ -328,7 +328,7 @@ class SlideController extends Controller
         $title = $show?->name ?: 'Announcement Slides';
 
         // Where widgets with no location of their own should point: the
-        // show's church, else the requester's current one, else the site
+        // show's church, else the requested entity (?entity_id=), else the site
         // default (the same chain the live screens use).
         $location = $show?->entity_id
             ? WidgetLocation::for($show->entity)
