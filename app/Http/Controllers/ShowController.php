@@ -53,7 +53,7 @@ class ShowController extends Controller
                 'auto_fill_global' => $s->auto_fill_global, 'auto_fill_nearby' => $s->auto_fill_nearby,
             ]),
             'selectedShowId' => $selectedShow->id,
-            'showSlides' => $showSlides->map(fn ($s) => $this->slideResource($s)),
+            'showSlides' => $showSlides->map(fn ($s) => $this->slideResource($s, $selectedShow->is_main)),
             'unusedSlides' => $unusedSlides->map(fn ($s) => $this->slideResource($s)),
             'isAdmin' => $isAdmin,
             'languages' => $languages,
@@ -193,6 +193,11 @@ class ShowController extends Controller
     {
         $entityId = $this->authorizedEntityId($request);
         abort_unless($show->entity_id === $entityId, 404);
+        abort_if(
+            $show->is_main && $slide->isLockedInShows(),
+            422,
+            "This slide is required by the administrator and can't be removed from the show."
+        );
 
         $show->slides()->detach($slide->id);
 
@@ -282,7 +287,7 @@ class ShowController extends Controller
             ->withExists(['shows as linked_elsewhere' => fn ($q) => $q->whereIn('shows.id', $otherShowIds)]);
     }
 
-    private function slideResource(Slide $slide): array
+    private function slideResource(Slide $slide, bool $showLocks = false): array
     {
         return [
             'id' => $slide->id,
@@ -302,6 +307,7 @@ class ShowController extends Controller
             'overlay_widgets' => $slide->overlay_widgets,
             'status' => $slide->status,
             'share_nearby' => $slide->share_nearby,
+            'locked' => $showLocks && $slide->isLockedInShows(),
             'publish_at' => $slide->publish_at?->toIso8601String(),
             'expires_at' => $slide->expires_at?->toIso8601String(),
             'uploader' => $slide->uploader?->only('id', 'name'),

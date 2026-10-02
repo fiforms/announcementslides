@@ -131,6 +131,27 @@ class Show extends Model
     }
 
     /**
+     * Put an immutable global slide back into every entity's Main Show —
+     * including ones where a leader removed it before it became immutable.
+     * Other (extra) shows are left alone: the lock applies to Main only.
+     */
+    public static function restoreImmutableSlide(Slide $slide): void
+    {
+        if (!$slide->isLockedInShows()) {
+            return;
+        }
+
+        static::where('is_main', true)->whereNotNull('entity_id')->get()->each(function (self $show) use ($slide) {
+            if (!$show->slides()->where('slides.id', $slide->id)->exists()) {
+                $show->slides()->attach($slide->id, [
+                    'sort_order' => $slide->assignFanoutSortOrderIfNeeded(),
+                    'auto_added' => true,
+                ]);
+            }
+        });
+    }
+
+    /**
      * Remove every auto-added cross-entity link to $slide — used when a
      * slide stops being eligible for fan-out at all (e.g. "share nearby" is
      * turned off), since syncAutoFillForSlide's empty candidate set alone

@@ -125,13 +125,14 @@ class SlideController extends Controller
             'status'              => 'required|in:draft,pending,published,rejected',
             'entity_id'           => 'nullable|integer|exists:entities,id',
             'share_nearby'        => 'boolean',
+            'immutable'           => 'boolean',
         ]);
 
         $newLanguageId = $request->filled('language_id') ? (int) $request->input('language_id') : null;
         $languageChanged = $slide->language_id !== $newLanguageId;
         $statusChanged = $slide->status !== $request->input('status');
 
-        $data = $request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'entity_id', 'share_nearby');
+        $data = $request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'entity_id', 'share_nearby', 'immutable');
 
         // Share-with-nearby only means anything for an entity-owned slide — a
         // global slide is already visible everywhere, so never let it persist
@@ -141,13 +142,23 @@ class SlideController extends Controller
             $data['share_nearby'] = false;
         }
 
+        // Immutable only applies to global slides (a church can always manage
+        // its own).
+        $immutableChanged = false;
+        if (array_key_exists('immutable', $data)) {
+            $data['immutable'] = $resolvedEntityId === null && (bool) $data['immutable'];
+            $immutableChanged = $data['immutable'] !== $slide->immutable;
+        }
+
         $slide->update($data);
 
         // Re-run auto-fill fan-out so language-gated shows pick up/drop this
         // slide to match its new tag, and so it fans into (once published) or
         // out of (once un-published) every eligible show's rotation — never
         // touches a leader's manual keep (see Show::reconcilePair).
-        if (($languageChanged || $statusChanged) && $slide->entity_id === null) {
+        // Turning immutable on also restores the slide to any show a leader had
+        // already removed it from.
+        if (($languageChanged || $statusChanged || $immutableChanged) && $slide->entity_id === null) {
             SyncShowAutoFillForSlide::dispatch($slide->id);
         }
 
@@ -269,6 +280,7 @@ class SlideController extends Controller
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'status'            => $slide->status,
             'share_nearby'      => $slide->share_nearby,
+            'immutable'         => $slide->immutable,
             'original_filename' => $slide->original_filename,
             'file_size'         => $slide->file_size,
             'validation_issues' => $slide->validation_issues,

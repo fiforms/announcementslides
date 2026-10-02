@@ -243,6 +243,8 @@
         "reject_confirm": "Reject \"{title}\"?"
     },
     "admin": {
+        "immutable": "Required slide (global)",
+        "immutable_info": "Global admins keep this slide in every church's Main Show. It can be removed once it expires or the administrator lifts the requirement.",
         "dashboard_title": "Dashboard",
         "live_slides": "Live Slides",
         "pending_review": "Pending Review",
@@ -488,6 +490,9 @@
         "drag_here": "Drag slides here from \"Unused slides.\"",
         "expired_in_show": "Expired in this show ({n})",
         "archive_all": "Archive all",
+        "required": "Required",
+        "required_info": "Required by the administrator: it can't be removed until it expires.",
+        "required_cannot_remove": "This slide is required by your administrator, so it can't be removed from the Main Show until it expires. You can still reorder it.",
         "remove_from_show": "Remove from show",
         "all_archived": "All archived (expired) slides →",
         "edit_slide": "Edit Slide",

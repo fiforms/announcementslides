@@ -43,6 +43,7 @@ const showValidationDetails = ref(false);
                         {{ scopeBadge.label }}
                     </span>
                     <span v-if="autoTag" class="inline-flex text-[10px] text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full">{{ $t('show_manage.auto') }}</span>
+                    <span v-if="slide.locked" :title="$t('show_manage.required_info')" class="inline-flex text-[10px] text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded-full">{{ $t('show_manage.required') }}</span>
                     <span v-if="expiresLabel" class="inline-flex text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
                         {{ expiresLabel }}
                     </span>

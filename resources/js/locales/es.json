@@ -243,6 +243,8 @@
         "reject_confirm": "¿Rechazar \"{title}\"?"
     },
     "admin": {
+        "immutable": "Diapositiva obligatoria (global)",
+        "immutable_info": "Los administradores globales mantienen esta diapositiva en el programa principal de cada iglesia. Se puede quitar cuando expire o el administrador retire el requisito.",
         "dashboard_title": "Panel",
         "live_slides": "Diapositivas en vivo",
         "pending_review": "Pendiente de revisión",
@@ -488,6 +490,9 @@
         "drag_here": "Arrastra diapositivas aquí desde \"Diapositivas sin usar\".",
         "expired_in_show": "Expiradas en este programa ({n})",
         "archive_all": "Archivar todas",
+        "required": "Obligatoria",
+        "required_info": "Requerida por el administrador: no se puede quitar hasta que expire.",
+        "required_cannot_remove": "Esta diapositiva es obligatoria por su administrador, por lo que no se puede quitar del programa principal hasta que expire. Aún puede reordenarla.",
         "remove_from_show": "Quitar del programa",
         "all_archived": "Todas las diapositivas archivadas (expiradas) →",
         "edit_slide": "Editar diapositiva",

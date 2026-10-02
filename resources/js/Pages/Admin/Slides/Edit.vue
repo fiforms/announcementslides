@@ -34,6 +34,7 @@ const form = useForm({
     expires_at:          toLocalDatetime(props.slide.expires_at),
     status:              props.slide.status,
     share_nearby:        props.slide.share_nearby ?? false,
+    immutable:           props.slide.immutable ?? false,
 });
 
 function submit() {
@@ -186,6 +187,15 @@ onBeforeUnmount(() => {
                                 <option value="rejected">{{ $t('admin.rejected') }}</option>
                             </select>
                         </div>
+                    </div>
+
+                    <div v-if="!slide.entity">
+                        <label class="flex items-center gap-2">
+                            <input v-model="form.immutable" type="checkbox"
+                                class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                            <span class="text-sm font-medium text-gray-700">{{ $t('admin.immutable') }}</span>
+                        </label>
+                        <p class="mt-1 text-xs text-gray-500">{{ $t('admin.immutable_info') }}</p>
                     </div>
 
                     <div v-if="slide.entity">

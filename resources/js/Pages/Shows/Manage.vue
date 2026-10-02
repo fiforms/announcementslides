@@ -303,9 +303,22 @@ function dropOnZone(zone, targetSlide = null) {
     dragEnd();
 }
 
+const lockedNotice = ref('');
+let lockedNoticeTimer = null;
+
+function showLockedNotice() {
+    lockedNotice.value = t('show_manage.required_cannot_remove');
+    clearTimeout(lockedNoticeTimer);
+    lockedNoticeTimer = setTimeout(() => { lockedNotice.value = ''; }, 6000);
+}
+
 function dropOnUnused() {
     const slide = draggedSlide.value;
-    if (!slide || draggedFrom.value !== 'show') return;
+    if (slide?.locked && draggedFrom.value === 'show') {
+        showLockedNotice();
+        return dragEnd();
+    }
+    if (!slide || draggedFrom.value !== 'show') return dragEnd();
 
     inShow.value = inShow.value.filter(s => s.id !== slide.id);
     unused.value = [...unused.value, slide];
@@ -459,6 +472,9 @@ function persistLeaderOrder() {
                 <!-- In this show -->
                 <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
                     <h2 class="mb-3 text-sm font-semibold text-gray-700">{{ $t('show_manage.in_show', { show: showName(selectedShow) }) }}</h2>
+
+                    <p v-if="lockedNotice" role="alert"
+                        class="mb-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-800">{{ lockedNotice }}</p>
 
                     <div class="space-y-3">
                         <template v-for="zone in ZONE_ORDER" :key="zone">

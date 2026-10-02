@@ -63,6 +63,10 @@ Models live in [app/Models/](app/Models/); schema in [database/migrations/](data
 
 Because expiry/publishing is computed at query time, no scheduled job is needed. `getDisplayStatusAttribute()` derives `scheduled`/`archived` labels for the UI.
 
+### Immutable global slides
+
+An admin can mark a global slide `immutable` (Admin → Edit slide). While it is published and unexpired ([Slide::isLockedInShows()](app/Models/Slide.php)), a leader can't remove it from their entity's **Main Show** (`ShowController::detach` returns 422; the Show Editor tags it "Required"). Extra shows are unaffected. Turning the flag on re-adds the slide to every Main Show via `Show::restoreImmutableSlide()` (run from the `SyncShowAutoFillForSlide` job). Expiry, un-publishing or clearing the flag releases the lock.
+
 ### Nearby sharing
 
 A church viewer can opt to also pull in slides from nearby congregations. [NearbyEntities::within()](app/Support/NearbyEntities.php) does a cheap SQL bounding-box pre-filter, then refines to an exact great-circle (haversine) radius in PHP so it stays DB-portable. The radius default is [config/slides.php](config/slides.php) (`SLIDES_NEARBY_RADIUS_MILES`, default 50), overridable per user via the `nearby_radius_miles` setting. Only the *borrowed* bucket is gated by the `share_nearby` flag.

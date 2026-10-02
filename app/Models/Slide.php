@@ -18,7 +18,7 @@ class Slide extends Model
     protected $fillable = [
         'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
         'status', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
-        'share_nearby', 'fanout_sort_order', 'overlay_thumbnail_path',
+        'share_nearby', 'immutable', 'fanout_sort_order', 'overlay_thumbnail_path',
     ];
 
     protected function casts(): array
@@ -28,6 +28,7 @@ class Slide extends Model
             'expires_at'  => 'datetime',
             'reviewed_at' => 'datetime',
             'share_nearby' => 'boolean',
+            'immutable' => 'boolean',
         ];
     }
 
@@ -91,6 +92,20 @@ class Slide extends Model
         return $query->where('status', 'published')
             ->where(fn ($q) => $q->whereNull('publish_at')->orWhere('publish_at', '<=', now()))
             ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()));
+    }
+
+    /**
+     * An immutable global slide can't be removed from an entity's Main Show
+     * while it's live: published and not yet expired. Once it
+     * expires or is unpublished/archived, or the flag is cleared, a leader
+     * may remove it like any other slide.
+     */
+    public function isLockedInShows(): bool
+    {
+        return $this->immutable
+            && $this->entity_id === null
+            && $this->status === 'published'
+            && ($this->expires_at === null || $this->expires_at->isFuture());
     }
 
     public function scopeArchived(Builder $query): Builder

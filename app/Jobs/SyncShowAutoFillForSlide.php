@@ -28,6 +28,7 @@ class SyncShowAutoFillForSlide implements ShouldQueue
         $slide = Slide::find($this->slideId);
         if ($slide) {
             Show::syncAutoFillForSlide($slide);
+            Show::restoreImmutableSlide($slide);
         }
     }
 }
