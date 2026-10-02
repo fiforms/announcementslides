@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import WidgetLayer from '@/Components/Widgets/WidgetLayer.vue';
 
 const props = defineProps({
@@ -32,6 +32,25 @@ const MEDIA_TYPE_LABELS = {
 function mediaLabel(media) {
     return MEDIA_TYPE_LABELS[media.media_type] ?? media.media_type;
 }
+
+// One download button per attachment. When the slide has an overlay, its
+// 'Slide' button is the composited result and the bare base image moves to
+// a separate 'Background' button (the overlay keeps its own button).
+const downloads = computed(() => {
+    const media = props.slide?.media ?? [];
+    const hasOverlay = media.some(m => m.media_type === 'slide-overlay');
+
+    return media.flatMap(m => {
+        const item = { media: m, label: mediaLabel(m), href: route('slides.media.download', [props.slide.id, m.id]) };
+        if (hasOverlay && m.media_type === 'slide') {
+            return [
+                { ...item, href: route('slides.download', props.slide.id) },
+                { ...item, label: 'Background' },
+            ];
+        }
+        return [item];
+    });
+});
 
 function isPdf(media) {
     return media.mime_type === 'application/pdf';
@@ -151,11 +170,11 @@ async function copy(text, field) {
                         </button>
                     </div>
 
-                    <div v-if="slide.media?.length" class="flex flex-wrap gap-2 pt-1">
-                        <a v-for="media in slide.media" :key="media.id"
-                            :href="route('slides.media.download', [slide.id, media.id])"
+                    <div v-if="downloads.length" class="flex flex-wrap gap-2 pt-1">
+                        <a v-for="d in downloads" :key="d.label + d.media.id"
+                            :href="d.href"
                             class="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20 transition-colors">
-                            <svg v-if="isPdf(media)" class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <svg v-if="isPdf(d.media)" class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                             </svg>
@@ -163,7 +182,7 @@ async function copy(text, field) {
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M4 8h16M4 4h16a1 1 0 011 1v14a1 1 0 01-1 1H4a1 1 0 01-1-1V5a1 1 0 011-1z" />
                             </svg>
-                            {{ mediaLabel(media) }}
+                            {{ d.label }}
                             <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />

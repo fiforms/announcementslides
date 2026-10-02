@@ -185,7 +185,12 @@ class SlideController extends Controller
         return back()->with('success', 'Slide restored.');
     }
 
-    public function download(Slide $slide)
+    /**
+     * Downloads the slide as viewers see it: the overlay (if any) burned
+     * into the primary image. Slides with no overlay (or a video/failed
+     * flatten) download the primary file as-is.
+     */
+    public function download(Slide $slide, OverlayCompositor $compositor)
     {
         abort_unless(
             $slide->status === 'published',
@@ -194,6 +199,13 @@ class SlideController extends Controller
 
         $media = $slide->primaryMedia;
         abort_unless($media, 404);
+
+        $composite = $this->flattenSlide($slide, $media, $compositor);
+        if ($composite) {
+            return response()->download($composite, $this->jpgName($media->downloadName()), [
+                'Content-Type' => 'image/jpeg',
+            ])->deleteFileAfterSend(true);
+        }
 
         return Storage::disk('public')->download($media->disk_path, $media->downloadName());
     }
@@ -243,16 +255,12 @@ class SlideController extends Controller
             $name = $media->downloadName();
 
             // Burn the overlay into the image so the zip holds the slide as
-            // viewers see it. If flattening fails, fall back to the bare file.
-            if ($slide->overlayMedia && $media->isImage()) {
-                $compositePath = sys_get_temp_dir() . '/slide-composite-' . Str::uuid() . '.jpg';
-                if ($compositor->flatten($fullPath, $slide->overlayMedia, $compositePath, quality: 92)) {
-                    $tempImages[] = $compositePath;
-                    $fullPath = $compositePath;
-                    if (! in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['jpg', 'jpeg'], true)) {
-                        $name = pathinfo($name, PATHINFO_FILENAME) . '.jpg';
-                    }
-                }
+            // viewers see it (falling back to the bare file).
+            $composite = $this->flattenSlide($slide, $media, $compositor);
+            if ($composite) {
+                $tempImages[] = $composite;
+                $fullPath = $composite;
+                $name = $this->jpgName($name);
             }
 
             $zip->addFile($fullPath, $this->zipEntryName(++$position, $slides->count(), $name));
@@ -270,6 +278,34 @@ class SlideController extends Controller
         return response()->download($tmpFile, 'announcement-slides.zip', [
             'Content-Type' => 'application/zip',
         ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * Flattens the slide's overlay onto its primary image into a temp JPEG
+     * (full base resolution) and returns its path, or null if there's no
+     * overlay, the primary isn't an image, or flattening failed. The caller
+     * owns the file and must delete it.
+     */
+    private function flattenSlide(Slide $slide, SlideMedia $media, OverlayCompositor $compositor): ?string
+    {
+        $overlay = $slide->overlayMedia;
+        if (! $overlay || ! $media->isImage()) {
+            return null;
+        }
+
+        $path = sys_get_temp_dir() . '/slide-composite-' . Str::uuid() . '.jpg';
+        $ok   = $compositor->flatten(Storage::disk('public')->path($media->disk_path), $overlay, $path, quality: 92);
+
+        return $ok ? $path : null;
+    }
+
+    private function jpgName(string $name): string
+    {
+        if (in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['jpg', 'jpeg'], true)) {
+            return $name;
+        }
+
+        return pathinfo($name, PATHINFO_FILENAME) . '.jpg';
     }
 
     /**
