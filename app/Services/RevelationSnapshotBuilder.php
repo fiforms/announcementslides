@@ -195,6 +195,9 @@ class RevelationSnapshotBuilder
     {
         $date = now()->toDateString();
 
+        // FIXME: Replace 12000 ms below with the user's configured
+        // default auto-slide duration once this is implemented
+
         return <<<YAML
         ---
         title: {$this->yaml($title)}
@@ -214,6 +217,9 @@ class RevelationSnapshotBuilder
           showSlideNumber: speaker
           hashOneBasedIndex: true
           hash: true
+          loop: true
+          autoSlide: 12000
+          autoSlideStoppable: false
         confidence: {}
         version: 1.0.13
         ---
