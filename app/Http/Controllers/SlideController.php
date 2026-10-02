@@ -13,6 +13,7 @@ use App\Services\OverlayCompositor;
 use App\Services\RevelationSnapshotBuilder;
 use App\Services\VideoFrameExtractor;
 use App\Support\NearbyEntities;
+use App\Support\WidgetLocation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -326,7 +327,14 @@ class SlideController extends Controller
         $show  = $request->query('show_id') ? Show::find((int) $request->query('show_id')) : null;
         $title = $show?->name ?: 'Announcement Slides';
 
-        $tmpFile = $builder->build($slides, $title);
+        // Where widgets with no location of their own should point: the
+        // show's church, else the requester's current one, else the site
+        // default (the same chain the live screens use).
+        $location = $show?->entity_id
+            ? WidgetLocation::for($show->entity)
+            : WidgetLocation::forRequest($request);
+
+        $tmpFile = $builder->build($slides, $title, $location);
 
         // "Main Show" -> main_show.revelation.zip; non-letters/digits collapse to underscores.
         $slug = trim(preg_replace('/[^\p{L}\p{N}]+/u', '_', mb_strtolower($title)), '_') ?: 'announcement_slides';

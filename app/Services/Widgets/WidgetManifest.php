@@ -68,6 +68,10 @@ class WidgetManifest
             $errors[] = '"aspectLocked" must be true or false.';
         }
 
+        if (isset($m['usesLocation']) && !is_bool($m['usesLocation'])) {
+            $errors[] = '"usesLocation" must be true or false.';
+        }
+
         $params = $m['parameters'] ?? [];
         if (!is_array($params) || ($params !== [] && array_is_list($params))) {
             $errors[] = '"parameters" must be an object.';
@@ -111,6 +115,7 @@ class WidgetManifest
             'preview'      => $m['preview'] ?? null,
             'defaultSize'  => ['w' => $size['w'], 'h' => $size['h']],
             'aspectLocked' => (bool) ($m['aspectLocked'] ?? false),
+            'usesLocation' => (bool) ($m['usesLocation'] ?? false),
             'parameters'   => $params,
             'settings'     => $settings,
             'endpoints'    => $endpoints,

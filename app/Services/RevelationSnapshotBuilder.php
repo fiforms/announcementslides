@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Slide;
+use App\Models\Widget;
 use App\Services\Widgets\OverlayWidgets;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
@@ -55,9 +56,12 @@ class RevelationSnapshotBuilder
     /**
      * Writes the package for $slides (already in show order, primaryMedia
      * and overlayMedia loaded) to a temp zip and returns its path; the
-     * caller deletes it. Slides without media are skipped.
+     * caller deletes it. Slides without media are skipped. $location is
+     * the screen location widgets fall back to (see WidgetLocation); it's
+     * written into the block of each widget whose manifest declares
+     * "usesLocation", so e.g. a weather widget with a blank ZIP still gets one.
      */
-    public function build(Collection $slides, string $title): string
+    public function build(Collection $slides, string $title, ?array $location = null): string
     {
         $disk  = Storage::disk('public');
         $total = $slides->count();
@@ -88,8 +92,10 @@ class RevelationSnapshotBuilder
             $files[$overlayName] = $disk->path($overlay->disk_path);
 
             $section = $this->image('background', $baseName) . "\n\n" . $this->image('fill', $overlayName);
+            $installed = Widget::enabledBySlug();
             foreach ($this->widgets->forDevice($overlay) as $placement) {
-                $section .= "\n\n" . $this->widgetBlock($placement);
+                $usesLocation = (bool) ($installed[$placement['widget']]->manifest['usesLocation'] ?? false);
+                $section .= "\n\n" . $this->widgetBlock($placement, $location, $usesLocation);
             }
             $sections[] = $section;
         }
@@ -142,7 +148,7 @@ class RevelationSnapshotBuilder
      * the screen width/height so it's independent of canvas size, and its
      * parameters. Opacity is only written when the widget isn't fully opaque.
      */
-    private function widgetBlock(array $p): string
+    private function widgetBlock(array $p, ?array $location, bool $usesLocation): string
     {
         $lines = [
             ':widget:',
@@ -156,6 +162,12 @@ class RevelationSnapshotBuilder
         ];
         if (($p['opacity'] ?? 1) < 1) {
             $lines[] = '  opacity: ' . $this->yamlScalar($p['opacity']);
+        }
+        if ($location && $usesLocation) {
+            $lines[] = '  location:';
+            $lines[] = '    name: ' . $this->yamlScalar((string) $location['name']);
+            $lines[] = '    latitude: ' . $this->yamlScalar((float) $location['latitude']);
+            $lines[] = '    longitude: ' . $this->yamlScalar((float) $location['longitude']);
         }
         if (! empty($p['params'])) {
             $lines[] = '  parameters:';
@@ -174,7 +186,7 @@ class RevelationSnapshotBuilder
             is_bool($value)  => $value ? 'true' : 'false',
             $value === null  => 'null',
             is_int($value)   => (string) $value,
-            is_float($value) => rtrim(rtrim(sprintf('%.4F', $value), '0'), '.'),
+            is_float($value) => rtrim(rtrim(sprintf('%.6F', $value), '0'), '.'),
             default          => $this->yaml((string) $value, multiline: true),
         };
     }
