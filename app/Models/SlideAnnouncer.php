@@ -12,6 +12,7 @@ class SlideAnnouncer extends Model
     protected $fillable = [
         'entity_id',
         'language_id',
+        'language_revision',
         'name',
         'mac_address',
         'device_uuid',
@@ -37,6 +38,7 @@ class SlideAnnouncer extends Model
 
     protected $casts = [
         'auto_update_enabled' => 'boolean',
+        'language_revision' => 'integer',
         'srt_sink_enabled' => 'boolean',
         'srt_sink_config' => 'array',
         'srt_sink_config_revision' => 'integer',
@@ -55,6 +57,22 @@ class SlideAnnouncer extends Model
     public function language()
     {
         return $this->belongsTo(Language::class);
+    }
+
+    /**
+     * The one place a device's language changes, so the revision always
+     * moves with it. No-op (no revision bump) if it's already that language.
+     */
+    public function changeLanguage(?int $languageId): void
+    {
+        if ($languageId === $this->language_id) {
+            return;
+        }
+
+        $this->update([
+            'language_id' => $languageId,
+            'language_revision' => $this->language_revision + 1,
+        ]);
     }
 
     public function pairedBy()

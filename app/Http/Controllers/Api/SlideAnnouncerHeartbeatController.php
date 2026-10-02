@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Language;
 use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerRelease;
 use App\Support\SlideAnnouncerVideoReceiver;
@@ -44,10 +45,27 @@ class SlideAnnouncerHeartbeatController extends Controller
             // web-edit revision it applied — absent from older app versions.
             // See App\Support\SlideAnnouncerVideoReceiver.
             'srt_sink_config' => 'nullable|array',
+            // A language the device's user picked locally (setup wizard or
+            // Settings > Advanced) that the server hasn't seen yet, with the
+            // `language_revision` the device had last synced when they
+            // picked it. Applied only if that revision is still current —
+            // otherwise the language was changed on the web in the meantime
+            // and the server's value wins (it comes back in the response).
+            'language_change' => 'nullable|array',
+            'language_change.code' => 'required_with:language_change|string|max:10',
+            'language_change.base_revision' => 'required_with:language_change|integer|min:0',
         ]);
 
         $device = $request->user();
         $ip = $request->ip();
+
+        if (isset($data['language_change'])
+            && (int) $data['language_change']['base_revision'] === $device->language_revision) {
+            $languageId = Language::where('abbreviation', $data['language_change']['code'])->value('id');
+            if ($languageId) {
+                $device->changeLanguage($languageId);
+            }
+        }
 
         $device->update([
             'app_version' => $data['app_version'] ?? $device->app_version,
@@ -91,11 +109,15 @@ class SlideAnnouncerHeartbeatController extends Controller
             // moving to a different entity via re-pair, which changes
             // entity_id without touching device_name at all.
             'entity_name' => $device->entity->name,
-            // Null until an entity admin assigns one (EntitySlideAnnouncerController::update),
-            // in which case the device keeps using its own boot-yaml
-            // default — see local-app/backend/pairing.py's
-            // read_effective_language() and slideannouncer/LOCALIZATION_TODO.md.
+            // One language shared by the device UI and its slides, changed
+            // from either side (web edit or the device's own picker) with
+            // the later change winning — see language_revision. Null until
+            // someone sets one, in which case the device keeps its own
+            // default (local-app/backend/pairing.py's read_effective_language()).
             'language' => $device->language?->abbreviation,
+            // Lets the device tell its own unsent change from a newer web
+            // edit — see language_change above.
+            'language_revision' => $device->language_revision,
             'latest_app_version' => $activeAppRelease?->version,
             'app_update_available' => $appUpdateAvailable,
             'app_download_url' => $appUpdateAvailable ? $activeAppRelease->url() : null,

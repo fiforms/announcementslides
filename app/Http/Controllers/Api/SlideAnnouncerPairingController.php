@@ -126,6 +126,11 @@ class SlideAnnouncerPairingController extends Controller
             'entity_name' => $device->entity->name,
             'token' => $token->plainTextToken,
             'sibling_hostnames' => $siblingHostnames,
+            // What the device should now treat as its language (its own pick
+            // when this was a first pairing, or the existing server value on
+            // a re-pair) so it doesn't have to wait for a heartbeat.
+            'language' => $device->language?->abbreviation,
+            'language_revision' => $device->language_revision,
         ], 201);
     }
 }

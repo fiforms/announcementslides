@@ -172,6 +172,13 @@ class EntitySlideAnnouncerController extends Controller
             SlideAnnouncerVideoReceiver::applyWebEdit($slideAnnouncer, $data['srt_sink_config']);
         }
         unset($data['srt_sink_config']);
+
+        // Goes through changeLanguage() so the revision bumps and the device
+        // adopts the new language on its next heartbeat.
+        if (array_key_exists('language_id', $data)) {
+            $slideAnnouncer->changeLanguage($data['language_id'] ? (int) $data['language_id'] : null);
+            unset($data['language_id']);
+        }
         $slideAnnouncer->update($data);
 
         return back()->with('success', 'Device updated.');
