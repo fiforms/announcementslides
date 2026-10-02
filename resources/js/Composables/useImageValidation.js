@@ -1,3 +1,5 @@
+import { scanQrCodes } from '@/Composables/useQrScan.js';
+
 export function useImageValidation() {
     const MIN_RESOLUTION_MP = 2;
     const MAX_RESOLUTION_MP = 8.5;
@@ -69,7 +71,7 @@ export function useImageValidation() {
         const issues = [];
 
         if (!file.type.startsWith('image/')) {
-            return { issues: [], width: null, height: null };
+            return { issues: [], width: null, height: null, qrCodes: [] };
         }
 
         const [width, height] = await getImageDimensions(file);
@@ -83,7 +85,12 @@ export function useImageValidation() {
 
         issues.push(...checkFileSize(file.size));
 
-        return { issues, width, height };
+        const qrCodes = await scanQrCodes(file);
+        if (qrCodes.length > 1) {
+            issues.push(`${qrCodes.length} QR codes found — a slide should carry only one`);
+        }
+
+        return { issues, width, height, qrCodes };
     }
 
     // Resolution and aspect-ratio issues for a size alone (no file yet) — used

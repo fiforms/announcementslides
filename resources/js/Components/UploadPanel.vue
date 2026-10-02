@@ -7,6 +7,7 @@ import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
 import { useImageValidation } from '@/Composables/useImageValidation.js';
+import { isWebUrl } from '@/Composables/useQrScan.js';
 import ResizeOption from '@/Components/ResizeOption.vue';
 import { useUploadResize } from '@/Composables/useUploadResize.js';
 
@@ -60,6 +61,10 @@ async function onFilesSelected(files) {
 
     fileValidations.value = await Promise.all(files.map(f => validateImage(f)));
     resize.setFiles(files, fileValidations.value);
+
+    // One link covers a whole batch, so only a lone slide's QR code is used for it.
+    const qrUrl = files.length === 1 ? fileValidations.value[0]?.qrCodes?.find(isWebUrl) : null;
+    if (qrUrl && !link.value) link.value = qrUrl;
 
     if (!title.value && files.length === 1) {
         title.value = files[0].name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');

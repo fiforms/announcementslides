@@ -7,6 +7,7 @@ import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import ResizeOption from '@/Components/ResizeOption.vue';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
 import { useImageValidation } from '@/Composables/useImageValidation.js';
+import { isWebUrl } from '@/Composables/useQrScan.js';
 import { useUploadResize } from '@/Composables/useUploadResize.js';
 
 const { isUploading, uploadError, fileProgress, overallProgress, upload } = useChunkedUpload();
@@ -41,6 +42,10 @@ async function onFilesSelected(files) {
 
     fileValidations.value = await Promise.all(files.map(f => validateImage(f)));
     resize.setFiles(files, fileValidations.value);
+
+    // One link covers a whole batch, so only a lone slide's QR code is used for it.
+    const qrUrl = files.length === 1 ? fileValidations.value[0]?.qrCodes?.find(isWebUrl) : null;
+    if (qrUrl && !link.value) link.value = qrUrl;
 }
 
 function removeFile(i) {

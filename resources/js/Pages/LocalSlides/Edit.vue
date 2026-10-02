@@ -1,4 +1,5 @@
 <script setup>
+import QrLinkScan from '@/Components/QrLinkScan.vue';
 import { computed } from 'vue';
 import { useForm, Link, router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
@@ -92,7 +93,10 @@ function toggleShareNearby() {
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <div class="flex items-start justify-between gap-3 mb-1">
+                        <label class="block text-sm font-medium text-gray-700">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                        <QrLinkScan :media="slide.media ?? []" @pick="form.link = $event" />
+                    </div>
                     <input v-model="form.link" type="url" placeholder="https://…"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     <p v-if="form.errors.link" class="mt-1 text-xs text-red-600">{{ form.errors.link }}</p>
