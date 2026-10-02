@@ -172,7 +172,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
 
 <template>
     <PublicLayout>
-        <head><title>Announcement Slides</title></head>
+        <head><title>{{ $t('slides.page_title') }}</title></head>
 
         <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
@@ -201,21 +201,21 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
                     <Dropdown align="left" width="48" contentClasses="py-1 bg-white">
                         <template #trigger>
                             <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-                                Show/Download Selected ({{ selectedIds.size }})
+                                {{ $t('slides.show_download_selected') }} ({{ selectedIds.size }})
                             </button>
                         </template>
                         <template #content>
                             <button @click="openSlideshowSelected"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
-                                Slideshow
+                                {{ $t('slides.slideshow') }}
                             </button>
                             <a @click="downloadSelected"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                Image Download (.zip)
+                                {{ $t('slides.image_download') }}
                             </a>
                             <a @click="downloadPowerPointSelected"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                PowerPoint Download (.pptx)
+                                {{ $t('slides.powerpoint_download') }}
                             </a>
                         </template>
                     </Dropdown>
@@ -228,21 +228,21 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
                     <Dropdown v-if="slides.length" align="left" width="48" contentClasses="py-1 bg-white">
                         <template #trigger>
                             <button class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
-                                Show/Download All
+                                {{ $t('slides.show_download_all') }}
                             </button>
                         </template>
                         <template #content>
                             <button @click="openSlideshowAll"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none">
-                                Slideshow
+                                {{ $t('slides.slideshow') }}
                             </button>
                             <a @click="downloadAll"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                Image Download (.zip)
+                                {{ $t('slides.image_download') }}
                             </a>
                             <a @click="downloadPowerPointAll"
                                 class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
-                                PowerPoint Download (.pptx)
+                                {{ $t('slides.powerpoint_download') }}
                             </a>
                         </template>
                     </Dropdown>

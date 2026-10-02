@@ -1,5 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
+import { useI18n } from 'vue-i18n';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 
 const props = defineProps({
@@ -12,20 +13,21 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['toggle-select', 'open']);
+const { t, locale } = useI18n();
 const showValidationDetails = ref(false);
 
 const expiresLabel = computed(() => {
     if (!props.slide.expires_at) return null;
     const d = new Date(props.slide.expires_at);
     const isExpired = d <= new Date();
-    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return isExpired ? `Expired ${dateStr}` : `Expires ${dateStr}`;
+    const dateStr = d.toLocaleDateString(locale.value, { month: 'short', day: 'numeric', year: 'numeric' });
+    return isExpired ? t('slides.expired_on', { date: dateStr }) : t('slides.expires_on', { date: dateStr });
 });
 
 const publishLabel = computed(() => {
     if (!props.slide.publish_at) return null;
     const d = new Date(props.slide.publish_at);
-    return `From ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    return t('slides.from_date', { date: d.toLocaleDateString(locale.value, { month: 'short', day: 'numeric', year: 'numeric' }) });
 });
 
 const isVideoSlide = computed(() => !!props.slide.mime_type?.startsWith('video/'));
@@ -114,7 +116,7 @@ const previewSrc = computed(() => {
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                         d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Download
+                {{ $t('slides.download') }}
             </a>
         </div>
     </div>

@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
@@ -9,6 +10,8 @@ const props = defineProps({
     pairingCode: { type: Object, default: null },
     diskImages: { type: Array, default: () => [] },
 });
+
+const { t, locale } = useI18n();
 
 const generating = ref(false);
 
@@ -20,14 +23,14 @@ function generateCode() {
 }
 
 function unpair(device) {
-    if (confirm(`Unpair "${device.name}"? It will need a fresh pairing code to reconnect.`)) {
+    if (confirm(t('slide_announcers.unpair_confirm', { name: device.name }))) {
         router.delete(route('slide-announcers.destroy', { slideAnnouncer: device.id, entity_id: props.entity.id }));
     }
 }
 
 function formatSeen(device) {
-    if (!device.last_seen_at) return 'Never';
-    return new Date(device.last_seen_at).toLocaleString();
+    if (!device.last_seen_at) return t('slide_announcers.never');
+    return new Date(device.last_seen_at).toLocaleString(locale.value);
 }
 
 function formatBytes(bytes) {
@@ -42,37 +45,37 @@ function formatBytes(bytes) {
     <AuthenticatedLayout>
         <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8 space-y-6">
             <Link :href="route('entity.slides.index', { entity: entity.id })" class="text-sm text-indigo-600 hover:text-indigo-800">
-                &larr; Back to slides
+                &larr; {{ $t('slide_announcers.back_to_slides') }}
             </Link>
             <div class="flex items-center justify-between">
-                <h1 class="text-xl font-semibold text-gray-900">Slide Announcer devices &mdash; {{ entity.name }}</h1>
+                <h1 class="text-xl font-semibold text-gray-900">{{ $t('slide_announcers.entity_title', { name: entity.name }) }}</h1>
                 <button @click="generateCode" :disabled="generating"
                     class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-                    Generate pairing code
+                    {{ $t('slide_announcers.generate_code') }}
                 </button>
             </div>
 
             <div v-if="pairingCode" class="rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3 text-sm text-indigo-800">
-                Pairing code: <span class="font-mono text-lg font-bold tracking-widest">{{ pairingCode.code }}</span>
-                &mdash; enter this on the device's pairing screen. Expires {{ new Date(pairingCode.expires_at).toLocaleTimeString() }}.
+                {{ $t('slide_announcers.pairing_code') }} <span class="font-mono text-lg font-bold tracking-widest">{{ pairingCode.code }}</span>
+                {{ $t('slide_announcers.pairing_instructions', { time: new Date(pairingCode.expires_at).toLocaleTimeString(locale) }) }}
             </div>
 
             <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">
-                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">Get a device image</h2>
-                <p class="text-sm text-gray-600">
-                    Write one of these directly to an SD card (with
-                    <a href="https://etcher.balena.io/" target="_blank" rel="noopener noreferrer"
-                        class="text-indigo-600 hover:text-indigo-800 underline">balenaEtcher</a>
-                    or similar) to provision a new device, then pair it with the code above.
-                </p>
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wide">{{ $t('slide_announcers.image_title') }}</h2>
+                <i18n-t keypath="slide_announcers.etcher_help_entity" tag="p" class="text-sm text-gray-600">
+                    <template #etcher>
+                        <a href="https://etcher.balena.io/" target="_blank" rel="noopener noreferrer"
+                            class="text-indigo-600 hover:text-indigo-800 underline">balenaEtcher</a>
+                    </template>
+                </i18n-t>
 
                 <div v-if="diskImages.length" class="overflow-hidden rounded-lg border border-gray-200">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-2 text-left font-medium text-gray-500">Architecture</th>
-                                <th class="px-4 py-2 text-left font-medium text-gray-500">Stable</th>
-                                <th class="px-4 py-2 text-left font-medium text-gray-500">Testing</th>
+                                <th class="px-4 py-2 text-left font-medium text-gray-500">{{ $t('slide_announcers.architecture') }}</th>
+                                <th class="px-4 py-2 text-left font-medium text-gray-500">{{ $t('slide_announcers.col_stable') }}</th>
+                                <th class="px-4 py-2 text-left font-medium text-gray-500">{{ $t('slide_announcers.col_testing') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100">
@@ -100,19 +103,19 @@ function formatBytes(bytes) {
                         </tbody>
                     </table>
                 </div>
-                <p v-else class="text-sm text-gray-500">No OS disk images have been published yet.</p>
+                <p v-else class="text-sm text-gray-500">{{ $t('slide_announcers.no_images') }}</p>
             </div>
 
             <div v-if="devices.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
                 <table class="min-w-full divide-y divide-gray-200 text-sm">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Device</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500">Status</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">App / OS version</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">IP / Temp</th>
-                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Last seen</th>
-                            <th class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('slide_announcers.device') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('slide_announcers.status') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">{{ $t('slide_announcers.app_os_version') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">{{ $t('slide_announcers.ip_temp') }}</th>
+                            <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">{{ $t('slide_announcers.last_seen') }}</th>
+                            <th class="px-4 py-3 text-right font-medium text-gray-500">{{ $t('slide_announcers.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
@@ -122,12 +125,12 @@ function formatBytes(bytes) {
                                     class="font-medium text-indigo-600 hover:text-indigo-800">
                                     {{ device.name }}
                                 </Link>
-                                <div class="text-xs text-gray-500">{{ device.mac_address || 'no MAC on file' }}</div>
+                                <div class="text-xs text-gray-500">{{ device.mac_address || $t('slide_announcers.no_mac') }}</div>
                             </td>
                             <td class="px-4 py-3">
                                 <span :class="device.online ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'"
                                     class="rounded-full px-2 py-0.5 text-xs font-medium">
-                                    {{ device.online ? 'Online' : 'Offline' }}
+                                    {{ device.online ? $t('slide_announcers.online') : $t('slide_announcers.offline') }}
                                 </span>
                             </td>
                             <td class="px-4 py-3 hidden sm:table-cell text-gray-600">
@@ -140,7 +143,7 @@ function formatBytes(bytes) {
                             <td class="px-4 py-3 hidden lg:table-cell text-gray-600">{{ formatSeen(device) }}</td>
                             <td class="px-4 py-3 text-right">
                                 <button @click="unpair(device)" class="text-red-600 hover:text-red-800 text-sm font-medium">
-                                    Unpair
+                                    {{ $t('slide_announcers.unpair') }}
                                 </button>
                             </td>
                         </tr>
@@ -148,7 +151,7 @@ function formatBytes(bytes) {
                 </table>
             </div>
             <div v-else class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">
-                No Slide Announcer devices paired yet. Generate a pairing code and enter it on the device's setup screen.
+                {{ $t('slide_announcers.no_devices') }}
             </div>
         </div>
     </AuthenticatedLayout>

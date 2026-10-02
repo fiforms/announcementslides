@@ -113,7 +113,7 @@ const user  = computed(() => page.props.auth?.user);
             <div class="ml-56 flex-1 flex flex-col min-h-screen">
                 <header class="bg-white shadow-sm h-16 flex items-center px-8">
                     <slot name="header">
-                        <h1 class="text-xl font-semibold text-gray-900">Admin</h1>
+                        <h1 class="text-xl font-semibold text-gray-900">{{ $t('nav.admin') }}</h1>
                     </slot>
                 </header>
 

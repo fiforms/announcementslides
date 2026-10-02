@@ -1,6 +1,9 @@
 <script setup>
 import { Link, router } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
+
+const { t, locale } = useI18n();
 
 const props = defineProps({
     entity: { type: Object, required: true },
@@ -8,7 +11,7 @@ const props = defineProps({
 });
 
 function destroy(slide) {
-    if (confirm(`Delete "${slide.title}"? This cannot be undone.`)) {
+    if (confirm(t('admin_entities.delete_confirm', { title: slide.title }))) {
         router.delete(route('admin.slides.destroy', slide.id));
     }
 }
@@ -18,7 +21,7 @@ function approve(slide) {
 }
 
 function reject(slide) {
-    if (confirm(`Reject "${slide.title}"?`)) {
+    if (confirm(t('admin_entities.reject_confirm', { title: slide.title }))) {
         router.post(route('admin.slides.reject', slide.id));
     }
 }
@@ -43,7 +46,7 @@ function statusBadge(status) {
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
                 </Link>
-                <h1 class="text-xl font-semibold text-gray-900">{{ entity.name }} — Entity Slides</h1>
+                <h1 class="text-xl font-semibold text-gray-900">{{ $t('admin_entities.entity_slides_title', { name: entity.name }) }}</h1>
             </div>
         </template>
 
@@ -51,11 +54,11 @@ function statusBadge(status) {
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-3 text-left font-medium text-gray-500">Slide</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">Status</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">Dates</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">Uploaded by</th>
-                        <th class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin_entities.col_slide') }}</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">{{ $t('admin_entities.col_status') }}</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden md:table-cell">{{ $t('admin_entities.col_dates') }}</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden lg:table-cell">{{ $t('admin_entities.col_uploaded_by') }}</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-500">{{ $t('admin_entities.col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -76,13 +79,13 @@ function statusBadge(status) {
                         <td class="px-4 py-3 hidden sm:table-cell">
                             <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold capitalize"
                                 :class="statusBadge(slide.status)">
-                                {{ slide.status }}
+                                {{ $t(`admin_entities.status_${slide.status}`) }}
                             </span>
                         </td>
                         <td class="px-4 py-3 hidden md:table-cell text-xs text-gray-500 space-y-0.5">
-                            <div v-if="slide.publish_at">From: {{ new Date(slide.publish_at).toLocaleDateString() }}</div>
-                            <div v-if="slide.expires_at">Exp: {{ new Date(slide.expires_at).toLocaleDateString() }}</div>
-                            <div v-if="!slide.publish_at && !slide.expires_at" class="text-gray-300">Always on</div>
+                            <div v-if="slide.publish_at">{{ $t('admin_entities.date_from') }} {{ new Date(slide.publish_at).toLocaleDateString(locale) }}</div>
+                            <div v-if="slide.expires_at">{{ $t('admin_entities.date_exp') }} {{ new Date(slide.expires_at).toLocaleDateString(locale) }}</div>
+                            <div v-if="!slide.publish_at && !slide.expires_at" class="text-gray-300">{{ $t('admin_entities.always_on') }}</div>
                         </td>
                         <td class="px-4 py-3 hidden lg:table-cell text-xs text-gray-500">
                             {{ slide.uploader?.name ?? '—' }}
@@ -92,20 +95,20 @@ function statusBadge(status) {
                                 <template v-if="slide.status === 'pending'">
                                     <button @click="approve(slide)"
                                         class="rounded-md bg-green-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-green-700 transition-colors">
-                                        Approve
+                                        {{ $t('admin.approve') }}
                                     </button>
                                     <button @click="reject(slide)"
                                         class="rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 transition-colors">
-                                        Reject
+                                        {{ $t('admin.reject') }}
                                     </button>
                                 </template>
                                 <Link :href="route('admin.slides.edit', slide.id)"
                                     class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                                    Edit
+                                    {{ $t('admin.edit') }}
                                 </Link>
                                 <button @click="destroy(slide)"
                                     class="rounded-md border border-red-200 px-2.5 py-1 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
-                                    Delete
+                                    {{ $t('admin.delete') }}
                                 </button>
                             </div>
                         </td>
@@ -115,7 +118,7 @@ function statusBadge(status) {
         </div>
 
         <div v-else class="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
-            <p class="text-gray-400">No entity-scoped slides for {{ entity.name }}.</p>
+            <p class="text-gray-400">{{ $t('admin_entities.no_entity_slides', { name: entity.name }) }}</p>
         </div>
     </AdminLayout>
 </template>

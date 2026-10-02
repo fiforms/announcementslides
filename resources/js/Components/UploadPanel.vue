@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import DropZone from '@/Components/DropZone.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
@@ -22,6 +23,8 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['success']);
+
+const { t } = useI18n();
 
 const { isUploading, uploadError, fileProgress, overallProgress, upload } = useChunkedUpload();
 const { validate: validateImage } = useImageValidation();
@@ -142,7 +145,7 @@ async function submit() {
 
 <template>
     <div class="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-        <h2 class="mb-4 text-base font-semibold text-gray-900">Upload Slides</h2>
+        <h2 class="mb-4 text-base font-semibold text-gray-900">{{ $t('upload.panel_title') }}</h2>
 
         <div v-if="pendingMessage" class="mb-4 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
             {{ pendingMessage }}
@@ -179,7 +182,7 @@ async function submit() {
                         @update:enabled="resize.infos.value[i].enabled = $event" @cancel="resize.cancel" />
                     <div v-if="isUploading && fileProgress[i]" class="mt-2">
                         <div class="flex justify-between text-xs text-gray-500 mb-1">
-                            <span>{{ fileProgress[i].done ? 'Done' : 'Uploading…' }}</span>
+                            <span>{{ fileProgress[i].done ? $t('show_manage.done') : $t('show_manage.uploading') }}</span>
                             <span>{{ fileProgress[i].progress }}%</span>
                         </div>
                         <div class="h-1.5 w-full rounded-full bg-gray-200 overflow-hidden">
@@ -193,7 +196,7 @@ async function submit() {
 
             <div v-if="isUploading && filePreviews.length > 1" class="rounded-lg bg-indigo-50 px-4 py-3">
                 <div class="flex justify-between text-sm font-medium text-indigo-700 mb-1.5">
-                    <span>Overall progress</span>
+                    <span>{{ $t('show_manage.overall_progress') }}</span>
                     <span>{{ overallProgress }}%</span>
                 </div>
                 <div class="h-2 w-full rounded-full bg-indigo-100 overflow-hidden">
@@ -204,37 +207,37 @@ async function submit() {
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('upload.title_label') }} <span class="text-red-500">*</span></label>
                     <input v-model="title" type="text" required
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        placeholder="e.g. Camp Meeting 2026" />
+                        :placeholder="$t('show_manage.title_placeholder')" />
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.notes') }} <span class="text-gray-400 font-normal">{{ $t('upload.notes_optional') }}</span></label>
                     <textarea v-model="notes" rows="2"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        placeholder="Optional context for administrators…" />
+                        :placeholder="$t('show_manage.notes_placeholder')" />
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.description') }} <span class="text-gray-400 font-normal">{{ $t('upload.notes_optional') }}</span></label>
                     <textarea v-model="textDescription" rows="2"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                        placeholder="Shown alongside the slide, e.g. event details…" />
+                        :placeholder="$t('show_manage.description_placeholder')" />
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.link') }} <span class="text-gray-400 font-normal">{{ $t('upload.notes_optional') }}</span></label>
                     <input v-model="link" type="url" placeholder="https://…"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                 </div>
 
                 <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.language') }} <span class="text-gray-400 font-normal">{{ $t('upload.notes_optional') }}</span></label>
                     <select v-model="languageId"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="">No specific language (visible in all)</option>
+                        <option value="">{{ $t('show_manage.no_language') }}</option>
                         <option v-for="lang in languages" :key="lang.id" :value="lang.id">
                             {{ lang.name }} ({{ lang.native_name }})
                         </option>
@@ -242,52 +245,52 @@ async function submit() {
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.publish_date') }} <span class="text-gray-400 font-normal">{{ $t('upload.notes_optional') }}</span></label>
                     <DateTimeLocalInput v-model="publishAt" />
-                    <p class="mt-1 text-xs text-gray-500">Don't show before this date/time</p>
+                    <p class="mt-1 text-xs text-gray-500">{{ $t('upload.publish_hint') }}</p>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.expiration_date') }} <span class="text-gray-400 font-normal">{{ $t('upload.notes_optional') }}</span></label>
                     <DateTimeLocalInput v-model="expiresAt" />
-                    <p class="mt-1 text-xs text-gray-500">Hide after this date/time</p>
+                    <p class="mt-1 text-xs text-gray-500">{{ $t('upload.expiry_hint') }}</p>
                 </div>
 
                 <div v-if="showStatusSelect">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.status') }}</label>
                     <select v-model="status"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="published">Published (live immediately)</option>
-                        <option value="pending">Pending (submit for review)</option>
-                        <option value="draft">Draft (not visible)</option>
+                        <option value="published">{{ $t('upload.status_published') }}</option>
+                        <option value="pending">{{ $t('show_manage.status_pending') }}</option>
+                        <option value="draft">{{ $t('upload.status_draft') }}</option>
                     </select>
                 </div>
 
                 <div class="sm:col-span-2 space-y-2">
-                    <label class="block text-sm font-medium text-gray-700">Add to show</label>
+                    <label class="block text-sm font-medium text-gray-700">{{ $t('show_manage.add_to_show') }}</label>
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input v-model="addToShow" type="radio" value="main"
                             class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                        Add to Main Show (default)
+                        {{ $t('show_manage.add_to_main') }}
                     </label>
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input v-model="addToShow" type="radio" value="separate"
                             class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                        Add to a different show
+                        {{ $t('show_manage.add_to_other') }}
                     </label>
                     <div v-if="addToShow === 'separate'" class="ml-6 flex flex-wrap items-center gap-2">
                         <select v-model="targetShowId"
                             class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                            <option value="">+ Create new show…</option>
+                            <option value="">{{ $t('show_manage.create_new_show') }}</option>
                             <option v-for="s in shows" :key="s.id" :value="s.id">{{ s.name }}</option>
                         </select>
-                        <input v-if="!targetShowId" v-model="newShowName" type="text" placeholder="New show name"
+                        <input v-if="!targetShowId" v-model="newShowName" type="text" :placeholder="$t('show_manage.new_show_name_placeholder')"
                             class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     </div>
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input v-model="addToShow" type="radio" value="none"
                             class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                        Do not add to any show
+                        {{ $t('show_manage.add_to_none') }}
                     </label>
                 </div>
 
@@ -295,11 +298,11 @@ async function submit() {
                     <label class="flex items-start gap-2">
                         <input v-model="shareNearby" type="checkbox"
                             class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
-                        <span class="text-sm font-medium text-gray-700">Share with nearby churches</span>
+                        <span class="text-sm font-medium text-gray-700">{{ $t('show_manage.share_nearby') }}</span>
                     </label>
                     <div v-if="shareNearby" class="mt-2 rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-3 text-sm text-indigo-800">
-                        Local slide sharing allows you to promote events and ministries relevant to others in your local area. Ensure that your slide contains all relevant information such as the date and time, and the specific address of the event. Please share any events you would invite the public to, but don't share weekly announcements such as regular potluck, regular weekly services, other events specifically for local members. Refrain from sharing generic greetings or anything not specifically tied to an event.
-                        <p class="mt-2 text-xs text-indigo-700">Shared slides must meet the image quality requirements.</p>
+                        {{ $t('show_manage.share_nearby_info') }}
+                        <p class="mt-2 text-xs text-indigo-700">{{ $t('show_manage.share_nearby_quality') }}</p>
                     </div>
                 </div>
             </div>
@@ -311,7 +314,7 @@ async function submit() {
             <div class="flex gap-3 pt-2">
                 <button type="submit" :disabled="busy || !canSubmit"
                     class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    {{ resize.isResizing.value ? 'Resizing…' : isUploading ? `Uploading… ${overallProgress}%` : `Upload ${selectedFiles.length || ''} slide${selectedFiles.length === 1 ? '' : 's'}` }}
+                    {{ resize.isResizing.value ? $t('show_manage.resizing') : isUploading ? $t('upload.btn_uploading', { pct: overallProgress }) : $t('upload.btn_upload', { n: selectedFiles.length }) }}
                 </button>
             </div>
         </form>

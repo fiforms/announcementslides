@@ -1,9 +1,12 @@
 <script setup>
 import { computed } from 'vue';
 import { useForm, Link } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import MediaManager from '@/Components/MediaManager.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
+
+const { t } = useI18n();
 
 const props = defineProps({
     entity: { type: Object, required: true },
@@ -45,48 +48,48 @@ function submit() {
 
             <form @submit.prevent="submit" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('upload.title_label') }} <span class="text-red-500">*</span></label>
                     <input v-model="form.title" type="text" required
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">{{ form.errors.title }}</p>
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.notes') }} <span class="text-gray-400 font-normal">{{ $t('slide_announcers.optional') }}</span></label>
                     <textarea v-model="form.notes" rows="3"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.field_description') }} <span class="text-gray-400 font-normal">{{ $t('slide_announcers.optional') }}</span></label>
                     <textarea v-model="form.text_description" rows="3"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                 </div>
 
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.field_link') }} <span class="text-gray-400 font-normal">{{ $t('slide_announcers.optional') }}</span></label>
                     <input v-model="form.link" type="url" placeholder="https://…"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     <p v-if="form.errors.link" class="mt-1 text-xs text-red-600">{{ form.errors.link }}</p>
                 </div>
 
                 <div v-if="isVideoSlide">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.video_playback') }}</label>
                     <select v-model="form.video_playback_mode"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        <option value="play_through">Play through, then advance immediately</option>
-                        <option value="hold_last_frame">Hold last frame until slide delay</option>
-                        <option value="loop">Loop until slide delay</option>
+                        <option value="play_through">{{ $t('slide_announcers.video_play_through') }}</option>
+                        <option value="hold_last_frame">{{ $t('slide_announcers.video_hold_last_frame') }}</option>
+                        <option value="loop">{{ $t('slide_announcers.video_loop') }}</option>
                     </select>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.publish_date') }}</label>
                         <DateTimeLocalInput v-model="form.publish_at" />
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.expiration_date') }}</label>
                         <DateTimeLocalInput v-model="form.expires_at" />
                     </div>
                 </div>
@@ -94,11 +97,11 @@ function submit() {
                 <div class="flex gap-3 pt-2">
                     <button type="submit" :disabled="form.processing"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                        {{ form.processing ? 'Saving…' : 'Save Changes' }}
+                        {{ form.processing ? $t('admin.saving') : $t('admin.save_changes') }}
                     </button>
                     <Link :href="route('entity.slides.index', entity.id)"
                         class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                        Cancel
+                        {{ $t('admin.cancel') }}
                     </Link>
                 </div>
             </form>

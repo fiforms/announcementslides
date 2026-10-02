@@ -38,13 +38,14 @@ function slideScope(slide) {
 }
 
 const scopeBadges = {
-    global: { label: 'Global', classes: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
-    nearby: { label: 'Nearby', classes: 'bg-purple-50 text-purple-700', dot: 'bg-purple-500' },
-    mine:   { label: 'Mine',   classes: 'bg-green-50 text-green-700', dot: 'bg-green-500' },
+    global: { key: 'scope_global', classes: 'bg-blue-50 text-blue-700', dot: 'bg-blue-500' },
+    nearby: { key: 'scope_nearby', classes: 'bg-purple-50 text-purple-700', dot: 'bg-purple-500' },
+    mine:   { key: 'scope_mine',   classes: 'bg-green-50 text-green-700', dot: 'bg-green-500' },
 };
 
 function scopeBadge(slide) {
-    return scopeBadges[slideScope(slide)];
+    const badge = scopeBadges[slideScope(slide)];
+    return { ...badge, label: t(`show_manage.${badge.key}`) };
 }
 
 function canEdit(slide) {
@@ -111,7 +112,7 @@ function submitEdit() {
 }
 
 function archiveEditingSlide() {
-    if (!confirm(`Archive "${editingSlide.value.title}"? It will stop showing right away — you can restore it later from the archive.`)) return;
+    if (!confirm(t('show_manage.archive_confirm', { title: editingSlide.value.title }))) return;
     router.post(route('local-slides.archive', { slide: editingSlide.value.id, entity_id: props.entity.id }), {}, {
         preserveScroll: true,
         onSuccess: () => closeEdit(),
@@ -129,8 +130,8 @@ function isExpired(slide) {
 function expiresLabel(slide) {
     if (!slide.expires_at) return null;
     const d = new Date(slide.expires_at);
-    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    return isExpired(slide) ? `Expired ${dateStr}` : `Expires ${dateStr}`;
+    const dateStr = d.toLocaleDateString(locale.value, { month: 'short', day: 'numeric', year: 'numeric' });
+    return t(isExpired(slide) ? 'show_manage.expired_on' : 'show_manage.expires_on', { date: dateStr });
 }
 
 const activeInShow = computed(() => inShow.value.filter(s => !isExpired(s) && matchesLanguage(s)));
@@ -139,7 +140,7 @@ const showExpiredPane = ref(false);
 
 function detachAllExpired() {
     if (!expiredInShow.value.length) return;
-    if (!confirm(`Remove ${expiredInShow.value.length} expired slide(s) from "${selectedShow.value.name}"?`)) return;
+    if (!confirm(t('show_manage.remove_expired_confirm', { n: expiredInShow.value.length, show: showName(selectedShow.value) }, expiredInShow.value.length))) return;
     router.post(route('shows.slides.detachExpired', { show: props.selectedShowId, entity_id: props.entity.id }),
         {}, { preserveScroll: true });
 }
@@ -152,13 +153,10 @@ function detachAllExpired() {
 // placeholder marking exactly where the next new slide of that kind lands.
 const ZONE_ORDER = ['leader_early', 'global', 'leader_mid', 'nearby', 'leader_late'];
 const LEADER_ZONES = ['leader_early', 'leader_mid', 'leader_late'];
-const ZONE_LABELS = {
-    leader_early: 'Before global slides',
-    global: 'Global slides',
-    leader_mid: 'Between global & nearby',
-    nearby: 'Nearby slides',
-    leader_late: 'After nearby slides',
-};
+const zoneLabel = (zone) => t(`show_manage.zone_${zone}`);
+
+// Stored show names are user data, except the built-in Main show.
+const showName = (show) => (show?.is_main ? t('shows.main') : show?.name);
 
 function zoneOf(slide) {
     return ZONE_ORDER.includes(slide.zone) ? slide.zone : 'leader_late';
@@ -247,7 +245,7 @@ function updateShowSettings(changes) {
 
 function deleteShow() {
     if (!selectedShow.value || selectedShow.value.is_main) return;
-    if (confirm(`Delete the show "${selectedShow.value.name}"? This can't be undone.`)) {
+    if (confirm(t('show_manage.delete_show_confirm', { show: showName(selectedShow.value) }))) {
         router.delete(route('shows.destroy', { show: selectedShow.value.id, entity_id: props.entity.id }));
     }
 }
@@ -351,62 +349,62 @@ function persistLeaderOrder() {
                     <select :value="selectedShowId" @change="switchShow($event.target.value)"
                         class="rounded-lg border-gray-300 text-sm font-medium">
                         <option v-for="show in shows" :key="show.id" :value="show.id">
-                            {{ show.is_main ? '🔒 ' : '' }}{{ show.is_main ? t('shows.main') : show.name }}
+                            {{ show.is_main ? '🔒 ' : '' }}{{ showName(show) }}
                         </option>
                     </select>
                     <select v-model.number="languageFilter"
-                        title="Only changes what's shown on this page — every show holds all languages"
+                        :title="$t('show_manage.language_filter_hint')"
                         class="rounded-lg border-gray-300 text-sm">
-                        <option value="">All languages</option>
+                        <option value="">{{ $t('show_manage.all_languages') }}</option>
                         <option v-for="lang in languages" :key="lang.id" :value="lang.id">{{ lang.name }}</option>
                     </select>
                     <button v-if="isAdmin && !showingNewShowForm" @click="showingNewShowForm = true"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                        + New Show
+                        {{ $t('show_manage.new_show') }}
                     </button>
                     <div v-if="showingNewShowForm" class="flex flex-wrap items-center gap-2">
-                        <input v-model="newShowName" type="text" placeholder="Show name"
+                        <input v-model="newShowName" type="text" :placeholder="$t('show_manage.show_name_placeholder')"
                             class="rounded-lg border-gray-300 text-sm" @keyup.enter="createShow" />
                         <label class="flex items-center gap-1 text-sm text-gray-700">
                             <input v-model="newShowAutoFillGlobal" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
-                            Add global slides
+                            {{ $t('show_manage.add_global') }}
                         </label>
                         <label class="flex items-center gap-1 text-sm text-gray-700">
                             <input v-model="newShowAutoFillNearby" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
-                            Add nearby slides
+                            {{ $t('show_manage.add_nearby') }}
                         </label>
-                        <button @click="createShow" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">Create</button>
-                        <button @click="showingNewShowForm = false" class="text-sm text-gray-500">Cancel</button>
+                        <button @click="createShow" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">{{ $t('show_manage.create') }}</button>
+                        <button @click="showingNewShowForm = false" class="text-sm text-gray-500">{{ $t('show_manage.cancel') }}</button>
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <button v-if="isAdmin && selectedShow && !selectedShow.is_main" @click="deleteShow"
                         class="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
-                        Delete Show
+                        {{ $t('show_manage.delete_show') }}
                     </button>
                     <button v-if="isAdmin" @click="showUploadPanel = !showUploadPanel"
                         class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
-                        Upload Slide
+                        {{ $t('show_manage.upload_slide') }}
                     </button>
                 </div>
             </div>
 
             <div v-if="isAdmin && selectedShow" class="space-y-3 rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-3">
                 <div class="rounded-lg border-2 border-gray-300 bg-white px-3 py-2">
-                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Auto Fill Options</p>
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $t('show_manage.auto_fill_options') }}</p>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-gray-700">
                         <label class="flex items-center gap-2">
                             <input type="checkbox" :checked="selectedShow.auto_fill_global" :disabled="selectedShow.is_main"
                                 @change="updateShowSettings({ auto_fill_global: $event.target.checked })"
                                 class="rounded border-gray-300 text-indigo-600" />
-                            Add global slides
-                            <span v-if="selectedShow.is_main" class="text-xs text-gray-400">(always on for Main)</span>
+                            {{ $t('show_manage.add_global') }}
+                            <span v-if="selectedShow.is_main" class="text-xs text-gray-400">{{ $t('show_manage.always_on_main') }}</span>
                         </label>
                         <label class="flex items-center gap-2">
                             <input type="checkbox" :checked="selectedShow.auto_fill_nearby"
                                 @change="updateShowSettings({ auto_fill_nearby: $event.target.checked })"
                                 class="rounded border-gray-300 text-indigo-600" />
-                            Add nearby slides
+                            {{ $t('show_manage.add_nearby') }}
                         </label>
                     </div>
                 </div>
@@ -428,17 +426,17 @@ function persistLeaderOrder() {
                     @dragover.prevent @drop="dropOnUnused">
                     <div class="mb-3 flex items-center justify-between gap-2">
                         <h2 class="text-sm font-semibold text-gray-700">
-                            {{ unusedScope === 'this' ? 'Available slides' : 'Unused slides' }}
+                            {{ unusedScope === 'this' ? $t('show_manage.available_slides') : $t('show_manage.unused_slides') }}
                         </h2>
                     </div>
                     <div class="mb-3 flex items-center gap-4 text-xs text-gray-600">
                         <label class="flex items-center gap-1.5 cursor-pointer">
                             <input type="radio" value="this" v-model="unusedScope" class="text-indigo-600 focus:ring-indigo-500" />
-                            All Available
+                            {{ $t('show_manage.all_available') }}
                         </label>
                         <label class="flex items-center gap-1.5 cursor-pointer">
                             <input type="radio" value="all" v-model="unusedScope" class="text-indigo-600 focus:ring-indigo-500" />
-                            Only Unused
+                            {{ $t('show_manage.only_unused') }}
                         </label>
                     </div>
                     <div class="space-y-2 min-h-[8rem]">
@@ -447,27 +445,27 @@ function persistLeaderOrder() {
                             :show-edit="canEdit(slide)"
                             @dragstart="dragStart(slide, 'unused')" @dragend="dragEnd" @edit="openEdit(slide)" @open="openLightbox">
                             <template v-if="slide.linked_elsewhere" #extra>
-                                <span class="flex-shrink-0 text-[10px] text-gray-400" title="Already attached to another show">
-                                    In another show
+                                <span class="flex-shrink-0 text-[10px] text-gray-400"              :title="$t('show_manage.already_attached')">
+                                    {{ $t('show_manage.in_another_show') }}
                                 </span>
                             </template>
                         </ShowSlideRow>
                         <p v-if="!filteredUnused.length" class="text-sm text-gray-400">
-                            {{ unusedScope === 'this' ? 'Nothing else available right now.' : 'Nothing unused right now.' }}
+                            {{ unusedScope === 'this' ? $t('show_manage.nothing_available') : $t('show_manage.nothing_unused') }}
                         </p>
                     </div>
                 </div>
 
                 <!-- In this show -->
                 <div class="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
-                    <h2 class="mb-3 text-sm font-semibold text-gray-700">In "{{ selectedShow?.name }}"</h2>
+                    <h2 class="mb-3 text-sm font-semibold text-gray-700">{{ $t('show_manage.in_show', { show: showName(selectedShow) }) }}</h2>
 
                     <div class="space-y-3">
                         <template v-for="zone in ZONE_ORDER" :key="zone">
                             <div v-if="LEADER_ZONES.includes(zone)"
                                 class="space-y-2 rounded-lg border border-dashed border-gray-200 p-2 min-h-[3rem]"
                                 @dragover.prevent @drop="dropOnZone(zone)">
-                                <p class="px-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">{{ ZONE_LABELS[zone] }}</p>
+                                <p class="px-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">{{ zoneLabel(zone) }}</p>
                                 <ShowSlideRow v-for="slide in zoneGroups[zone]" :key="slide.id"
                                     :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
                                     :show-edit="canEdit(slide)"
@@ -477,8 +475,8 @@ function persistLeaderOrder() {
                             </div>
 
                             <div v-else class="space-y-2">
-                                <p class="px-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">{{ ZONE_LABELS[zone] }}</p>
-                                <div class="h-2 mx-1 rounded bg-slate-800/70" title="New auto-added slides insert here"></div>
+                                <p class="px-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">{{ zoneLabel(zone) }}</p>
+                                <div class="h-2 mx-1 rounded bg-slate-800/70" :title="$t('show_manage.auto_insert_here')"></div>
                                 <ShowSlideRow v-for="slide in zoneGroups[zone]" :key="slide.id"
                                     :slide="slide" :scope-badge="scopeBadge(slide)" :expires-label="expiresLabel(slide)"
                                     :draggable="true" :auto-tag="true" :show-edit="canEdit(slide)"
@@ -486,20 +484,20 @@ function persistLeaderOrder() {
                             </div>
                         </template>
 
-                        <p v-if="!activeInShow.length" class="text-sm text-gray-400">Drag slides here from "Unused slides."</p>
+                        <p v-if="!activeInShow.length" class="text-sm text-gray-400">{{ $t('show_manage.drag_here') }}</p>
                     </div>
 
                     <div v-if="expiredInShow.length" class="mt-4 border-t border-gray-100 pt-3">
                         <button type="button" @click="showExpiredPane = !showExpiredPane"
                             class="flex w-full items-center justify-between text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700">
-                            <span>{{ showExpiredPane ? '▾' : '▸' }} Expired in this show ({{ expiredInShow.length }})</span>
+                            <span>{{ showExpiredPane ? '▾' : '▸' }} {{ $t('show_manage.expired_in_show', { n: expiredInShow.length }) }}</span>
                         </button>
 
                         <div v-if="showExpiredPane" class="mt-2 space-y-2">
                             <div class="flex justify-end">
                                 <button type="button" @click="detachAllExpired"
                                     class="rounded-lg border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50">
-                                    Archive all
+                                    {{ $t('show_manage.archive_all') }}
                                 </button>
                             </div>
                             <ShowSlideRow v-for="slide in expiredInShow" :key="slide.id"
@@ -507,7 +505,7 @@ function persistLeaderOrder() {
                                 :draggable="false" :dimmed="true" :show-edit="canEdit(slide)"
                                 @edit="openEdit(slide)" @open="openLightbox">
                                 <template #extra>
-                                    <button type="button" @click.stop="detachSlide(slide.id)" title="Remove from show"
+                                    <button type="button" @click.stop="detachSlide(slide.id)" :title="$t('show_manage.remove_from_show')"
                                         class="flex-shrink-0 rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-red-600">
                                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
                                             <path fill-rule="evenodd" d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L8.94 10l-4.72 4.72a.75.75 0 1 0 1.06 1.06L10 11.06l4.72 4.72a.75.75 0 1 0 1.06-1.06L11.06 10l4.72-4.72a.75.75 0 0 0-1.06-1.06L10 8.94 5.28 4.22Z" clip-rule="evenodd" />
@@ -523,7 +521,7 @@ function persistLeaderOrder() {
             <div class="text-center">
                 <Link :href="route('slides.archive', { entity_id: entity.id })"
                     class="text-sm font-medium text-gray-500 hover:text-gray-700">
-                    All archived (expired) slides →
+                    {{ $t('show_manage.all_archived') }}
                 </Link>
             </div>
 
@@ -534,8 +532,8 @@ function persistLeaderOrder() {
                 <div class="relative w-full max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg space-y-4"
                     :class="editTab === 'overlay' ? 'max-w-6xl' : 'max-w-2xl'">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-gray-900">Edit Slide</h3>
-                        <button @click="closeEdit" class="text-gray-400 hover:text-gray-600">&times;</button>
+                        <h3 class="text-sm font-semibold text-gray-900">{{ $t('show_manage.edit_slide') }}</h3>
+                        <button @click="closeEdit" :aria-label="$t('show_manage.close')" class="text-gray-400 hover:text-gray-600">&times;</button>
                     </div>
 
                     <nav class="-mb-px flex gap-6 border-b border-gray-200">
@@ -562,46 +560,46 @@ function persistLeaderOrder() {
 
                         <form @submit.prevent="submitEdit" class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Title <span class="text-red-500">*</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.title') }} <span class="text-red-500">*</span></label>
                                 <input v-model="editForm.title" type="text" required
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                                 <p v-if="editForm.errors.title" class="mt-1 text-xs text-red-600">{{ editForm.errors.title }}</p>
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Notes <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.notes') }} <span class="text-gray-400 font-normal">{{ $t('show_manage.optional') }}</span></label>
                                 <textarea v-model="editForm.notes" rows="2"
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Description <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.description') }} <span class="text-gray-400 font-normal">{{ $t('show_manage.optional') }}</span></label>
                                 <textarea v-model="editForm.text_description" rows="2"
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Link <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.link') }} <span class="text-gray-400 font-normal">{{ $t('show_manage.optional') }}</span></label>
                                 <input v-model="editForm.link" type="url" placeholder="https://…"
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                                 <p v-if="editForm.errors.link" class="mt-1 text-xs text-red-600">{{ editForm.errors.link }}</p>
                             </div>
 
                             <div v-if="editingSlide.mime_type?.startsWith('video/')">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Video playback</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.video_playback') }}</label>
                                 <select v-model="editForm.video_playback_mode"
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="play_through">Play through, then advance immediately</option>
-                                    <option value="hold_last_frame">Hold last frame until slide delay</option>
-                                    <option value="loop">Loop until slide delay</option>
+                                    <option value="play_through">{{ $t('show_manage.video_play_through') }}</option>
+                                    <option value="hold_last_frame">{{ $t('show_manage.video_hold_last_frame') }}</option>
+                                    <option value="loop">{{ $t('show_manage.video_loop') }}</option>
                                 </select>
                             </div>
 
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-1">Language <span class="text-gray-400 font-normal">(optional)</span></label>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.language') }} <span class="text-gray-400 font-normal">{{ $t('show_manage.optional') }}</span></label>
                                 <select v-model="editForm.language_id"
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="">No specific language (visible in all)</option>
+                                    <option value="">{{ $t('show_manage.no_language') }}</option>
                                     <option v-for="lang in languages" :key="lang.id" :value="lang.id">
                                         {{ lang.name }} ({{ lang.native_name }})
                                     </option>
@@ -611,11 +609,11 @@ function persistLeaderOrder() {
 
                             <div class="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Publish Date</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.publish_date') }}</label>
                                     <DateTimeLocalInput v-model="editForm.publish_at" />
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 mb-1">Expiration Date</label>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('show_manage.expiration_date') }}</label>
                                     <DateTimeLocalInput v-model="editForm.expires_at" />
                                 </div>
                             </div>
@@ -623,15 +621,15 @@ function persistLeaderOrder() {
                             <div class="flex gap-3 pt-2">
                                 <button type="submit" :disabled="editForm.processing"
                                     class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
-                                    {{ editForm.processing ? 'Saving…' : 'Save Changes' }}
+                                    {{ editForm.processing ? $t('show_manage.saving') : $t('show_manage.save_changes') }}
                                 </button>
                                 <button type="button" @click="closeEdit"
                                     class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                                    Cancel
+                                    {{ $t('show_manage.cancel') }}
                                 </button>
                                 <button v-if="!isExpired(editingSlide)" type="button" @click="archiveEditingSlide"
                                     class="ml-auto rounded-lg border border-red-200 px-5 py-2 text-sm font-medium text-red-700 hover:bg-red-50 transition-colors">
-                                    Archive
+                                    {{ $t('show_manage.archive') }}
                                 </button>
                             </div>
                         </form>

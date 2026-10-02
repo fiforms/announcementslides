@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload';
 import { upscaleImage, upscaleIneligibility, ineligibleMessage, useUpscalerSettings } from '@/Composables/useUpscaler';
 import { downscaleImage, exceedsDownscaleLimit, exceedsFileSizeLimit } from '@/Composables/useImageResize';
@@ -19,6 +20,7 @@ const props = defineProps({
     versionRoute: { type: String, default: null },
 });
 
+const { t } = useI18n();
 const upscaler = useUpscalerSettings();
 const resizeRouteName = computed(() => props.resizeRoute ?? props.storeRoute.replace(/store$/, 'resize'));
 const versionRouteName = computed(() => props.versionRoute ?? props.storeRoute.replace(/store$/, 'version'));
@@ -104,7 +106,7 @@ async function resizeMedia(media) {
 
     try {
         const response = await fetch(media.file_url);
-        if (!response.ok) throw new Error('The image could not be downloaded.');
+        if (!response.ok) throw new Error(t('show_manage.media_download_failed'));
         const source = await response.blob();
 
         const result = isUpscale
@@ -118,7 +120,7 @@ async function resizeMedia(media) {
             : await downscaleImage(source, option.kind === 'downscale' ? upscaler.downscale.max : null, { quality: upscaler.jpeg_quality });
 
         if (option.kind === 'compress' && result.blob.size >= media.file_size) {
-            throw new Error('Re-encoding as JPEG would not make this file smaller.');
+            throw new Error(t('show_manage.media_compress_no_gain'));
         }
 
         state.progress = 100;
@@ -137,7 +139,7 @@ async function resizeMedia(media) {
 
         router.reload({ only: props.reloadOnly });
     } catch (err) {
-        if (err.code !== 'aborted') state.error = err.message || 'Resizing failed.';
+        if (err.code !== 'aborted') state.error = err.message || t('show_manage.media_resize_failed');
     } finally {
         if (!state.error) resizing.value = {};
         resizeAbort = null;
@@ -157,7 +159,7 @@ function switchVersion(media, version) {
 }
 
 function removeMedia(media) {
-    if (!confirm(`Remove this ${labelFor(media.media_type)} file?`)) return;
+    if (!confirm(t('show_manage.media_remove_confirm', { type: labelFor(media.media_type) }))) return;
     router.delete(route(props.destroyRoute, { ...props.routeParams, slide: props.slide.id, media: media.id }), {
         preserveScroll: true,
         preserveState: true,
@@ -168,7 +170,7 @@ function removeMedia(media) {
 
 <template>
     <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
-        <h3 class="text-sm font-semibold text-gray-900">Media files</h3>
+        <h3 class="text-sm font-semibold text-gray-900">{{ $t('show_manage.media_files') }}</h3>
 
         <ul class="divide-y divide-gray-100 rounded-lg border border-gray-200">
             <li v-for="media in slide.media" :key="media.id"
@@ -185,19 +187,19 @@ function removeMedia(media) {
                         <span v-if="media.active_variant === 'resized'"
                             class="ml-1 rounded px-1.5 py-0.5 font-medium"
                             :class="media.resized_kind === 'upscale' ? 'bg-purple-100 text-purple-700' : 'bg-sky-100 text-sky-700'">
-                            {{ { downscale: 'Downscaled to 4K', compress: 'Converted to JPEG', upscale: 'AI upscaled' }[media.resized_kind] }}
+                            {{ $t(`show_manage.media_done_${media.resized_kind}`) }}
                         </span>
                     </p>
                     <div v-if="resizing[media.id]" class="mt-1">
                         <template v-if="resizing[media.id].error">
                             <p class="text-xs text-red-600">{{ resizing[media.id].error }}
-                                <button type="button" class="underline" @click="resizing = {}">Dismiss</button>
+                                <button type="button" class="underline" @click="resizing = {}">{{ $t('show_manage.media_dismiss') }}</button>
                             </p>
                         </template>
                         <template v-else>
                             <div class="flex justify-between text-xs text-gray-500">
-                                <span>{{ resizing[media.id].progress >= 100 ? 'Uploading…' : resizing[media.id].kind === 'upscale' ? `Upscaling… ${resizing[media.id].progress}%` : resizing[media.id].kind === 'compress' ? 'Converting…' : 'Downscaling…' }}</span>
-                                <button v-if="resizing[media.id].kind === 'upscale' && resizing[media.id].progress < 100" type="button" class="text-red-600 hover:underline" @click="cancelResize">Cancel</button>
+                                <span>{{ resizing[media.id].progress >= 100 ? $t('show_manage.uploading') : resizing[media.id].kind === 'upscale' ? $t('show_manage.media_upscaling', { pct: resizing[media.id].progress }) : resizing[media.id].kind === 'compress' ? $t('show_manage.media_converting') : $t('show_manage.media_downscaling') }}</span>
+                                <button v-if="resizing[media.id].kind === 'upscale' && resizing[media.id].progress < 100" type="button" class="text-red-600 hover:underline" @click="cancelResize">{{ $t('show_manage.cancel') }}</button>
                             </div>
                             <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
                                 <div class="h-full rounded-full bg-purple-500 transition-all duration-200"
@@ -208,45 +210,41 @@ function removeMedia(media) {
                 </div>
                 <template v-if="!resizing[media.id]">
                     <button v-if="media.active_variant === 'resized'" type="button" @click="switchVersion(media, 'original')"
-                        title="Go back to the image as it was uploaded"
+                        :title="$t('show_manage.media_undo_title')"
                         class="rounded-lg border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50">
-                        Undo {{ media.resized_kind ?? 'resize' }}
+                        {{ $t('show_manage.media_undo', { kind: $t(`show_manage.media_kind_${media.resized_kind ?? 'resize'}`) }) }}
                     </button>
                     <template v-else-if="resizeOptionFor(media)">
                         <button v-if="media.has_resized" type="button" @click="switchVersion(media, 'resized')"
-                            title="Use the resized version again"
+                            :title="$t('show_manage.media_redo_title')"
                             class="rounded-lg border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50">
-                            Redo {{ media.resized_kind ?? 'resize' }}
+                            {{ $t('show_manage.media_redo', { kind: $t(`show_manage.media_kind_${media.resized_kind ?? 'resize'}`) }) }}
                         </button>
                         <button type="button" @click="resizeMedia(media)"
                             :disabled="!!resizeOptionFor(media).blocked || Object.keys(resizing).length > 0"
                             :title="resizeOptionFor(media).blocked
                                 ? ineligibleMessage(resizeOptionFor(media).blocked, upscaler)
-                                : { upscale: 'Double the resolution with AI (the original is kept)',
-                                    downscale: 'Shrink to fit 4K (the original is kept)',
-                                    compress: 'Re-encode as JPEG to get under the file-size limit (the original is kept)' }[resizeOptionFor(media).kind]"
+                                : $t(`show_manage.media_hint_${resizeOptionFor(media).kind}`)"
                             class="rounded-lg border border-purple-200 px-3 py-1 text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-30 disabled:cursor-not-allowed">
-                            {{ { upscale: media.has_resized ? 'Upscale again' : 'Upscale 2×',
-                                downscale: media.has_resized ? 'Downscale again' : 'Downscale to 4K',
-                                compress: media.has_resized ? 'Compress again' : 'Compress to JPEG' }[resizeOptionFor(media).kind] }}
+                            {{ $t(`show_manage.media_btn_${resizeOptionFor(media).kind}${media.has_resized ? '_again' : ''}`) }}
                         </button>
                     </template>
                 </template>
                 <a :href="media.file_url" target="_blank" rel="noopener"
                     class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
-                    Download
+                    {{ $t('show_manage.media_download') }}
                 </a>
                 <button type="button" @click="removeMedia(media)" :disabled="isLastPrimary(media)"
-                    :title="isLastPrimary(media) ? 'A slide must keep at least one Slide file' : 'Remove'"
+                    :title="isLastPrimary(media) ? $t('show_manage.media_keep_one') : $t('show_manage.media_remove')"
                     class="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed">
-                    Remove
+                    {{ $t('show_manage.media_remove') }}
                 </button>
             </li>
         </ul>
 
         <div class="flex flex-wrap items-end gap-3 pt-2">
             <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Add media type</label>
+                <label class="block text-xs font-medium text-gray-700 mb-1">{{ $t('show_manage.media_add_type') }}</label>
                 <select v-model="selectedType"
                     class="rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                     <option v-for="t in mediaTypes" :key="t.value" :value="t.value">{{ t.label }}</option>
@@ -257,7 +255,7 @@ function removeMedia(media) {
                     @change="onFileSelected"
                     class="block text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-indigo-700" />
             </div>
-            <p v-if="isUploading" class="text-xs text-gray-500">Uploading… {{ overallProgress }}%</p>
+            <p v-if="isUploading" class="text-xs text-gray-500">{{ $t('upload.btn_uploading', { pct: overallProgress }) }}</p>
         </div>
         <p v-if="uploadError" class="text-xs text-red-600">{{ uploadError }}</p>
     </div>

@@ -10,17 +10,17 @@ defineProps({
 <template>
     <AdminLayout>
         <template #header>
-            <h1 class="text-xl font-semibold text-gray-900">Entity Slides</h1>
+            <h1 class="text-xl font-semibold text-gray-900">{{ $t('admin_entities.page_title') }}</h1>
         </template>
 
         <div v-if="entities.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
             <table class="min-w-full divide-y divide-gray-200 text-sm">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-3 text-left font-medium text-gray-500">Entity</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">Type</th>
-                        <th class="px-4 py-3 text-left font-medium text-gray-500">Slides</th>
-                        <th class="px-4 py-3 text-right font-medium text-gray-500">Actions</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin_entities.col_entity') }}</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500 hidden sm:table-cell">{{ $t('admin_entities.col_type') }}</th>
+                        <th class="px-4 py-3 text-left font-medium text-gray-500">{{ $t('admin_entities.col_slides') }}</th>
+                        <th class="px-4 py-3 text-right font-medium text-gray-500">{{ $t('admin_entities.col_actions') }}</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
@@ -36,7 +36,7 @@ defineProps({
                         <td class="px-4 py-3 text-right">
                             <Link :href="route('admin.entities.slides', entity.id)"
                                 class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-                                View Slides
+                                {{ $t('admin_entities.view_slides') }}
                             </Link>
                         </td>
                     </tr>
@@ -45,7 +45,7 @@ defineProps({
         </div>
 
         <div v-else class="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
-            <p class="text-gray-400">No entities with slides yet.</p>
+            <p class="text-gray-400">{{ $t('admin_entities.no_entities') }}</p>
         </div>
     </AdminLayout>
 </template>
