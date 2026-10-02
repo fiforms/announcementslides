@@ -52,7 +52,7 @@ class SlideAnnouncerSyncController extends Controller
             'id' => (string) $show->id,
             'name' => $show->name,
             'is_main' => $show->is_main,
-            'slides' => Slide::with(['primaryMedia', 'overlayMedia'])
+            'slides' => Slide::with(['primaryMedia', 'overlayMedia', 'language'])
                 ->orderedInShow($show->id)
                 ->current()
                 ->get()
@@ -82,6 +82,10 @@ class SlideAnnouncerSyncController extends Controller
     {
         return [
             'id' => $slide->id,
+            // Every language is distributed to every device; the device
+            // shows only slides matching its own language (or untagged
+            // ones, null) — see local-app/backend/main.py's slideshow().
+            'language' => $slide->language?->abbreviation,
             'file_url' => $slide->file_url,
             'thumbnail_url' => $slide->thumbnail_url,
             'mime_type' => $slide->mime_type,

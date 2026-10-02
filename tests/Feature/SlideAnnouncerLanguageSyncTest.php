@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Entity;
 use App\Models\Language;
+use App\Models\Show;
+use App\Models\Slide;
 use App\Models\SlideAnnouncer;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -107,5 +109,29 @@ class SlideAnnouncerLanguageSyncTest extends TestCase
             ->assertOk()
             ->assertJsonPath('language', 'en')
             ->assertJsonPath('language_revision', 0);
+    }
+
+    public function test_shows_endpoint_distributes_every_language_and_tags_each_slide(): void
+    {
+        $device = $this->makeDevice($this->en);
+        $device->entity->mainShow();
+        $by = User::factory()->create()->id;
+        $es = Slide::create(['title' => 'Spanish', 'status' => 'published', 'uploaded_by' => $by, 'language_id' => $this->es->id]);
+        $en = Slide::create(['title' => 'English', 'status' => 'published', 'uploaded_by' => $by, 'language_id' => $this->en->id]);
+        $untagged = Slide::create(['title' => 'Untagged', 'status' => 'published', 'uploaded_by' => $by]);
+        foreach ([$es, $en, $untagged] as $slide) {
+            Show::syncAutoFillForSlide($slide);
+        }
+
+        $this->app['auth']->forgetGuards();
+        $slides = $this->withToken($device->createToken('device')->plainTextToken)
+            ->getJson('/api/slide-announcers/shows')
+            ->assertOk()
+            ->json('shows.0.slides');
+
+        $byId = collect($slides)->pluck('language', 'id');
+        $this->assertSame('es', $byId[$es->id]);
+        $this->assertSame('en', $byId[$en->id]);
+        $this->assertNull($byId[$untagged->id]);
     }
 }

@@ -176,7 +176,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
             </div>
 
             <div class="flex flex-col sm:flex-row flex-wrap gap-3 items-start sm:items-center">
-                <select v-if="!entityId" :value="currentLanguageCode" @change="changeLanguage($event.target.value)"
+                <select :value="currentLanguageCode" @change="changeLanguage($event.target.value)"
                     class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right">
                     <option v-for="lang in languages" :key="lang.abbreviation" :value="lang.abbreviation">
                         {{ lang.name }} ({{ lang.native_name }})

@@ -82,13 +82,10 @@ class SlideController extends Controller
                 )->all();
         }
 
-        // Language filtering only applies in Global View: an entity's shows
-        // already encode their own preferred language (see Show::$language_id),
-        // so filtering again on top would fight the leader's own curation.
-        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->orderedInShow($showId)->current();
-        if (!$entityId) {
-            $slidesQuery->language($languageId);
-        }
+        // Shows hold every language, so the language selector is purely a
+        // display filter (untagged slides always show).
+        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->orderedInShow($showId)->current()
+            ->language($languageId);
         $slides = $slidesQuery->get()->map(fn ($s) => $this->slideResource($s));
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);

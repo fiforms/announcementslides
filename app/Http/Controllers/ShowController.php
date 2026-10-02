@@ -50,7 +50,6 @@ class ShowController extends Controller
             'entity' => ['id' => $entity->id, 'name' => $entity->name],
             'shows' => $shows->map(fn ($s) => [
                 'id' => $s->id, 'name' => $s->name, 'is_main' => $s->is_main,
-                'language_id' => $s->language_id,
                 'auto_fill_global' => $s->auto_fill_global, 'auto_fill_nearby' => $s->auto_fill_nearby,
             ]),
             'selectedShowId' => $selectedShow->id,
@@ -68,7 +67,6 @@ class ShowController extends Controller
 
         $request->validate([
             'name' => 'required|string|max:255',
-            'language_id' => 'nullable|integer|exists:languages,id',
             'auto_fill_global' => 'boolean',
             'auto_fill_nearby' => 'boolean',
         ]);
@@ -77,7 +75,6 @@ class ShowController extends Controller
             'entity_id' => $entityId,
             'name' => $request->name,
             'is_main' => false,
-            'language_id' => $request->language_id,
             'auto_fill_global' => $request->boolean('auto_fill_global'),
             'auto_fill_nearby' => $request->boolean('auto_fill_nearby'),
             'created_by' => $request->user()->id,
@@ -98,7 +95,6 @@ class ShowController extends Controller
 
         $request->validate([
             'name' => 'sometimes|required|string|max:255',
-            'language_id' => 'sometimes|nullable|integer|exists:languages,id',
             'auto_fill_global' => 'sometimes|boolean',
             'auto_fill_nearby' => 'sometimes|boolean',
         ]);
@@ -106,12 +102,8 @@ class ShowController extends Controller
         // Each field is a true partial patch: only touch it if the request
         // actually included the key, so e.g. changing just the language
         // doesn't silently reset the auto-fill flags (or vice versa).
-        $newLanguageId = $request->has('language_id')
-            ? ($request->filled('language_id') ? (int) $request->input('language_id') : null)
-            : $show->language_id;
-
         // Main's whole purpose is auto-receiving global content by default —
-        // it can be scoped to a language, but "add global slides" can't be
+        // "add global slides" can't be
         // turned off for it. "Add nearby slides" stays freely toggleable.
         $newAutoFillGlobal = $show->is_main
             ? true
@@ -120,11 +112,10 @@ class ShowController extends Controller
             ? $request->boolean('auto_fill_nearby')
             : $show->auto_fill_nearby;
 
-        $needsResync = ($newAutoFillGlobal && ($newAutoFillGlobal !== $show->auto_fill_global || $newLanguageId !== $show->language_id))
-            || ($newAutoFillNearby && ($newAutoFillNearby !== $show->auto_fill_nearby || $newLanguageId !== $show->language_id));
+        $needsResync = ($newAutoFillGlobal && $newAutoFillGlobal !== $show->auto_fill_global)
+            || ($newAutoFillNearby && $newAutoFillNearby !== $show->auto_fill_nearby);
 
         $attrs = [
-            'language_id' => $newLanguageId,
             'auto_fill_global' => $newAutoFillGlobal,
             'auto_fill_nearby' => $newAutoFillNearby,
         ];

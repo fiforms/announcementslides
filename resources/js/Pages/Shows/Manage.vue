@@ -133,8 +133,8 @@ function expiresLabel(slide) {
     return isExpired(slide) ? `Expired ${dateStr}` : `Expires ${dateStr}`;
 }
 
-const activeInShow = computed(() => inShow.value.filter(s => !isExpired(s)));
-const expiredInShow = computed(() => inShow.value.filter(s => isExpired(s)));
+const activeInShow = computed(() => inShow.value.filter(s => !isExpired(s) && matchesLanguage(s)));
+const expiredInShow = computed(() => inShow.value.filter(s => isExpired(s) && matchesLanguage(s)));
 const showExpiredPane = ref(false);
 
 function detachAllExpired() {
@@ -172,9 +172,8 @@ const zoneGroups = computed(() => {
     return groups;
 });
 
-// The interface language's matching `languages` row, if any — used as the
-// default for blank/ephemeral language selectors (never forced onto a
-// show's actual persisted setting, which may genuinely be "any language").
+// The interface language's matching `languages` row, if any — the default
+// for the page's display-only language filter.
 const uiLanguageId = computed(() => props.languages.find(l => l.abbreviation === locale.value)?.id ?? '');
 
 const showUploadPanel = ref(false);
@@ -183,15 +182,16 @@ const otherShows = computed(() => props.shows.filter(s => !s.is_main));
 const inShow = ref([...props.showSlides]);
 const unused = ref([...props.unusedSlides]);
 const newShowName = ref('');
-const newShowLanguageId = ref(uiLanguageId.value);
 const newShowAutoFillGlobal = ref(false);
 const newShowAutoFillNearby = ref(false);
 const showingNewShowForm = ref(false);
 
-// Temporary, client-only filter for "Unused slides" — never sent to the
-// server or saved onto the show. Defaults to the interface language but a
-// slide with no language tag always stays visible (it's meant for everyone).
-const unusedLanguageFilter = ref(uiLanguageId.value);
+// Display-only language filter for both lists on this page — never sent to
+// the server or saved onto a show (shows hold every language; Slide
+// Announcers filter by their own language). Defaults to the interface
+// language, and a slide with no language tag always stays visible.
+const languageFilter = ref(uiLanguageId.value);
+const matchesLanguage = (s) => !languageFilter.value || s.language_id === null || s.language_id === languageFilter.value;
 
 // "This Show" vs "All Shows" scope for the left panel — also client-only.
 // The server already excludes membership in *this* show from `unused`, and
@@ -201,7 +201,7 @@ const unusedLanguageFilter = ref(uiLanguageId.value);
 // than one show without a second round trip to change scope.
 const unusedScope = ref('all');
 const filteredUnused = computed(() => unused.value.filter(s =>
-    (!unusedLanguageFilter.value || s.language_id === null || s.language_id === unusedLanguageFilter.value)
+    matchesLanguage(s)
     && (unusedScope.value === 'this' || !s.linked_elsewhere)
 ));
 
@@ -226,13 +226,11 @@ function createShow() {
     if (!newShowName.value.trim()) return;
     router.post(route('shows.store', { entity_id: props.entity.id }), {
         name: newShowName.value,
-        language_id: newShowLanguageId.value || null,
         auto_fill_global: newShowAutoFillGlobal.value,
         auto_fill_nearby: newShowAutoFillNearby.value,
     }, {
         onSuccess: () => {
             newShowName.value = '';
-            newShowLanguageId.value = uiLanguageId.value;
             newShowAutoFillGlobal.value = false;
             newShowAutoFillNearby.value = false;
             showingNewShowForm.value = false;
@@ -240,7 +238,7 @@ function createShow() {
     });
 }
 
-// Updates the currently-selected show's language/auto-fill. Debounced isn't
+// Updates the currently-selected show's auto-fill. Debounced isn't
 // needed since these are discrete select/checkbox changes, not free typing.
 function updateShowSettings(changes) {
     router.patch(route('shows.update', { show: props.selectedShowId, entity_id: props.entity.id }),
@@ -356,6 +354,12 @@ function persistLeaderOrder() {
                             {{ show.is_main ? '🔒 ' : '' }}{{ show.name }}
                         </option>
                     </select>
+                    <select v-model.number="languageFilter"
+                        title="Only changes what's shown on this page — every show holds all languages"
+                        class="rounded-lg border-gray-300 text-sm">
+                        <option value="">All languages</option>
+                        <option v-for="lang in languages" :key="lang.id" :value="lang.id">{{ lang.name }}</option>
+                    </select>
                     <button v-if="isAdmin && !showingNewShowForm" @click="showingNewShowForm = true"
                         class="rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
                         + New Show
@@ -363,10 +367,6 @@ function persistLeaderOrder() {
                     <div v-if="showingNewShowForm" class="flex flex-wrap items-center gap-2">
                         <input v-model="newShowName" type="text" placeholder="Show name"
                             class="rounded-lg border-gray-300 text-sm" @keyup.enter="createShow" />
-                        <select v-model.number="newShowLanguageId" class="rounded-lg border-gray-300 text-sm">
-                            <option value="">Any language</option>
-                            <option v-for="lang in languages" :key="lang.id" :value="lang.id">{{ lang.name }}</option>
-                        </select>
                         <label class="flex items-center gap-1 text-sm text-gray-700">
                             <input v-model="newShowAutoFillGlobal" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
                             Add global slides
@@ -392,16 +392,6 @@ function persistLeaderOrder() {
             </div>
 
             <div v-if="isAdmin && selectedShow" class="space-y-3 rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-3">
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                    Filter by Language:
-                    <select :value="selectedShow.language_id ?? ''"
-                        @change="updateShowSettings({ language_id: $event.target.value || null })"
-                        class="rounded-lg border-gray-300 text-sm">
-                        <option value="">Any language</option>
-                        <option v-for="lang in languages" :key="lang.id" :value="lang.id">{{ lang.name }}</option>
-                    </select>
-                </label>
-
                 <div class="rounded-lg border-2 border-gray-300 bg-white px-3 py-2">
                     <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Auto Fill Options</p>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-gray-700">
@@ -440,12 +430,6 @@ function persistLeaderOrder() {
                         <h2 class="text-sm font-semibold text-gray-700">
                             {{ unusedScope === 'this' ? 'Available slides' : 'Unused slides' }}
                         </h2>
-                        <select v-model.number="unusedLanguageFilter"
-                            title="Temporarily filter this list — doesn't change the show's settings"
-                            class="rounded-lg border-gray-300 text-xs">
-                            <option value="">Any language</option>
-                            <option v-for="lang in languages" :key="lang.id" :value="lang.id">{{ lang.name }}</option>
-                        </select>
                     </div>
                     <div class="mb-3 flex items-center gap-4 text-xs text-gray-600">
                         <label class="flex items-center gap-1.5 cursor-pointer">

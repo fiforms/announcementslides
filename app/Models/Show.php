@@ -17,15 +17,15 @@ use Illuminate\Support\Collection;
  * every show — main, extra, or the Global Board — lives entirely in
  * show_slides; slides.sort_order no longer exists.
  *
- * A show optionally has a preferred `language_id` (null = accepts every
- * language) and two independent auto-fill flags — `auto_fill_global` (global
+ * A show has two independent auto-fill flags — `auto_fill_global` (global
  * slides) and `auto_fill_nearby` (nearby-shared slides). Only a show with the
  * relevant flag on participates in that kind of automatic distribution — see
  * syncAutoFillForSlide() and syncAutoFillFromCandidates(). A leader can
- * always manually attach any slide to any show regardless of language or
- * status; language and `status === 'published'` only gate *automatic*
- * fan-out (and language alone filters the Show Editor's "Unused slides"
- * list).
+ * always manually attach any slide to any show regardless of status;
+ * `status === 'published'` only gates *automatic* fan-out. Language plays no
+ * part in membership: shows hold every language, and the language is a
+ * display filter (web pages) or a per-device filter (Slide Announcers). The
+ * legacy `language_id` column is unused.
  */
 class Show extends Model
 {
@@ -181,7 +181,9 @@ class Show extends Model
     }
 
     /**
-     * Eligibility is gated on language and `status` — a slide that isn't
+     * Eligibility is gated on `status` only — shows hold every language and
+     * each device filters by its own language, so a show's `language_id` is
+     * no longer consulted. A slide that isn't
      * published has no business auto-appearing anywhere yet/anymore — but
      * deliberately NOT on publish_at/expires_at: once a slide is fanned in,
      * it stays attached through its own publish window the same way it stays
@@ -193,8 +195,7 @@ class Show extends Model
      */
     private static function reconcilePair(self $show, Slide $slide): void
     {
-        $languageMatches = $show->language_id === null || $show->language_id === $slide->language_id;
-        $eligible = $languageMatches && $slide->status === 'published';
+        $eligible = $slide->status === 'published';
         $pivot = $show->slides()->where('slides.id', $slide->id)->first()?->pivot;
 
         if ($eligible && !$pivot) {
