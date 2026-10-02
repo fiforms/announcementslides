@@ -1,5 +1,8 @@
 <script setup>
+import { useAppName } from '@/Composables/useAppName.js';
 import { Link } from '@inertiajs/vue3';
+
+const appName = useAppName();
 </script>
 
 <template>
@@ -8,7 +11,7 @@ import { Link } from '@inertiajs/vue3';
     >
         <div>
             <Link href="/" class="text-2xl font-bold text-gray-700">
-                {{ $page.props.appName }}
+                {{ appName }}
             </Link>
         </div>
 

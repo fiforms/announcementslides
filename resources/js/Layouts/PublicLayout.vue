@@ -1,4 +1,5 @@
 <script setup>
+import { useAppName } from '@/Composables/useAppName.js';
 import { Link, usePage, router } from '@inertiajs/vue3';
 import { computed, ref } from 'vue';
 import UserMenu from '@/Components/UserMenu.vue';
@@ -7,6 +8,7 @@ import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import { useEntitySelection } from '@/Composables/useEntitySelection.js';
 
 const page = usePage();
+const appName = useAppName();
 const auth = computed(() => page.props.auth);
 const flash = computed(() => page.props.flash);
 const showingNavigationDropdown = ref(false);
@@ -28,7 +30,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
-                        <span class="text-lg font-bold text-white">{{ page.props.appName }}</span>
+                        <span class="text-lg font-bold text-white">{{ appName }}</span>
                     </Link>
 
                     <div class="hidden nav:flex nav:items-center nav:gap-6">
@@ -206,7 +208,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
         </main>
 
         <footer class="mt-16 border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-400">
-            {{ page.props.appName }} &mdash; {{ $t('nav.powered_by') }} <a href="https://github.com/fiforms/announcementslides" class="text-indigo-600 hover:text-indigo-800" target="_blank">AnnouncementSlides</a>
+            {{ appName }} &mdash; {{ $t('nav.powered_by') }} <a href="https://github.com/fiforms/announcementslides" class="text-indigo-600 hover:text-indigo-800" target="_blank">AnnouncementSlides</a>
         </footer>
     </div>
 </template>

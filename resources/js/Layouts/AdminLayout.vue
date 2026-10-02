@@ -1,9 +1,11 @@
 <script setup>
+import { useAppName } from '@/Composables/useAppName.js';
 import { Link, usePage } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import UserMenuAdmin from '@/Components/UserMenuAdmin.vue';
 
 const page = usePage();
+const appName = useAppName();
 const flash = computed(() => page.props.flash);
 const user  = computed(() => page.props.auth?.user);
 </script>
@@ -19,7 +21,7 @@ const user  = computed(() => page.props.auth?.user);
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                 d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                         </svg>
-                        <span class="text-sm font-bold text-white">{{ page.props.appName }}</span>
+                        <span class="text-sm font-bold text-white">{{ appName }}</span>
                     </Link>
                 </div>
 

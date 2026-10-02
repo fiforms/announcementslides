@@ -1,11 +1,12 @@
 <script setup>
+import { useAppName } from '@/Composables/useAppName.js';
 import { ref, computed } from 'vue';
-import { router, useForm, usePage } from '@inertiajs/vue3';
+import { router, useForm } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 
 const { t } = useI18n();
-const appName = computed(() => usePage().props.appName);
+const appName = useAppName();
 
 const props = defineProps({
     users:       { type: Array, default: () => [] },

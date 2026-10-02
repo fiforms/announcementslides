@@ -17,6 +17,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Localized Application Name
+    |--------------------------------------------------------------------------
+    |
+    | Per-language overrides of the application name shown in the web UI,
+    | collected from APP_NAME_<locale> environment variables (for example
+    | APP_NAME_es="Anuncios"). Languages without an entry use 'name'.
+    |
+    */
+
+    'name_localized' => collect(array_merge($_SERVER, $_ENV))
+        ->filter(fn ($value, $key) => is_string($key) && preg_match('/^APP_NAME_[A-Za-z]{2,3}$/', $key) && $value !== '' && $value !== false)
+        ->mapWithKeys(fn ($value, $key) => [strtolower(substr($key, 9)) => $value])
+        ->all(),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Environment
     |--------------------------------------------------------------------------
     |
