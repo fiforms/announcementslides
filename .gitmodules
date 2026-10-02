@@ -1,3 +1,6 @@
 [submodule "slideannouncer"]
 	path = slideannouncer
 	url = https://github.com/fiforms/slideannouncer.git
+[submodule "resources/widgets"]
+	path = resources/widgets
+	url = https://github.com/fiforms/overlaywidgets.git
