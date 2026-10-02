@@ -99,6 +99,21 @@ function downloadPowerPointAll() {
     window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
 }
 
+function downloadRevelationSelected() {
+    const ids = [...selectedIds.value].join(',');
+    const params = new URLSearchParams();
+    if (ids) params.append('ids', ids);
+    params.append('language', currentLanguageCode.value);
+    window.location.href = route('slides.download-revelation') + `?${params.toString()}`;
+}
+
+function downloadRevelationAll() {
+    const params = new URLSearchParams();
+    params.append('language', currentLanguageCode.value);
+    if (props.showId) params.append('show_id', props.showId);
+    window.location.href = route('slides.download-revelation') + `?${params.toString()}`;
+}
+
 // Slideshow
 const showSlideshow = ref(false);
 const slideshowSlides = ref([]);
@@ -221,6 +236,10 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
                                     class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
                                     {{ $t('slides.powerpoint_download') }}
                                 </a>
+                                <a @click="downloadRevelationSelected"
+                                    class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
+                                    {{ $t('slides.revelation_download') }}
+                                </a>
                             </template>
                         </Dropdown>
                     </div>
@@ -252,6 +271,10 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
                                 <a @click="downloadPowerPointAll"
                                     class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
                                     {{ $t('slides.powerpoint_download') }}
+                                </a>
+                                <a @click="downloadRevelationAll"
+                                    class="block w-full px-4 py-2 text-start text-sm leading-5 text-gray-700 transition duration-150 ease-in-out hover:bg-gray-100 focus:bg-gray-100 focus:outline-none cursor-pointer">
+                                    {{ $t('slides.revelation_download') }}
                                 </a>
                             </template>
                         </Dropdown>

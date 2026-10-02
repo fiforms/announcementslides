@@ -111,6 +111,7 @@
         "slideshow": "Slideshow",
         "image_download": "Image Download (.zip)",
         "powerpoint_download": "PowerPoint Download (.pptx)",
+        "revelation_download": "REVELation Snapshot Presenter (.zip)",
         "page_title": "Announcement Slides",
         "expired_on": "Expired {date}",
         "expires_on": "Expires {date}",

@@ -111,6 +111,7 @@
         "slideshow": "Presentación",
         "image_download": "Descargar imágenes (.zip)",
         "powerpoint_download": "Descargar PowerPoint (.pptx)",
+        "revelation_download": "Descargar REVELation Snapshot Presenter (.zip)",
         "page_title": "Diapositivas de anuncios",
         "expired_on": "Venció el {date}",
         "expires_on": "Vence el {date}",

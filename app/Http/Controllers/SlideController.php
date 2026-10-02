@@ -10,6 +10,7 @@ use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Services\OverlayCompositor;
+use App\Services\RevelationSnapshotBuilder;
 use App\Services\VideoFrameExtractor;
 use App\Support\NearbyEntities;
 use Illuminate\Http\Request;
@@ -263,7 +264,7 @@ class SlideController extends Controller
                 $name = $this->jpgName($name);
             }
 
-            $zip->addFile($fullPath, $this->zipEntryName(++$position, $slides->count(), $name));
+            $zip->addFile($fullPath, RevelationSnapshotBuilder::entryName(++$position, $slides->count(), $name));
         }
 
         // The archive reads the files at close(), so they go afterwards.
@@ -309,24 +310,30 @@ class SlideController extends Controller
     }
 
     /**
-     * The name a slide gets inside the zip: a zero-padded sequence number
-     * (so extracting gives the deck in show order, and no two names can
-     * collide) plus the filename with anything outside letters, digits,
-     * spaces and . _ - ( ) replaced by underscores. Unicode letters stay,
-     * so accented names survive.
+     * REVELation Snapshot Presenter export: base images/videos and overlays
+     * as separate, slide-numbered files plus presentation.md and manifest.json
+     * (see RevelationSnapshotBuilder).
      */
-    private function zipEntryName(int $position, int $total, string $name): string
+    public function downloadRevelation(Request $request, RevelationSnapshotBuilder $builder)
     {
-        $base = pathinfo($name, PATHINFO_FILENAME);
-        $ext  = pathinfo($name, PATHINFO_EXTENSION);
+        $slides = $this->resolveDownloadSlides($request);
+        $slides->load('overlayMedia');
 
-        $clean = fn (string $part) => trim(preg_replace('/[^\p{L}\p{N} ._()-]+/u', '_', $part), ' ._');
-        $base  = $clean($base) ?: 'slide';
-        $ext   = $clean($ext);
+        if ($slides->isEmpty()) {
+            abort(404);
+        }
 
-        $width = max(3, strlen((string) $total));
+        $show  = $request->query('show_id') ? Show::find((int) $request->query('show_id')) : null;
+        $title = $show?->name ?: 'Announcement Slides';
 
-        return sprintf('%0' . $width . 'd_%s%s', $position, $base, $ext === '' ? '' : '.' . $ext);
+        $tmpFile = $builder->build($slides, $title);
+
+        // "Main Show" -> main_show.revelation.zip; non-letters/digits collapse to underscores.
+        $slug = trim(preg_replace('/[^\p{L}\p{N}]+/u', '_', mb_strtolower($title)), '_') ?: 'announcement_slides';
+
+        return response()->download($tmpFile, "{$slug}.revelation.zip", [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
     }
 
     public function downloadPowerPoint(Request $request, OverlayCompositor $compositor, VideoFrameExtractor $frames)
