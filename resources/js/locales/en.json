@@ -19,7 +19,8 @@
         "show_editor": "Show Editor",
         "global_view": "Global View",
         "log_in": "Log In",
-        "powered_by": "Powered by"
+        "powered_by": "Powered by",
+        "play_links": "Shared Links"
     },
     "auth": {
         "email": "Email",
@@ -754,5 +755,36 @@
         "upscaled": "Upscaled",
         "not_an_image": "That file is not an image the browser can read.",
         "failed": "Upscaling failed."
+    },
+    "play": {
+        "revoked": "This link is no longer active.",
+        "no_slides": "There are no slides to show right now."
+    },
+    "play_links": {
+        "title": "Shared links — {name}",
+        "intro": "A shared link plays this church's slides full-screen on any device with a web browser — no login needed. Anyone who has the link can watch, so treat it like a password and revoke it if it gets out.",
+        "back_to_slides": "Back to slides",
+        "new": "New shared link",
+        "edit": "Edit shared link",
+        "field_title": "Title",
+        "title_placeholder": "e.g. Hallway TV",
+        "field_show": "Show",
+        "show_main": "Main Show (follows the church's main show)",
+        "field_language": "Language",
+        "language_all": "All languages",
+        "field_delay": "Seconds per slide",
+        "create": "Create link",
+        "save": "Save changes",
+        "cancel": "Cancel",
+        "none": "No shared links yet.",
+        "url": "Link",
+        "last_used": "Last played",
+        "never": "Never",
+        "copy": "Copy link",
+        "copied": "Copied!",
+        "open": "Open",
+        "revoke": "Revoke",
+        "revoke_confirm": "Revoke \"{title}\"? Any screen using this link will stop playing, and the link can't be restored.",
+        "seconds": "{n} s"
     }
 }

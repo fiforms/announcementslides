@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PlayLink;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Models\User;
@@ -65,6 +66,27 @@ class WidgetDataController extends Controller
         abort_unless($widget, 404);
 
         return $this->respond($widget, $endpoint, $placement['params'] ?? [], 'device:' . $device->id, $this->args($request->query('args')));
+    }
+
+    /**
+     * The shared-link player's equivalent of show(): authorized by a PlayLink
+     * token rather than a session. Only placements on a live slide in the
+     * link's own show are readable.
+     */
+    public function playLink(Request $request, string $token, SlideMedia $slideMedia, string $element, string $endpoint): JsonResponse
+    {
+        $link = PlayLink::active()->where('token', $token)->first();
+        abort_unless($link && $slideMedia->media_type === 'slide-overlay', 404);
+        $inShow = Slide::current()->whereKey($slideMedia->slide_id)
+            ->whereHas('shows', fn ($q) => $q->whereKey($link->resolvedShow()->id))
+            ->exists();
+        abort_unless($inShow, 404);
+
+        $placement = OverlayWidgets::placement($slideMedia, $element);
+        $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
+        abort_unless($widget, 404);
+
+        return $this->respond($widget, $endpoint, $placement['params'] ?? [], 'play-link:' . $link->id, $this->args($request->query('args')));
     }
 
     public function preview(Request $request): JsonResponse

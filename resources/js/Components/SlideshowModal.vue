@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import WidgetLayer from '@/Components/Widgets/WidgetLayer.vue';
 
@@ -7,6 +7,11 @@ const props = defineProps({
     show: { type: Boolean, default: false },
     slide: { type: Object, default: null },
     slides: { type: Array, default: null },
+    // Unattended full-viewport playback (the shared-link player): no on-screen
+    // controls, no close/fullscreen handling, plays on mount.
+    kiosk: { type: Boolean, default: false },
+    // Overrides the profile's slide delay when set.
+    intervalSeconds: { type: Number, default: null },
 });
 
 const emit = defineEmits(['close']);
@@ -22,6 +27,15 @@ const slidesList = computed(() => {
     return props.slide ? [props.slide] : [];
 });
 const advanceTimer = ref(null);
+
+// A live list can shrink under us (kiosk refresh): stay in range.
+watch(() => slidesList.value.length, (len) => {
+    if (len && currentIndex.value >= len) currentIndex.value = 0;
+});
+// ...and pick up a changed delay without a restart.
+watch(() => props.intervalSeconds, () => {
+    slideshowInterval.value = getSlideshowInterval();
+});
 const slideshowInterval = ref(12000);
 const controlsHideTimer = ref(null);
 const containerRef = ref(null);
@@ -62,7 +76,7 @@ function formatTime(seconds) {
 }
 
 // The viewer's profile slide delay (shared Inertia prop; site default when anonymous).
-const getSlideshowInterval = () => (Number(page.props.slideDelaySeconds) || 12) * 1000;
+const getSlideshowInterval = () => (props.intervalSeconds || Number(page.props.slideDelaySeconds) || 12) * 1000;
 
 // Routed through goToIndex so each auto-advance (timer or a play_through
 // video's 'ended') re-arms the countdown for the next slide, including the
@@ -216,7 +230,7 @@ const scheduleControlsHide = () => {
 };
 
 const handleMouseMove = () => {
-    if (props.show) {
+    if (props.show && !props.kiosk) {
         scheduleControlsHide();
     }
 };
@@ -238,6 +252,7 @@ const handleKeydown = (e) => {
     if (!props.show) return;
 
     if (e.key === 'Escape') {
+        if (props.kiosk) return;
         if (document.fullscreenElement) {
             document.exitFullscreen();
         }
@@ -276,6 +291,11 @@ const handleClose = () => {
 const handleShow = () => {
     if (props.show) {
         startSlideshow();
+        if (props.kiosk) {
+            // Nothing to show or hide, and no gesture to enter fullscreen with.
+            showControls.value = false;
+            return;
+        }
         scheduleControlsHide();
         // Request fullscreen after a brief delay to ensure DOM is ready
         setTimeout(() => {
@@ -290,6 +310,7 @@ const handleShow = () => {
 
 <template>
     <Transition
+        appear
         enter-active-class="transition ease-out duration-300"
         enter-from-class="opacity-0"
         enter-to-class="opacity-100"
@@ -353,7 +374,7 @@ const handleShow = () => {
                 </div>
 
                 <!-- Controls -->
-                <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/50 px-6 py-3 rounded-full backdrop-blur transition-opacity duration-300" :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'">
+                <div v-if="!kiosk" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/50 px-6 py-3 rounded-full backdrop-blur transition-opacity duration-300" :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'">
                     <button
                         @click="prevSlide"
                         class="text-white hover:text-gray-300 transition p-2"
@@ -392,6 +413,7 @@ const handleShow = () => {
 
                 <!-- Close button -->
                 <button
+                    v-if="!kiosk"
                     @click="handleClose"
                     class="absolute top-8 right-8 text-white hover:text-gray-300 transition-all duration-300 p-2 bg-black/50 rounded-full backdrop-blur"
                     :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'"

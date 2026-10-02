@@ -71,6 +71,13 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                                 {{ $t('nav.slide_announcers') }}
                             </Link>
 
+                            <!-- Shared (no-login) playback links -->
+                            <Link v-if="hasEntities && currentEntityId" :href="route('play-links.index', { entity_id: currentEntityId })"
+                                class="text-sm text-indigo-200 hover:text-white transition-colors"
+                                :class="{ 'text-white font-semibold': route().current('play-links.*') }">
+                                {{ $t('nav.play_links') }}
+                            </Link>
+
                             <!-- Entity switcher: click to see available entities; shows the active one when closed -->
                             <Dropdown v-if="hasEntities" align="right" width="48" contentClasses="py-1 bg-white">
                                 <template #trigger>
@@ -189,6 +196,13 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                                 :active="route().current('slide-announcers.*')"
                             >
                                 {{ $t('nav.slide_announcers') }}
+                            </ResponsiveNavLink>
+                            <ResponsiveNavLink
+                                v-if="currentEntityId"
+                                :href="route('play-links.index', { entity_id: currentEntityId })"
+                                :active="route().current('play-links.*')"
+                            >
+                                {{ $t('nav.play_links') }}
                             </ResponsiveNavLink>
                             <ResponsiveNavLink
                                 @click.prevent="selectEntity(null)"

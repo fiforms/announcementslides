@@ -82,12 +82,18 @@ Each audience has its own controller and route group, keeping the scoping rules 
 | Contributor's own global slides | [MySlideController](app/Http/Controllers/MySlideController.php) | `/my-slides/*` |
 | A church member's local slides | [LocalSlideController](app/Http/Controllers/LocalSlideController.php) | `/local-slides/*` (incl. reorder, archive, share-nearby) |
 | A church leader managing an entity's slides | [EntitySlideController](app/Http/Controllers/EntitySlideController.php) | `/entity/{entity}/slides/*` |
+| Entity leader's shared no-login playback links | [PlayLinkController](app/Http/Controllers/PlayLinkController.php) | `/play-links/*` |
+| Public playback via a shared link | [PlayController](app/Http/Controllers/PlayController.php) | `/play/{token}` (+ `/slides`, `/widget-data/…`) |
 | Entity subscriptions / search | [EntityController](app/Http/Controllers/EntityController.php) | `/entities/*` |
 | Admin slide review & publishing | [Admin/SlideController](app/Http/Controllers/Admin/SlideController.php) | `/admin/slides/*` (approve, reject, archive, reorder) |
 | Admin users & invitations | [Admin/UserController](app/Http/Controllers/Admin/UserController.php) | `/admin/users/*`, `/admin/invitations/*` |
 | Admin dashboard | [Admin/DashboardController](app/Http/Controllers/Admin/DashboardController.php) | `/admin` |
 | Admin oversight of entity slides | [Admin/EntityConsoleController](app/Http/Controllers/Admin/EntityConsoleController.php) | `/admin/entities/*` |
 | Auth (Breeze + Google) | [app/Http/Controllers/Auth/](app/Http/Controllers/Auth/) | see [routes/auth.php](routes/auth.php) |
+
+### Shared playback links
+
+A leader can mint a revocable, titled link per screen ("Hallway TV") on `/play-links`. [PlayLink](app/Models/PlayLink.php) stores a 64-character random `token` (the URL secret, kept readable so the link can be copied again), the entity, an optional `show_id` (null follows the Main Show), an optional `language_id` (null plays all), `delay_seconds`, `last_used_at` and `revoked_at`. `/play/{token}` needs no login: [PlayController](app/Http/Controllers/PlayController.php) derives everything from the link (never the query string) and renders `Pages/Play/Show.vue`, which runs [SlideshowModal](resources/js/Components/SlideshowModal.vue) in `kiosk` mode (no controls, no fullscreen prompt). The open page polls `/play/{token}/slides` so slide edits, a changed delay and revocation reach an unattended screen; a 404 stops playback. Pages send `no-store`, `Referrer-Policy: no-referrer` and `noindex`; the routes are throttled per IP. Widgets on entity-local slides can't be read by a guest, so their `data_url`s are rewritten to the link's own `play.widget-data` endpoint (`WidgetDataController::playLink`), limited to slides in the link's show.
 
 ### Bulk downloads
 

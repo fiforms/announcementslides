@@ -14,6 +14,8 @@ use App\Http\Controllers\EntitySlideAnnouncerController;
 use App\Http\Controllers\EntitySlideController;
 use App\Http\Controllers\LocalSlideController;
 use App\Http\Controllers\MySlideController;
+use App\Http\Controllers\PlayController;
+use App\Http\Controllers\PlayLinkController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ShowController;
 use App\Http\Controllers\SlideController;
@@ -41,6 +43,15 @@ Route::get('/widget-assets/{slug}/{version}/{path}', [WidgetAssetController::cla
     ->where('path', '.*')->name('widgets.asset');
 Route::get('/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'show'])
     ->middleware('throttle:120,1')->name('widget-data.show');
+
+// Shared-link player: the unguessable token is the only credential, so no
+// login or session is needed. Throttled per IP against token guessing
+// (generous, since one church's screens share an IP).
+Route::prefix('play/{token}')->name('play.')->middleware('throttle:240,1')->group(function () {
+    Route::get('/', [PlayController::class, 'show'])->name('show');
+    Route::get('/slides', [PlayController::class, 'slides'])->name('slides');
+    Route::get('/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'playLink'])->name('widget-data');
+});
 
 // ── Auth (Breeze) ─────────────────────────────────────────────────────────────
 
@@ -127,6 +138,14 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::get('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'show'])->name('show');
         Route::patch('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'update'])->name('update');
         Route::delete('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'destroy'])->name('destroy');
+    });
+
+    // ── Entity leader: shareable no-login playback links ────────────────────
+    Route::prefix('play-links')->name('play-links.')->group(function () {
+        Route::get('/', [PlayLinkController::class, 'index'])->name('index');
+        Route::post('/', [PlayLinkController::class, 'store'])->name('store');
+        Route::patch('/{playLink}', [PlayLinkController::class, 'update'])->name('update');
+        Route::delete('/{playLink}', [PlayLinkController::class, 'destroy'])->name('destroy');
     });
 
     // ── Overlay editor: live widget preview with unsaved parameters ────────

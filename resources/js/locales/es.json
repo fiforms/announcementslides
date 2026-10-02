@@ -19,7 +19,8 @@
         "show_editor": "Editor de presentaciones",
         "global_view": "Vista global",
         "log_in": "Iniciar sesión",
-        "powered_by": "Desarrollado con"
+        "powered_by": "Desarrollado con",
+        "play_links": "Enlaces compartidos"
     },
     "auth": {
         "email": "Correo electrónico",
@@ -754,5 +755,36 @@
         "upscaled": "Escalada",
         "not_an_image": "Ese archivo no es una imagen que el navegador pueda leer.",
         "failed": "Error al escalar."
+    },
+    "play": {
+        "revoked": "Este enlace ya no está activo.",
+        "no_slides": "No hay diapositivas para mostrar por ahora."
+    },
+    "play_links": {
+        "title": "Enlaces compartidos — {name}",
+        "intro": "Un enlace compartido reproduce las diapositivas de esta iglesia a pantalla completa en cualquier dispositivo con navegador, sin iniciar sesión. Cualquiera que tenga el enlace puede verlas, así que trátelo como una contraseña y revóquelo si se filtra.",
+        "back_to_slides": "Volver a las diapositivas",
+        "new": "Nuevo enlace compartido",
+        "edit": "Editar enlace compartido",
+        "field_title": "Título",
+        "title_placeholder": "p. ej. TV del pasillo",
+        "field_show": "Presentación",
+        "show_main": "Presentación principal (sigue la principal de la iglesia)",
+        "field_language": "Idioma",
+        "language_all": "Todos los idiomas",
+        "field_delay": "Segundos por diapositiva",
+        "create": "Crear enlace",
+        "save": "Guardar cambios",
+        "cancel": "Cancelar",
+        "none": "Aún no hay enlaces compartidos.",
+        "url": "Enlace",
+        "last_used": "Última reproducción",
+        "never": "Nunca",
+        "copy": "Copiar enlace",
+        "copied": "¡Copiado!",
+        "open": "Abrir",
+        "revoke": "Revocar",
+        "revoke_confirm": "¿Revocar \"{title}\"? Las pantallas que usen este enlace dejarán de reproducir y el enlace no se puede restaurar.",
+        "seconds": "{n} s"
     }
 }
