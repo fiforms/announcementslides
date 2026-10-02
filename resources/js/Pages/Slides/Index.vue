@@ -21,6 +21,10 @@ const props = defineProps({
     initialSlide: { type: Object, default: null },
 });
 
+// The Main Show / Global Board are system shows: their names are translated
+// at display time instead of using the stored (English) name.
+const showLabel = (show) => show.system ? t(`shows.${show.system}`) : show.name;
+
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
 
 // Reload the dashboard preserving the current entity / language / show state,
@@ -185,7 +189,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
 
                 <select v-if="availableShows.length > 1" :value="showId" @change="changeShow($event.target.value)"
                     class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right">
-                    <option v-for="show in availableShows" :key="show.id" :value="show.id">{{ show.name }}</option>
+                    <option v-for="show in availableShows" :key="show.id" :value="show.id">{{ showLabel(show) }}</option>
                 </select>
 
                 <div class="flex flex-wrap gap-2">

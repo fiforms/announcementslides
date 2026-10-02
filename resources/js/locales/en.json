@@ -80,6 +80,10 @@
         "role_admin": "Admin",
         "admin_managed": "Admin (managed)"
     },
+    "shows": {
+        "main": "Main Show",
+        "global": "Announcements"
+    },
     "slides": {
         "announcement_slides_title": "Current Announcement Slides",
         "slides_available": "slide|slides available",

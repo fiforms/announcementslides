@@ -64,7 +64,7 @@ class SlideController extends Controller
             $showId = $request->query('show_id')
                 ? (int) $request->query('show_id')
                 : $entity->mainShow()->id;
-            $availableShows = $entityShows->map(fn ($s) => ['id' => $s->id, 'name' => $s->name])->all();
+            $availableShows = $entityShows->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'system' => $s->is_main ? 'main' : null])->all();
         } else {
             $globalBoard = Show::globalBoard();
             $showId = $request->query('show_id') ? (int) $request->query('show_id') : $globalBoard->id;
@@ -73,11 +73,12 @@ class SlideController extends Controller
             // a single show row — each entity got its own copy — so pick one
             // representative copy per template purely so an anonymous/global
             // viewer can preview the same content.
-            $availableShows = collect([['id' => $globalBoard->id, 'name' => 'Announcements']])
+            $availableShows = collect([['id' => $globalBoard->id, 'name' => 'Announcements', 'system' => 'global']])
                 ->concat(
                     GlobalShowTemplate::has('shows')->get()->map(fn ($t) => [
                         'id' => $t->shows()->first()->id,
                         'name' => $t->name,
+                        'system' => null,
                     ])
                 )->all();
         }

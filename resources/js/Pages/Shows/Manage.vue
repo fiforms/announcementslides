@@ -351,7 +351,7 @@ function persistLeaderOrder() {
                     <select :value="selectedShowId" @change="switchShow($event.target.value)"
                         class="rounded-lg border-gray-300 text-sm font-medium">
                         <option v-for="show in shows" :key="show.id" :value="show.id">
-                            {{ show.is_main ? '🔒 ' : '' }}{{ show.name }}
+                            {{ show.is_main ? '🔒 ' : '' }}{{ show.is_main ? t('shows.main') : show.name }}
                         </option>
                     </select>
                     <select v-model.number="languageFilter"

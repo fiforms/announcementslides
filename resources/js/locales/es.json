@@ -80,6 +80,10 @@
         "role_admin": "Administrador",
         "admin_managed": "Admin (gestionado)"
     },
+    "shows": {
+        "main": "Programa Principal",
+        "global": "Anuncios"
+    },
     "slides": {
         "announcement_slides_title": "Diapositivas de anuncios actuales",
         "slides_available": "diapositiva|diapositivas disponibles",
