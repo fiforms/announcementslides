@@ -83,7 +83,7 @@ const { lightboxSlide, openLightbox, closeLightbox } = useLightbox();
 
 <template>
     <PublicLayout>
-        <head><title>Slide Archive</title></head>
+        <head><title>{{ $t('slides.archive_title') }}</title></head>
 
         <div class="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
