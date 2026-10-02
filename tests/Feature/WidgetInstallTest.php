@@ -90,7 +90,7 @@ class WidgetInstallTest extends TestCase
         $this->assertSame('clock', $clock->slug);
         $this->assertTrue($clock->enabled);
         $this->assertSame(['icon.png', 'manifest.json', 'widget.js'], $calendar->files);
-        Storage::disk('local')->assertExists('widgets/calendar/1.0.0/widget.js');
+        Storage::disk('local')->assertExists('widgets/calendar/1.0.1/widget.js');
         $this->assertSame('{ics}', $calendar->manifest['endpoints']['events']['url']);
     }
 

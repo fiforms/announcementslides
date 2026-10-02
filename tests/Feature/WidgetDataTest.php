@@ -129,7 +129,7 @@ class WidgetDataTest extends TestCase
 
         $forPlayer = $this->slide->fresh()->overlay_widgets;
         $this->assertCount(1, $forPlayer);
-        $this->assertStringContainsString('/widget-assets/calendar/1.0.0/widget.js', $forPlayer[0]['entry_url']);
+        $this->assertStringContainsString('/widget-assets/calendar/1.0.1/widget.js', $forPlayer[0]['entry_url']);
     }
 
     public function test_an_ics_url_off_the_allowlist_cannot_be_saved(): void
