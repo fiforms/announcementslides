@@ -121,6 +121,24 @@ class SlideMedia extends Model
         ])->save();
     }
 
+    /**
+     * The filename to offer on download. A resized (upscaled, downscaled or
+     * compressed) version is always re-encoded as JPEG but keeps the original
+     * upload's name, so swap in a .jpg extension to match what the bytes are.
+     */
+    public function downloadName(): string
+    {
+        $name = $this->original_filename;
+        if ($this->active_variant !== 'resized' || $this->mime_type !== 'image/jpeg') {
+            return $name;
+        }
+        if (in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['jpg', 'jpeg'], true)) {
+            return $name;
+        }
+
+        return pathinfo($name, PATHINFO_FILENAME) . '.jpg';
+    }
+
     /** 'upscale' or 'downscale' for the stored resized version, if any. */
     public function resizedKind(): ?string
     {

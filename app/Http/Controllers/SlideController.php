@@ -195,7 +195,7 @@ class SlideController extends Controller
         $media = $slide->primaryMedia;
         abort_unless($media, 404);
 
-        return Storage::disk('public')->download($media->disk_path, $media->original_filename);
+        return Storage::disk('public')->download($media->disk_path, $media->downloadName());
     }
 
     /**
@@ -209,12 +209,13 @@ class SlideController extends Controller
         abort_unless($media->slide_id === $slide->id, 404);
         abort_unless(Slide::current()->whereKey($slide->id)->exists(), 404);
 
-        return Storage::disk('public')->download($media->disk_path, $media->original_filename);
+        return Storage::disk('public')->download($media->disk_path, $media->downloadName());
     }
 
-    public function downloadZip(Request $request)
+    public function downloadZip(Request $request, OverlayCompositor $compositor)
     {
         $slides = $this->resolveDownloadSlides($request);
+        $slides->load('overlayMedia');
 
         if ($slides->isEmpty()) {
             abort(404);
@@ -228,22 +229,68 @@ class SlideController extends Controller
             abort(500, 'Could not create zip archive.');
         }
 
+        $position   = 0;
+        $tempImages = [];
         foreach ($slides as $slide) {
             $media = $slide->primaryMedia;
             if (! $media) {
                 continue;
             }
             $fullPath = Storage::disk('public')->path($media->disk_path);
-            if (file_exists($fullPath)) {
-                $zip->addFile($fullPath, $media->original_filename);
+            if (! file_exists($fullPath)) {
+                continue;
             }
+            $name = $media->downloadName();
+
+            // Burn the overlay into the image so the zip holds the slide as
+            // viewers see it. If flattening fails, fall back to the bare file.
+            if ($slide->overlayMedia && $media->isImage()) {
+                $compositePath = sys_get_temp_dir() . '/slide-composite-' . Str::uuid() . '.jpg';
+                if ($compositor->flatten($fullPath, $slide->overlayMedia, $compositePath, quality: 92)) {
+                    $tempImages[] = $compositePath;
+                    $fullPath = $compositePath;
+                    if (! in_array(strtolower(pathinfo($name, PATHINFO_EXTENSION)), ['jpg', 'jpeg'], true)) {
+                        $name = pathinfo($name, PATHINFO_FILENAME) . '.jpg';
+                    }
+                }
+            }
+
+            $zip->addFile($fullPath, $this->zipEntryName(++$position, $slides->count(), $name));
         }
 
-        $zip->close();
+        // The archive reads the files at close(), so they go afterwards.
+        try {
+            $zip->close();
+        } finally {
+            foreach ($tempImages as $path) {
+                @unlink($path);
+            }
+        }
 
         return response()->download($tmpFile, 'announcement-slides.zip', [
             'Content-Type' => 'application/zip',
         ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * The name a slide gets inside the zip: a zero-padded sequence number
+     * (so extracting gives the deck in show order, and no two names can
+     * collide) plus the filename with anything outside letters, digits,
+     * spaces and . _ - ( ) replaced by underscores. Unicode letters stay,
+     * so accented names survive.
+     */
+    private function zipEntryName(int $position, int $total, string $name): string
+    {
+        $base = pathinfo($name, PATHINFO_FILENAME);
+        $ext  = pathinfo($name, PATHINFO_EXTENSION);
+
+        $clean = fn (string $part) => trim(preg_replace('/[^\p{L}\p{N} ._()-]+/u', '_', $part), ' ._');
+        $base  = $clean($base) ?: 'slide';
+        $ext   = $clean($ext);
+
+        $width = max(3, strlen((string) $total));
+
+        return sprintf('%0' . $width . 'd_%s%s', $position, $base, $ext === '' ? '' : '.' . $ext);
     }
 
     public function downloadPowerPoint(Request $request, OverlayCompositor $compositor, VideoFrameExtractor $frames)
