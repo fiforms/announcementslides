@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Slide;
+use App\Services\Widgets\OverlayWidgets;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -17,11 +18,19 @@ use ZipArchive;
  * a thumbnail of the first slide and a manifest.json listing every file
  * with its size, mtime and SHA-1.
  *
- * Widgets are not exported yet.
+ * A slide's overlay widgets follow its overlay as `:widget:` YAML blocks.
  */
 class RevelationSnapshotBuilder
 {
     private const APP_VERSION = '1.0.13';
+
+    /** The overlay editor's canvas, which widget placements are measured in. */
+    private const CANVAS_W = 1920;
+    private const CANVAS_H = 1080;
+
+    public function __construct(private OverlayWidgets $widgets)
+    {
+    }
 
     /**
      * Zero-padded slide number (wide enough for $total, minimum 3) plus the
@@ -78,7 +87,11 @@ class RevelationSnapshotBuilder
             $overlayName = self::entryName($position, $total, "overlay.{$ext}");
             $files[$overlayName] = $disk->path($overlay->disk_path);
 
-            $sections[] = $this->image('background', $baseName) . "\n\n" . $this->image('fill', $overlayName);
+            $section = $this->image('background', $baseName) . "\n\n" . $this->image('fill', $overlayName);
+            foreach ($this->widgets->forDevice($overlay) as $placement) {
+                $section .= "\n\n" . $this->widgetBlock($placement);
+            }
+            $sections[] = $section;
         }
 
         if (! $files) {
@@ -123,6 +136,49 @@ class RevelationSnapshotBuilder
         return "![{$alt}]({$target})";
     }
 
+    /**
+     * A `:widget:` block for one saved placement (enabled widgets only, via
+     * forDevice()): the widget's slug as name, its box as fractions (0-1) of
+     * the screen width/height so it's independent of canvas size, and its
+     * parameters. Opacity is only written when the widget isn't fully opaque.
+     */
+    private function widgetBlock(array $p): string
+    {
+        $lines = [
+            ':widget:',
+            '  name: ' . $this->yaml((string) $p['widget']),
+            '  position:',
+            '    x: ' . $this->yamlScalar($p['x'] / self::CANVAS_W),
+            '    y: ' . $this->yamlScalar($p['y'] / self::CANVAS_H),
+            '  size:',
+            '    w: ' . $this->yamlScalar($p['w'] / self::CANVAS_W),
+            '    h: ' . $this->yamlScalar($p['h'] / self::CANVAS_H),
+        ];
+        if (($p['opacity'] ?? 1) < 1) {
+            $lines[] = '  opacity: ' . $this->yamlScalar($p['opacity']);
+        }
+        if (! empty($p['params'])) {
+            $lines[] = '  parameters:';
+            foreach ($p['params'] as $key => $value) {
+                $lines[] = '    ' . $key . ': ' . $this->yamlScalar($value);
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /** Any widget-parameter scalar (bool, null, number, string) as YAML. */
+    private function yamlScalar(mixed $value): string
+    {
+        return match (true) {
+            is_bool($value)  => $value ? 'true' : 'false',
+            $value === null  => 'null',
+            is_int($value)   => (string) $value,
+            is_float($value) => rtrim(rtrim(sprintf('%.4F', $value), '0'), '.'),
+            default          => $this->yaml((string) $value, multiline: true),
+        };
+    }
+
     private function frontMatter(string $title): string
     {
         $date = now()->toDateString();
@@ -154,10 +210,16 @@ class RevelationSnapshotBuilder
     }
 
     /** A YAML scalar: plain when trivially safe, otherwise single-quoted. */
-    private function yaml(string $value): string
+    private function yaml(string $value, bool $multiline = false): string
     {
         if (preg_match('/^[A-Za-z0-9][A-Za-z0-9 _.-]*$/', $value) && ! preg_match('/^(true|false|null|yes|no|on|off|[0-9.]+)$/i', $value)) {
             return $value;
+        }
+
+        // Free text may contain newlines, which a single-quoted scalar can't
+        // carry; a JSON string is valid double-quoted YAML.
+        if ($multiline) {
+            return json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         }
 
         return "'" . str_replace("'", "''", preg_replace('/\s+/', ' ', $value)) . "'";
