@@ -20,7 +20,8 @@
         "global_view": "Global View",
         "log_in": "Log In",
         "powered_by": "Powered by",
-        "play_links": "Shared Links"
+        "play_links": "Shared Links",
+        "shows": "Shows"
     },
     "auth": {
         "email": "Email",

@@ -6,6 +6,7 @@ import NavLink from '@/Components/NavLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
 import UserMenu from '@/Components/UserMenu.vue';
 import Dropdown from '@/Components/Dropdown.vue';
+import ShowsNav from '@/Components/ShowsNav.vue';
 import { useEntitySelection } from '@/Composables/useEntitySelection.js';
 
 const page = usePage();
@@ -57,26 +58,8 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                                 {{ $t('nav.my_slides') }}
                             </Link>
 
-                            <!-- Show Editor link (no meaning in Global View) -->
-                            <Link v-if="hasEntities && currentEntityId" :href="route('shows.index', { entity_id: currentEntityId })"
-                                class="text-sm text-indigo-200 hover:text-white transition-colors"
-                                :class="{ 'text-white font-semibold': route().current('shows.*') }">
-                                {{ $t('nav.show_editor') }}
-                            </Link>
-
-                            <!-- SlideAnnouncers link (no meaning in Global View) -->
-                            <Link v-if="hasEntities && currentEntityId" :href="route('slide-announcers.index', { entity_id: currentEntityId })"
-                                class="text-sm text-indigo-200 hover:text-white transition-colors"
-                                :class="{ 'text-white font-semibold': route().current('slide-announcers.*') }">
-                                {{ $t('nav.slide_announcers') }}
-                            </Link>
-
-                            <!-- Shared (no-login) playback links -->
-                            <Link v-if="hasEntities && currentEntityId" :href="route('play-links.index', { entity_id: currentEntityId })"
-                                class="text-sm text-indigo-200 hover:text-white transition-colors"
-                                :class="{ 'text-white font-semibold': route().current('play-links.*') }">
-                                {{ $t('nav.play_links') }}
-                            </Link>
+                            <!-- Shows menu (no meaning in Global View) -->
+                            <ShowsNav v-if="hasEntities && currentEntityId" :entity-id="currentEntityId" />
 
                             <!-- Entity switcher: click to see available entities; shows the active one when closed -->
                             <Dropdown v-if="hasEntities" align="right" width="48" contentClasses="py-1 bg-white">
@@ -183,27 +166,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             {{ $t('nav.my_slides') }}
                         </ResponsiveNavLink>
                         <template v-if="hasEntities">
-                            <ResponsiveNavLink
-                                v-if="currentEntityId"
-                                :href="route('shows.index', { entity_id: currentEntityId })"
-                                :active="route().current('shows.*')"
-                            >
-                                {{ $t('nav.show_editor') }}
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                v-if="currentEntityId"
-                                :href="route('slide-announcers.index', { entity_id: currentEntityId })"
-                                :active="route().current('slide-announcers.*')"
-                            >
-                                {{ $t('nav.slide_announcers') }}
-                            </ResponsiveNavLink>
-                            <ResponsiveNavLink
-                                v-if="currentEntityId"
-                                :href="route('play-links.index', { entity_id: currentEntityId })"
-                                :active="route().current('play-links.*')"
-                            >
-                                {{ $t('nav.play_links') }}
-                            </ResponsiveNavLink>
+                            <ShowsNav v-if="currentEntityId" :entity-id="currentEntityId" responsive />
                             <ResponsiveNavLink
                                 @click.prevent="selectEntity(null)"
                                 href="#"

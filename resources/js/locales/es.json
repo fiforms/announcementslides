@@ -20,7 +20,8 @@
         "global_view": "Vista global",
         "log_in": "Iniciar sesión",
         "powered_by": "Desarrollado con",
-        "play_links": "Enlaces compartidos"
+        "play_links": "Enlaces compartidos",
+        "shows": "Presentaciones"
     },
     "auth": {
         "email": "Correo electrónico",

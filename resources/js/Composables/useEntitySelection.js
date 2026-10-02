@@ -2,7 +2,7 @@ import { computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 
 // Pages that have no meaning without an entity.
-const ENTITY_ROUTES = ['shows.*', 'slide-announcers.*', 'local-slides.*'];
+const ENTITY_ROUTES = ['shows.*', 'slide-announcers.*', 'play-links.*', 'local-slides.*'];
 
 /**
  * Shared entity-selection state for the top nav (used by both
