@@ -22,7 +22,7 @@ const slidesList = computed(() => {
     return props.slide ? [props.slide] : [];
 });
 const advanceTimer = ref(null);
-const slideshowInterval = ref(10000); // Default 10 seconds
+const slideshowInterval = ref(12000);
 const controlsHideTimer = ref(null);
 const containerRef = ref(null);
 const videoEl = ref(null);
@@ -61,13 +61,8 @@ function formatTime(seconds) {
     return `${mins}:${String(secs).padStart(2, '0')}`;
 }
 
-const getSlideshowInterval = () => {
-    if (typeof window !== 'undefined' && localStorage) {
-        const stored = localStorage.getItem('slideshowInterval');
-        return stored ? parseInt(stored) * 1000 : 10000;
-    }
-    return 10000;
-};
+// The viewer's profile slide delay (shared Inertia prop; site default when anonymous).
+const getSlideshowInterval = () => (Number(page.props.slideDelaySeconds) || 12) * 1000;
 
 // Routed through goToIndex so each auto-advance (timer or a play_through
 // video's 'ended') re-arms the countdown for the next slide, including the

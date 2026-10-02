@@ -60,8 +60,9 @@ class RevelationSnapshotBuilder
      * the screen location widgets fall back to (see WidgetLocation); it's
      * written into the block of each widget whose manifest declares
      * "usesLocation", so e.g. a weather widget with a blank ZIP still gets one.
+     * $slideDelaySeconds is the auto-advance time (config default when null).
      */
-    public function build(Collection $slides, string $title, ?array $location = null): string
+    public function build(Collection $slides, string $title, ?array $location = null, ?int $slideDelaySeconds = null): string
     {
         $disk  = Storage::disk('public');
         $total = $slides->count();
@@ -105,7 +106,7 @@ class RevelationSnapshotBuilder
         }
 
         $generated = [
-            'presentation.md' => $this->frontMatter($title) . implode("\n\n---\n\n", $sections),
+            'presentation.md' => $this->frontMatter($title, $slideDelaySeconds ?? (int) config('slides.slide_delay_seconds')) . implode("\n\n---\n\n", $sections),
             'style.css'       => "/* Add custom styles here */\n",
         ];
 
@@ -191,12 +192,10 @@ class RevelationSnapshotBuilder
         };
     }
 
-    private function frontMatter(string $title): string
+    private function frontMatter(string $title, int $slideDelaySeconds): string
     {
-        $date = now()->toDateString();
-
-        // FIXME: Replace 12000 ms below with the user's configured
-        // default auto-slide duration once this is implemented
+        $date      = now()->toDateString();
+        $autoSlide = $slideDelaySeconds * 1000;
 
         return <<<YAML
         ---
@@ -218,7 +217,7 @@ class RevelationSnapshotBuilder
           hashOneBasedIndex: true
           hash: true
           loop: true
-          autoSlide: 12000
+          autoSlide: {$autoSlide}
           autoSlideStoppable: false
         confidence: {}
         version: 1.0.13

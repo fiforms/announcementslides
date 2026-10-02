@@ -16,6 +16,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Slide delay
+    |--------------------------------------------------------------------------
+    |
+    | Default seconds each slide shows before a slideshow auto-advances, both
+    | in the browser slideshow and the REVELation Snapshot Presenter export.
+    | Users can override it with a per-user setting (setting_tag =
+    | 'slide_delay_seconds'); anonymous viewers always use this default.
+    |
+    */
+    'slide_delay_seconds' => env('SLIDES_SLIDE_DELAY_SECONDS', 12),
+
+    /*
+    |--------------------------------------------------------------------------
     | ffmpeg binary
     |--------------------------------------------------------------------------
     |

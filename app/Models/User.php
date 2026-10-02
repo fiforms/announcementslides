@@ -87,6 +87,14 @@ class User extends Authenticatable
     }
 
     /**
+     * Seconds each slide shows before a slideshow auto-advances.
+     */
+    public function slideDelaySeconds(): int
+    {
+        return (int) $this->setting('slide_delay_seconds', config('slides.slide_delay_seconds'));
+    }
+
+    /**
      * Create or update a single per-user setting.
      */
     public function putSetting(string $tag, $value): void

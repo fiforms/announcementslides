@@ -334,7 +334,7 @@ class SlideController extends Controller
             ? WidgetLocation::for($show->entity)
             : WidgetLocation::forRequest($request);
 
-        $tmpFile = $builder->build($slides, $title, $location);
+        $tmpFile = $builder->build($slides, $title, $location, $request->user()?->slideDelaySeconds());
 
         // "Main Show" -> main_show.revelation.zip; non-letters/digits collapse to underscores.
         $slug = trim(preg_replace('/[^\p{L}\p{N}]+/u', '_', mb_strtolower($title)), '_') ?: 'announcement_slides';

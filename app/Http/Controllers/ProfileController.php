@@ -25,6 +25,7 @@ class ProfileController extends Controller
             'status' => session('status'),
             'authMethod' => $user->google_id ? 'google' : 'password',
             'nearbyRadiusMiles' => (int) $user->setting('nearby_radius_miles', config('slides.nearby_radius_miles')),
+            'slideDelaySeconds' => $user->slideDelaySeconds(),
             'subscriptions' => $user->entities()
                 ->orderBy('name')
                 ->get(['entities.id', 'entities.name', 'entities.city', 'entities.state', 'entities.entity_type'])
@@ -56,15 +57,18 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's per-user settings (e.g. nearby sharing radius).
+     * Update the user's per-user settings (e.g. nearby sharing radius, slide delay).
      */
     public function updateSettings(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'nearby_radius_miles' => ['required', 'integer', 'min:1', 'max:500'],
+            'nearby_radius_miles' => ['sometimes', 'required', 'integer', 'min:1', 'max:500'],
+            'slide_delay_seconds' => ['sometimes', 'required', 'integer', 'min:1', 'max:600'],
         ]);
 
-        $request->user()->putSetting('nearby_radius_miles', $validated['nearby_radius_miles']);
+        foreach ($validated as $tag => $value) {
+            $request->user()->putSetting($tag, $value);
+        }
 
         return Redirect::route('profile.edit');
     }
