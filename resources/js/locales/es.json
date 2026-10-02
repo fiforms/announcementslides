@@ -14,7 +14,12 @@
         "qr_code": "Creador de códigos QR",
         "widgets": "Complementos",
         "upscaler": "Escalado con IA",
-        "admin": "Administración"
+        "admin": "Administración",
+        "announcements": "Anuncios",
+        "show_editor": "Editor de presentaciones",
+        "global_view": "Vista global",
+        "log_in": "Iniciar sesión",
+        "powered_by": "Desarrollado con"
     },
     "auth": {
         "email": "Correo electrónico",
@@ -716,5 +721,31 @@
         "direct_link": "Enlace de descarga directa",
         "etcher_help_admin": "Puedes escribir esta imagen directamente en una tarjeta SD para preparar un anunciador en un dispositivo nuevo. Usa {etcher} o un programa similar para escribirla.",
         "compat_aarch64": "Esta imagen es compatible con Raspberry Pi 3 o más reciente (se sugieren 2 GB de RAM o más)."
+    },
+    "upscaler": {
+        "settings": "Configuración",
+        "description": "Las imágenes de diapositivas de entre {min} y {max} pueden duplicar su resolución mediante un modelo de IA que se ejecuta en el navegador de quien las sube (requiere un navegador con aceleración por GPU; el primer uso descarga el modelo). Siempre se conserva la imagen original para poder deshacer el escalado.",
+        "enable": "Activar el escalado",
+        "enable_hint": "Si se desactiva, se ocultan todas las opciones de escalado (las imágenes ya escaladas siguen funcionando).",
+        "auto_on_upload": "Escalar las nuevas subidas de forma predeterminada",
+        "auto_on_upload_hint": "El formulario de subida marca \"Escalar 2× con IA\" para las imágenes elegibles; quien sube puede desmarcarlo.",
+        "model": "Modelo",
+        "download_size": "descarga de {size}",
+        "jpeg_quality": "Calidad JPEG: {n}%",
+        "jpeg_quality_hint": "Las imágenes escaladas se guardan como JPEG. Si el resultado supera el límite de 5 MB, se vuelve a codificar automáticamente con menor calidad (hasta un 80%).",
+        "tile_size": "Tamaño de mosaico",
+        "tile_size_hint": "Las imágenes se procesan en mosaicos. Los mosaicos más pequeños usan menos memoria de GPU (menos fallos en equipos modestos), pero tardan más.",
+        "shrink": "Reducir imágenes demasiado grandes: mayores de {size} (4K) o de más de 5 MB",
+        "shrink_hint": "Las imágenes mayores que 4K se reducen para ajustarse a ese tamaño, y los archivos de más de 5 MB (como un PNG grande) se vuelven a codificar como JPEG, ambos en el navegador de quien sube (sin IA, con la misma calidad JPEG de arriba). Se conserva el original para poder deshacerlo. Es independiente de \"Activar el escalado\".",
+        "save": "Guardar configuración",
+        "saved": "Guardado.",
+        "try_title": "Probar un modelo",
+        "try_description": "Escala una imagen de tu computadora con cualquier modelo para compararlos. No se sube ni se guarda nada. Usa la calidad y el tamaño de mosaico de arriba (aunque no estén guardados).",
+        "upscale_2x": "Escalar 2×",
+        "cancel": "Cancelar",
+        "original": "Original",
+        "upscaled": "Escalada",
+        "not_an_image": "Ese archivo no es una imagen que el navegador pueda leer.",
+        "failed": "Error al escalar."
     }
 }

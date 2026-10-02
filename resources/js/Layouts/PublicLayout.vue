@@ -35,7 +35,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         <Link :href="route('slides.index', currentEntityId ? { entity_id: currentEntityId } : {})"
                             class="text-sm text-indigo-200 hover:text-white transition-colors"
                             :class="{ 'text-white font-semibold': route().current('slides.index') }">
-                            Announcements
+                            {{ $t('nav.announcements') }}
                         </Link>
 
                         <template v-if="auth?.user?.role === 'viewer' || auth?.user?.role === 'contributor'">
@@ -50,21 +50,21 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         <Link v-if="auth?.user && hasEntities && currentEntityId" :href="route('shows.index', { entity_id: currentEntityId })"
                             class="text-sm text-indigo-200 hover:text-white transition-colors"
                             :class="{ 'text-white font-semibold': route().current('shows.*') }">
-                            Show Editor
+                            {{ $t('nav.show_editor') }}
                         </Link>
 
                         <!-- SlideAnnouncers link (no meaning in Global View) -->
                         <Link v-if="auth?.user && hasEntities && currentEntityId" :href="route('slide-announcers.index', { entity_id: currentEntityId })"
                             class="text-sm text-indigo-200 hover:text-white transition-colors"
                             :class="{ 'text-white font-semibold': route().current('slide-announcers.*') }">
-                            SlideAnnouncers
+                            {{ $t('nav.slide_announcers') }}
                         </Link>
 
                         <!-- Entity switcher: click to see available entities; shows the active one when closed -->
                         <Dropdown v-if="auth?.user && hasEntities" align="right" width="48" contentClasses="py-1 bg-white">
                             <template #trigger>
                                 <button class="flex items-center gap-1 text-sm text-indigo-200 hover:text-white transition-colors">
-                                    {{ currentEntity?.name ?? 'Global View' }}
+                                    {{ currentEntity?.name ?? $t('nav.global_view') }}
                                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                                     </svg>
@@ -76,7 +76,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                                     class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 transition-colors"
                                     :class="{ 'bg-indigo-50 font-semibold': !currentEntityId }"
                                 >
-                                    Global View
+                                    {{ $t('nav.global_view') }}
                                 </button>
                                 <button
                                     v-for="entity in userEntities"
@@ -93,14 +93,14 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         <template v-if="auth?.user">
                             <Link v-if="auth.user.role === 'admin'" :href="route('admin.dashboard')"
                                 class="rounded-md bg-indigo-500 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-400 transition-colors">
-                                Admin
+                                {{ $t('nav.admin') }}
                             </Link>
                             <UserMenu :user="auth.user" />
                         </template>
                         <template v-else>
                             <Link :href="route('login')"
                                 class="text-sm text-indigo-200 hover:text-white transition-colors">
-                                Log In
+                                {{ $t('nav.log_in') }}
                             </Link>
                         </template>
                     </div>
@@ -124,7 +124,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             </button>
                         </template>
                         <Link v-else :href="route('login')" class="text-sm text-indigo-200 hover:text-white transition-colors">
-                            Log In
+                            {{ $t('nav.log_in') }}
                         </Link>
                     </div>
                 </div>
@@ -141,7 +141,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         :href="route('slides.index', currentEntityId ? { entity_id: currentEntityId } : {})"
                         :active="route().current('slides.index')"
                     >
-                        Announcements
+                        {{ $t('nav.announcements') }}
                     </ResponsiveNavLink>
                     <ResponsiveNavLink
                         v-if="auth.user.role === 'viewer' || auth.user.role === 'contributor'"
@@ -156,21 +156,21 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                             :href="route('shows.index', { entity_id: currentEntityId })"
                             :active="route().current('shows.*')"
                         >
-                            Show Editor
+                            {{ $t('nav.show_editor') }}
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             v-if="currentEntityId"
                             :href="route('slide-announcers.index', { entity_id: currentEntityId })"
                             :active="route().current('slide-announcers.*')"
                         >
-                            SlideAnnouncers
+                            {{ $t('nav.slide_announcers') }}
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             @click.prevent="selectEntity(null)"
                             href="#"
                             :active="!currentEntityId"
                         >
-                            Global View
+                            {{ $t('nav.global_view') }}
                         </ResponsiveNavLink>
                         <ResponsiveNavLink
                             v-for="entity in userEntities"
@@ -187,7 +187,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         :href="route('admin.dashboard')"
                         :active="route().current('admin.*')"
                     >
-                        Admin
+                        {{ $t('nav.admin') }}
                     </ResponsiveNavLink>
                 </div>
             </div>
@@ -206,7 +206,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
         </main>
 
         <footer class="mt-16 border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-400">
-            {{ page.props.appName }} &mdash; Powered by <a href="https://github.com/fiforms/announcementslides" class="text-indigo-600 hover:text-indigo-800" target="_blank">AnnouncementSlides</a>
+            {{ page.props.appName }} &mdash; {{ $t('nav.powered_by') }} <a href="https://github.com/fiforms/announcementslides" class="text-indigo-600 hover:text-indigo-800" target="_blank">AnnouncementSlides</a>
         </footer>
     </div>
 </template>

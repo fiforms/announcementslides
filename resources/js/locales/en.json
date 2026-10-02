@@ -14,7 +14,12 @@
         "qr_code": "QR Code Creator",
         "widgets": "Widgets",
         "upscaler": "AI Upscaler",
-        "admin": "Admin"
+        "admin": "Admin",
+        "announcements": "Announcements",
+        "show_editor": "Show Editor",
+        "global_view": "Global View",
+        "log_in": "Log In",
+        "powered_by": "Powered by"
     },
     "auth": {
         "email": "Email",
@@ -716,5 +721,31 @@
         "direct_link": "Direct download link",
         "etcher_help_admin": "You can write this image directly to an SD card to provision Slide Announcer on a new device. Use {etcher} or similar software to write this image.",
         "compat_aarch64": "This image is compatible with Raspberry Pi 3 or newer (suggested 2GB or more RAM)."
+    },
+    "upscaler": {
+        "settings": "Settings",
+        "description": "Slide images between {min} and {max} can be doubled in resolution by an AI model that runs in the browser of the person uploading (needs a GPU-accelerated browser; the first use downloads the model). The original image is always kept so an upscale can be undone.",
+        "enable": "Enable upscaling",
+        "enable_hint": "Off hides every upscale option (existing upscaled images keep working).",
+        "auto_on_upload": "Upscale new uploads by default",
+        "auto_on_upload_hint": "The upload form ticks \"Upscale 2× with AI\" for eligible images; uploaders can untick it.",
+        "model": "Model",
+        "download_size": "{size} download",
+        "jpeg_quality": "JPEG quality: {n}%",
+        "jpeg_quality_hint": "Upscaled images are saved as JPEG. If a result is over the 5 MB size limit it is re-encoded at lower quality (down to 80%) automatically.",
+        "tile_size": "Tile size",
+        "tile_size_hint": "Images are processed in tiles. Smaller tiles use less GPU memory (fewer failures on weak computers) but take longer.",
+        "shrink": "Shrink oversized images: larger than {size} (4K) or over 5 MB",
+        "shrink_hint": "Images beyond 4K are downscaled to fit it, and files over 5 MB (such as a large PNG) are re-encoded as JPEG, both in the uploader's browser (no AI, same JPEG quality as above). The original is kept so it can be undone. Independent of \"Enable upscaling\".",
+        "save": "Save settings",
+        "saved": "Saved.",
+        "try_title": "Try a model",
+        "try_description": "Upscale an image on your computer with any model to compare them. Nothing is uploaded or saved. It uses the quality and tile size above (even if unsaved).",
+        "upscale_2x": "Upscale 2×",
+        "cancel": "Cancel",
+        "original": "Original",
+        "upscaled": "Upscaled",
+        "not_an_image": "That file is not an image the browser can read.",
+        "failed": "Upscaling failed."
     }
 }

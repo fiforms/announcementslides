@@ -1,8 +1,11 @@
 <script setup>
 import { ref, computed, onBeforeUnmount } from 'vue';
 import { useForm } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import { upscaleImage, upscaleIneligibility, ineligibleMessage } from '@/Composables/useUpscaler.js';
+
+const { t } = useI18n();
 
 // Options for the AI upscaler that runs in the browser of whoever uploads or
 // upscales a slide image. Nothing here is processed on the server.
@@ -51,7 +54,7 @@ async function pickFile(event) {
             tryInfo.value = { width: bitmap.width, height: bitmap.height };
             bitmap.close?.();
         } catch {
-            tryError.value = 'That file is not an image the browser can read.';
+            tryError.value = t('upscaler.not_an_image');
         }
     }
 }
@@ -82,7 +85,7 @@ async function runTry() {
             model: tryModel.value,
         };
     } catch (err) {
-        if (err.code !== 'aborted') tryError.value = err.message || 'Upscaling failed.';
+        if (err.code !== 'aborted') tryError.value = err.message || t('upscaler.failed');
     } finally {
         trying.value = false;
         abort = null;
@@ -105,18 +108,15 @@ onBeforeUnmount(() => {
 <template>
     <AdminLayout>
         <template #header>
-            <h1 class="text-xl font-semibold text-gray-900">AI Upscaler</h1>
+            <h1 class="text-xl font-semibold text-gray-900">{{ $t('nav.upscaler') }}</h1>
         </template>
 
         <div class="mx-auto max-w-5xl space-y-8">
             <form class="space-y-6 rounded-xl border border-gray-200 bg-white p-6 shadow-sm" @submit.prevent="save">
                 <div>
-                    <h2 class="text-lg font-semibold text-gray-900">Settings</h2>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ $t('upscaler.settings') }}</h2>
                     <p class="mt-1 text-sm text-gray-600">
-                        Slide images between {{ limits.min.w }}×{{ limits.min.h }} and {{ limits.max.w }}×{{ limits.max.h }}
-                        can be doubled in resolution by an AI model that runs in the browser of the person uploading
-                        (needs a GPU-accelerated browser; the first use downloads the model). The original image is always kept
-                        so an upscale can be undone.
+                        {{ $t('upscaler.description', { min: `${limits.min.w}×${limits.min.h}`, max: `${limits.max.w}×${limits.max.h}` }) }}
                     </p>
                 </div>
 
@@ -124,8 +124,8 @@ onBeforeUnmount(() => {
                     <input v-model="form.enabled" type="checkbox"
                         class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
                     <span>
-                        <span class="block text-sm font-medium text-gray-900">Enable upscaling</span>
-                        <span class="block text-xs text-gray-500">Off hides every upscale option (existing upscaled images keep working).</span>
+                        <span class="block text-sm font-medium text-gray-900">{{ $t('upscaler.enable') }}</span>
+                        <span class="block text-xs text-gray-500">{{ $t('upscaler.enable_hint') }}</span>
                     </span>
                 </label>
 
@@ -133,20 +133,20 @@ onBeforeUnmount(() => {
                     <input v-model="form.auto_on_upload" type="checkbox" :disabled="!form.enabled"
                         class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
                     <span>
-                        <span class="block text-sm font-medium text-gray-900">Upscale new uploads by default</span>
-                        <span class="block text-xs text-gray-500">The upload form ticks "Upscale 2× with AI" for eligible images; uploaders can untick it.</span>
+                        <span class="block text-sm font-medium text-gray-900">{{ $t('upscaler.auto_on_upload') }}</span>
+                        <span class="block text-xs text-gray-500">{{ $t('upscaler.auto_on_upload_hint') }}</span>
                     </span>
                 </label>
 
                 <fieldset class="space-y-2" :disabled="!form.enabled">
-                    <legend class="text-sm font-medium text-gray-900">Model</legend>
+                    <legend class="text-sm font-medium text-gray-900">{{ $t('upscaler.model') }}</legend>
                     <label v-for="m in models" :key="m.value"
                         class="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
                         :class="form.model === m.value ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'">
                         <input v-model="form.model" type="radio" :value="m.value"
                             class="mt-1 border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                         <span>
-                            <span class="block text-sm font-medium text-gray-900">{{ m.label }} <span class="font-normal text-gray-500">· {{ m.size }} download</span></span>
+                            <span class="block text-sm font-medium text-gray-900">{{ m.label }} <span class="font-normal text-gray-500">· {{ $t('upscaler.download_size', { size: m.size }) }}</span></span>
                             <span class="block text-xs text-gray-600">{{ m.note }}</span>
                         </span>
                     </label>
@@ -155,23 +155,21 @@ onBeforeUnmount(() => {
 
                 <div class="grid gap-6 sm:grid-cols-2">
                     <div>
-                        <label class="block text-sm font-medium text-gray-900">JPEG quality: {{ form.jpeg_quality }}%</label>
+                        <label class="block text-sm font-medium text-gray-900">{{ $t('upscaler.jpeg_quality', { n: form.jpeg_quality }) }}</label>
                         <input v-model.number="form.jpeg_quality" type="range" min="60" max="100" step="1"
                             :disabled="!form.enabled" class="mt-2 w-full" />
                         <p class="mt-1 text-xs text-gray-500">
-                            Upscaled images are saved as JPEG. If a result is over the 5 MB size limit it is
-                            re-encoded at lower quality (down to 80%) automatically.
+                            {{ $t('upscaler.jpeg_quality_hint') }}
                         </p>
                     </div>
                     <div>
-                        <label class="block text-sm font-medium text-gray-900">Tile size</label>
+                        <label class="block text-sm font-medium text-gray-900">{{ $t('upscaler.tile_size') }}</label>
                         <select v-model.number="form.patch_size" :disabled="!form.enabled"
                             class="mt-2 w-full rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <option v-for="n in patchSizes" :key="n" :value="n">{{ n }} px</option>
                         </select>
                         <p class="mt-1 text-xs text-gray-500">
-                            Images are processed in tiles. Smaller tiles use less GPU memory (fewer failures on weak
-                            computers) but take longer.
+                            {{ $t('upscaler.tile_size_hint') }}
                         </p>
                     </div>
                 </div>
@@ -181,12 +179,10 @@ onBeforeUnmount(() => {
                         class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
                     <span>
                         <span class="block text-sm font-medium text-gray-900">
-                            Shrink oversized images: larger than {{ limits.downscale.max.w }}×{{ limits.downscale.max.h }} (4K) or over 5 MB
+                            {{ $t('upscaler.shrink', { size: `${limits.downscale.max.w}×${limits.downscale.max.h}` }) }}
                         </span>
                         <span class="block text-xs text-gray-500">
-                            Images beyond 4K are downscaled to fit it, and files over 5 MB (such as a large PNG) are
-                            re-encoded as JPEG, both in the uploader's browser (no AI, same JPEG quality as above).
-                            The original is kept so it can be undone. Independent of "Enable upscaling".
+                            {{ $t('upscaler.shrink_hint') }}
                         </span>
                     </span>
                 </label>
@@ -194,18 +190,17 @@ onBeforeUnmount(() => {
                 <div class="flex items-center gap-3">
                     <button type="submit" :disabled="form.processing"
                         class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
-                        Save settings
+                        {{ $t('upscaler.save') }}
                     </button>
-                    <span v-if="form.recentlySuccessful" class="text-sm text-green-700">Saved.</span>
+                    <span v-if="form.recentlySuccessful" class="text-sm text-green-700">{{ $t('upscaler.saved') }}</span>
                 </div>
             </form>
 
             <div class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                 <div>
-                    <h2 class="text-lg font-semibold text-gray-900">Try a model</h2>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ $t('upscaler.try_title') }}</h2>
                     <p class="mt-1 text-sm text-gray-600">
-                        Upscale an image on your computer with any model to compare them. Nothing is uploaded or saved.
-                        It uses the quality and tile size above (even if unsaved).
+                        {{ $t('upscaler.try_description') }}
                     </p>
                 </div>
 
@@ -217,11 +212,11 @@ onBeforeUnmount(() => {
                     </select>
                     <button v-if="!trying" type="button" :disabled="!tryFile || !!tryIneligible" @click="runTry"
                         class="rounded-lg bg-purple-600 px-4 py-2 text-sm font-medium text-white hover:bg-purple-700 disabled:opacity-50">
-                        Upscale 2×
+                        {{ $t('upscaler.upscale_2x') }}
                     </button>
                     <button v-else type="button" class="rounded-lg border border-red-300 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
                         @click="abort?.abort()">
-                        Cancel ({{ tryProgress }}%)
+                        {{ $t('upscaler.cancel') }} ({{ tryProgress }}%)
                     </button>
                 </div>
                 <p v-if="tryIneligible" class="text-sm text-amber-700">{{ ineligibleMessage(tryIneligible, limits) }}</p>
@@ -233,18 +228,18 @@ onBeforeUnmount(() => {
                 <div v-if="tryUrl" class="grid gap-4 md:grid-cols-2">
                     <figure>
                         <figcaption class="mb-1 text-xs font-medium text-gray-700">
-                            Original<span v-if="tryInfo"> · {{ tryInfo.width }}×{{ tryInfo.height }}</span>
+                            {{ $t('upscaler.original') }}<span v-if="tryInfo"> · {{ tryInfo.width }}×{{ tryInfo.height }}</span>
                         </figcaption>
-                        <img :src="tryUrl" alt="Original" class="w-full rounded-lg border border-gray-200 bg-gray-50" />
+                        <img :src="tryUrl" :alt="$t('upscaler.original')" class="w-full rounded-lg border border-gray-200 bg-gray-50" />
                     </figure>
                     <figure v-if="tryResult">
                         <figcaption class="mb-1 text-xs font-medium text-gray-700">
                             {{ modelLabel(tryResult.model) }} · {{ tryResult.width }}×{{ tryResult.height }} ·
                             {{ formatBytes(tryResult.size) }} (q{{ tryResult.quality }}) ·
                             {{ (tryResult.ms / 1000).toFixed(1) }}s
-                            · <a :href="tryResult.url" download="upscaled.jpg" class="text-indigo-600 hover:underline">Download</a>
+                            · <a :href="tryResult.url" download="upscaled.jpg" class="text-indigo-600 hover:underline">{{ $t('slides.download') }}</a>
                         </figcaption>
-                        <img :src="tryResult.url" alt="Upscaled" class="w-full rounded-lg border border-gray-200 bg-gray-50" />
+                        <img :src="tryResult.url" :alt="$t('upscaler.upscaled')" class="w-full rounded-lg border border-gray-200 bg-gray-50" />
                     </figure>
                 </div>
             </div>
