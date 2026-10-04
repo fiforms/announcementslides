@@ -336,11 +336,11 @@ class SlideController extends Controller
 
         $tmpFile = $builder->build($slides, $title, $location, $request->user()?->slideDelaySeconds());
 
-        // "Main Show" -> main_show.revelation.zip; non-letters/digits collapse to underscores.
+        // "Main Show" -> main_show.revel; non-letters/digits collapse to underscores.
         $slug = trim(preg_replace('/[^\p{L}\p{N}]+/u', '_', mb_strtolower($title)), '_') ?: 'announcement_slides';
 
-        return response()->download($tmpFile, "{$slug}.revelation.zip", [
-            'Content-Type' => 'application/zip',
+        return response()->download($tmpFile, "{$slug}.revel", [
+            'Content-Type' => 'application/vnd.revelation.presentation+zip',
         ])->deleteFileAfterSend(true);
     }
 

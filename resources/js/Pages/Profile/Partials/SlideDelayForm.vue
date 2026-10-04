@@ -30,8 +30,10 @@ const save = () => {
 
             <p class="mt-1 text-sm text-gray-600">
                 How long each slide shows before a slideshow you start from the browser moves to the
-                next one. This is also the auto-advance time written into the REVELation Snapshot
-                Presenter export.
+                next one. This is also the auto-advance time written into the
+                <a href="https://snapshots.vrbm.org/revelation-snapshot-presenter/" target="_blank" rel="noopener"
+                    class="text-indigo-600 underline hover:text-indigo-800">REVELation Snapshot Presenter</a>
+                export.
             </p>
         </header>
 

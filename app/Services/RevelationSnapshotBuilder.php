@@ -12,12 +12,20 @@ use RuntimeException;
 use ZipArchive;
 
 /**
- * Builds a "REVELation Snapshot Presenter" package: a zip holding each
+ * Builds a "REVELation Snapshot Presenter" package (a `.revel` file, media type
+ * application/vnd.revelation.presentation+zip): a zip holding each
  * slide's base image/video and (separately) its overlay, keyed by slide
  * number, plus a presentation.md that stacks them (the base marked with the
- * special "background" alt text, the overlay as "fill"), a stub stylesheet,
+ * special "fill:background" alt text, the overlay as "fill"), a stub stylesheet,
  * a thumbnail of the first slide and a manifest.json listing every file
  * with its size, mtime and SHA-1.
+ *
+ * The output must conform to the .revel format spec:
+ * https://github.com/fiforms/revelation-electron-wrapper/blob/main/doc/dev/REVEL_FORMAT.md
+ * (archive root is the presentation folder, entry names relative with no "..",
+ * no executable/script content, manifest.json sorted with SHA-1s and no hash
+ * for itself, appVersion set to the REVELation release implemented). Re-check
+ * it when changing the layout, manifest or the file types we package.
  *
  * A slide's overlay widgets follow its overlay as `:widget:` YAML blocks.
  */
@@ -92,7 +100,7 @@ class RevelationSnapshotBuilder
             $overlayName = self::entryName($position, $total, "overlay.{$ext}");
             $files[$overlayName] = $disk->path($overlay->disk_path);
 
-            $section = $this->image('background', $baseName) . "\n\n" . $this->image('fill', $overlayName);
+            $section = $this->image('fill:background', $baseName) . "\n\n" . $this->image('fill', $overlayName);
             $installed = Widget::enabledBySlug();
             foreach ($this->widgets->forDevice($overlay) as $placement) {
                 $usesLocation = (bool) ($installed[$placement['widget']]->manifest['usesLocation'] ?? false);

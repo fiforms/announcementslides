@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 import PublicLayout from '@/Layouts/PublicLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import SlideshowModal from '@/Components/SlideshowModal.vue';
+import RevelationInfoModal from '@/Components/RevelationInfoModal.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
 import { useLightbox } from '@/Composables/useLightbox.js';
 import { useI18n } from 'vue-i18n';
@@ -103,13 +104,29 @@ function downloadPowerPointAll() {
     window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
 }
 
+// First .revel download per browser and user: point at the app that opens it.
+const showRevelationInfo = ref(false);
+
+function startRevelationDownload(url) {
+    window.location.href = url;
+
+    const key = `revelationInfoSeen:${usePage().props.auth?.user?.id ?? 'guest'}`;
+    try {
+        if (localStorage.getItem(key)) return;
+        localStorage.setItem(key, '1');
+    } catch {
+        return; // storage blocked: skip rather than nag on every download
+    }
+    showRevelationInfo.value = true;
+}
+
 function downloadRevelationSelected() {
     const ids = [...selectedIds.value].join(',');
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
     params.append('language', currentLanguageCode.value);
     if (props.entityId) params.append('entity_id', props.entityId);
-    window.location.href = route('slides.download-revelation') + `?${params.toString()}`;
+    startRevelationDownload(route('slides.download-revelation') + `?${params.toString()}`);
 }
 
 function downloadRevelationAll() {
@@ -117,7 +134,7 @@ function downloadRevelationAll() {
     params.append('language', currentLanguageCode.value);
     if (props.showId) params.append('show_id', props.showId);
     if (props.entityId) params.append('entity_id', props.entityId);
-    window.location.href = route('slides.download-revelation') + `?${params.toString()}`;
+    startRevelationDownload(route('slides.download-revelation') + `?${params.toString()}`);
 }
 
 // Slideshow
@@ -315,6 +332,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
         </div>
         <!-- Slideshow Modal -->
         <SlideshowModal :show="showSlideshow" :slides="slideshowSlides" @close="showSlideshow = false" />
+        <RevelationInfoModal :show="showRevelationInfo" @close="showRevelationInfo = false" />
 
         <SlideLightbox :slide="lightboxSlide" :start-expanded="lightboxStartExpanded" @close="closeLightbox" />
     </PublicLayout>
