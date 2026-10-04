@@ -58,6 +58,7 @@ For the whole site:
 [widgetHost.js](js/Composables/widgets/widgetHost.js) is this app's implementation of the contract in the README.
 
 - **Mounting.** `mountWidget` dynamically imports the entry module from `widgets.asset`, then calls `mount(el, { width, height, params, api })` with `width`/`height` taken from the saved placement and `params` frozen. [WidgetBox.vue](js/Components/Widgets/WidgetBox.vue) is keyed on placement, size and params, so any change remounts, and unmounting always runs the widget's cleanup. A returned function, or an object with `destroy()`, counts as cleanup. Then `el` is emptied.
+- **Readiness.** `mountWidget` returns `{ ready, dispose }`. `ready` resolves when `mount` returns, or, for a module that exports `manualReady = true`, when the widget calls `api.ready()`. It also resolves if the widget fails to load or takes longer than 8 seconds, so a bad widget can't stall a slide. `WidgetBox` fades the widget in when it's ready and emits `ready`; `WidgetLayer` emits `ready` once all its boxes have (immediately if it has none); [SlideStage.vue](js/Components/SlideStage.vue) uses that to hold a slide off screen. The device host has the same contract.
 - **`api.mode`.** `'live'` in players and lightboxes, `'editor'` in the overlay editor's preview.
 - **`api.locale`.** The app's vue-i18n locale (`en`, `es`).
 - **`api.storage`.** `localStorage` under `as-widget:{widgetId}:{placementId}:`.

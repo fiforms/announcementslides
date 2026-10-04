@@ -11,6 +11,13 @@ import axios from 'axios';
 //
 // Everything a widget needs from the host goes through `api`, so the
 // widget stays portable if it's ever moved into a sandboxed iframe.
+//
+// Readiness: the host reports a widget "ready" (so the slideshow can hold a
+// slide off screen until everything on it is painted). By default that is
+// when `mount` returns. A widget that paints later — after a slow
+// api.fetch — exports `manualReady = true` and calls `api.ready()` once its
+// first real content is drawn. A widget that fails, or never signals, is
+// treated as ready after READY_TIMEOUT_MS so it can't hold a slide hostage.
 
 export class WidgetDataError extends Error {
     constructor(reason, status) {
@@ -43,7 +50,7 @@ function storageFor(prefix) {
 // `placement` is a saved placement from the server (live mode: has
 // data_url) or an unsaved editor element (editor mode: fetches go through
 // the preview endpoint with its current params).
-export function createApi(placement, { mode, locale, location = null }) {
+export function createApi(placement, { mode, locale, location = null }, ready = () => {}) {
     // Runtime args (e.g. a forecast's lat/lon) travel as ?args[name]=value;
     // the server checks them against the endpoint's declared `args`.
     function withArgs(url, args) {
@@ -80,6 +87,9 @@ export function createApi(placement, { mode, locale, location = null }) {
         // 'invalid_args', 'rate_limited', 'upstream_status').
         fetch: mode === 'editor' ? fetchPreview : fetchLive,
         storage: storageFor(`as-widget:${placement.widget}:${placement.id}:`),
+        // Call once the first real content is painted (widgets that export
+        // `manualReady = true`; harmless otherwise). Idempotent.
+        ready,
         // Where the screen is: { name, latitude, longitude, source } — the
         // page's church, else the site default (App\Support\WidgetLocation),
         // else null. `source` is 'entity' or 'default'.
@@ -87,25 +97,38 @@ export function createApi(placement, { mode, locale, location = null }) {
     });
 }
 
-// Mounts one placement into `el`; resolves to a cleanup function. Safe to
-// call cleanup before the module has finished loading.
+const READY_TIMEOUT_MS = 8000;
+
+// Mounts one placement into `el`. Returns { ready, dispose }: `ready`
+// resolves (never rejects) once the widget has painted — or failed, or timed
+// out — and `dispose` runs the cleanup. Safe to call dispose before the
+// module has finished loading.
 export function mountWidget(el, placement, entryUrl, options) {
     let disposed = false;
     let cleanup = null;
+    let markReady;
+    const ready = new Promise(resolve => { markReady = resolve; });
+    const timeout = setTimeout(() => {
+        console.warn(`Widget "${placement.widget}" did not signal ready in ${READY_TIMEOUT_MS}ms`);
+        markReady();
+    }, READY_TIMEOUT_MS);
+    ready.then(() => clearTimeout(timeout));
 
-    const ready = (async () => {
+    (async () => {
         const mod = await import(/* @vite-ignore */ entryUrl);
         if (disposed) return;
         const result = await mod.mount(el, {
             width: placement.w,
             height: placement.h,
             params: Object.freeze({ ...(placement.params ?? {}) }),
-            api: createApi(placement, options),
+            api: createApi(placement, options, markReady),
         });
         cleanup = typeof result === 'function' ? result : result?.destroy?.bind(result) ?? null;
         if (disposed) runCleanup();
+        if (mod.manualReady !== true) markReady();
     })().catch(err => {
         console.warn(`Widget "${placement.widget}" failed to load`, err);
+        markReady();
     });
 
     function runCleanup() {
@@ -119,6 +142,7 @@ export function mountWidget(el, placement, entryUrl, options) {
         ready,
         dispose() {
             disposed = true;
+            markReady();
             runCleanup();
         },
     };

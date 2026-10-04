@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
-import WidgetLayer from '@/Components/Widgets/WidgetLayer.vue';
+import SlideStage from '@/Components/SlideStage.vue';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -28,10 +28,6 @@ const slidesList = computed(() => {
 });
 const advanceTimer = ref(null);
 
-// A live list can shrink under us (kiosk refresh): stay in range.
-watch(() => slidesList.value.length, (len) => {
-    if (len && currentIndex.value >= len) currentIndex.value = 0;
-});
 // ...and pick up a changed delay without a restart.
 watch(() => props.intervalSeconds, () => {
     slideshowInterval.value = getSlideshowInterval();
@@ -39,7 +35,6 @@ watch(() => props.intervalSeconds, () => {
 const slideshowInterval = ref(12000);
 const controlsHideTimer = ref(null);
 const containerRef = ref(null);
-const videoEl = ref(null);
 
 // Mirrors the device kiosk's key mapping (slideannouncer/local-app/frontend/
 // src/views/Slideshow.vue) — including remote-only keys like MediaTrackNext
@@ -62,7 +57,115 @@ const showSeekIndicator = ref(false);
 const seekPositionSeconds = ref(0);
 const seekDurationSeconds = ref(0);
 
-const currentSlide = computed(() => slidesList.value[currentIndex.value]);
+// Slides are never built on screen. Each one is mounted as a hidden
+// SlideStage first and only faded in once everything on it (image/video,
+// overlay, widgets) has loaded and painted, so a slide change always lands
+// on a finished slide, however slow the network. The next slide is mounted
+// ahead of time, as soon as the current one is up, so a normal advance
+// swaps instantly; if it isn't ready when the delay runs out, the current
+// slide simply stays up until it is.
+//
+// A stage record is { id, index, slide, visible }. `visible` stages are on
+// screen (the active one, plus the outgoing one while it is faded under the
+// new one); at most one non-visible stage exists at a time — the incoming
+// one. The slide is a snapshot, so a live list refresh never changes what's
+// on screen mid-slide.
+const FADE_MS = 1000;
+let stageSeq = 0;
+const stages = ref([]);
+const activeId = ref(null);
+const stageRefs = new Map();
+const readyIds = new Set();
+const leaveTimers = new Set();
+// True once something asked to move to the incoming slide (the delay ran
+// out, or a key was pressed): swap as soon as it is ready.
+let swapRequested = false;
+
+const activeStage = computed(() => stages.value.find(s => s.id === activeId.value) ?? null);
+const currentSlide = computed(() => activeStage.value?.slide ?? null);
+const incomingStage = () => stages.value.find(s => !s.visible) ?? null;
+const activeVideo = () => stageRefs.get(activeId.value)?.videoEl ?? null;
+
+// Where the show is heading: the incoming slide if a move is pending, so
+// pressing Next twice quickly skips two slides rather than one.
+const targetIndex = () => (swapRequested && incomingStage()) ? incomingStage().index : currentIndex.value;
+
+function setStageRef(id, instance) {
+    if (instance) stageRefs.set(id, instance);
+    else stageRefs.delete(id);
+}
+
+function dropStage(id) {
+    stages.value = stages.value.filter(s => s.id !== id);
+    readyIds.delete(id);
+}
+
+function ensureIncoming(index) {
+    const existing = incomingStage();
+    if (existing?.index === index) return;
+    if (existing) dropStage(existing.id);
+    stages.value.push({ id: ++stageSeq, index, slide: slidesList.value[index], visible: false });
+}
+
+function prefetchNext() {
+    const len = slidesList.value.length;
+    if (len > 1) ensureIncoming((currentIndex.value + 1) % len);
+}
+
+function onStageReady(id) {
+    readyIds.add(id);
+    trySwap();
+}
+
+function trySwap() {
+    const next = incomingStage();
+    if (!swapRequested || !next || !readyIds.has(next.id)) return;
+    swapRequested = false;
+    const previous = activeStage.value;
+    next.visible = true;
+    activeId.value = next.id;
+    currentIndex.value = next.index;
+    if (previous) {
+        // Drop the old stage once the new one has fully faded in over it.
+        const timer = setTimeout(() => { leaveTimers.delete(timer); dropStage(previous.id); }, FADE_MS + 100);
+        leaveTimers.add(timer);
+    }
+    scheduleAdvance();
+    prefetchNext();
+}
+
+function resetStages() {
+    leaveTimers.forEach(clearTimeout);
+    leaveTimers.clear();
+    stages.value = [];
+    stageRefs.clear();
+    readyIds.clear();
+    activeId.value = null;
+    currentIndex.value = 0;
+    swapRequested = slidesList.value.length > 0;
+    if (swapRequested) ensureIncoming(0);
+}
+
+watch(() => props.show, (show) => {
+    if (show) resetStages();
+}, { immediate: true });
+
+// A live list can change under us (kiosk refresh): stay in range and
+// re-prepare the incoming slide from the new list. What's on screen stays.
+watch(slidesList, (list) => {
+    if (!props.show) return;
+    if (list.length && currentIndex.value >= list.length) currentIndex.value = 0;
+    if (!activeStage.value) {
+        resetStages();
+        return;
+    }
+    const incoming = incomingStage();
+    if (incoming) {
+        dropStage(incoming.id);
+        if (swapRequested) ensureIncoming(Math.min(incoming.index, list.length - 1));
+    }
+    if (!swapRequested) prefetchNext();
+});
 
 function isVideoSlide(slide) {
     return !!slide?.mime_type?.startsWith('video/');
@@ -81,7 +184,7 @@ const getSlideshowInterval = () => (props.intervalSeconds || Number(page.props.s
 // Routed through goToIndex so each auto-advance (timer or a play_through
 // video's 'ended') re-arms the countdown for the next slide, including the
 // wrap from the last slide back to the first.
-const advanceSlide = () => goToIndex(currentIndex.value + 1);
+const advanceSlide = () => goToIndex(targetIndex() + 1);
 
 // Per-slide scheduler: an image or a video in 'hold_last_frame'/'loop' mode
 // advances after the normal slide delay; a 'play_through' video advances
@@ -104,9 +207,14 @@ const scheduleAdvance = () => {
         return;
     }
 
+    slideshowInterval.value = getSlideshowInterval();
     advanceTimer.value = setTimeout(() => {
         if (!isPaused.value) advanceSlide();
     }, slideshowInterval.value);
+};
+
+const onStageEnded = (id) => {
+    if (id === activeId.value) onVideoEnded();
 };
 
 const onVideoEnded = () => {
@@ -118,47 +226,42 @@ const onVideoEnded = () => {
     // on its last frame until scheduleAdvance()'s timeout fires.
 };
 
-// Plays with sound where the browser allows it (opening the slideshow is
-// itself a user click, which is usually enough); falls back to muted
-// playback rather than leaving the slide frozen if a stricter browser
-// blocks unmuted autoplay for a visitor with no prior interaction on the
-// site.
-const playWithSound = async (event) => {
-    const el = event.target;
-    el.muted = false;
-    try {
-        await el.play();
-    } catch {
-        el.muted = true;
-        try { await el.play(); } catch { /* give up silently */ }
-    }
-};
-
+// The advance countdown starts when a slide actually appears (trySwap), not
+// here — the first slide may still be loading.
 const startSlideshow = () => {
     slideshowInterval.value = getSlideshowInterval();
-    scheduleAdvance();
 };
 
 const stopSlideshow = () => {
     clearAdvanceTimer();
 };
 
-// Routed through goToIndex (rather than mutating currentIndex directly) so
-// every manual nav restarts the advance countdown, whether or not the index
-// actually changed (e.g. restartShow() jumping to slide 1 while already there).
+// Every manual nav or auto-advance goes through here. The countdown is
+// stopped while the target slide gets ready and restarts when it appears
+// (trySwap); landing on the slide already showing (restartShow() while on
+// slide 1, a one-slide show) just restarts it.
 const goToIndex = (index) => {
     const len = slidesList.value.length;
     if (len === 0) return;
-    currentIndex.value = ((index % len) + len) % len;
-    scheduleAdvance();
+    const target = ((index % len) + len) % len;
+    clearAdvanceTimer();
+    if (target === currentIndex.value && activeStage.value) {
+        swapRequested = false;
+        scheduleAdvance();
+        prefetchNext();
+    } else {
+        swapRequested = true;
+        ensureIncoming(target);
+        trySwap();
+    }
     // A slide change makes any in-progress seek indicator stale (wrong video).
     if (seekHideTimer) { clearTimeout(seekHideTimer); seekHideTimer = null; }
     showSeekIndicator.value = false;
 };
 
-const nextSlide = () => goToIndex(currentIndex.value + 1);
+const nextSlide = () => goToIndex(targetIndex() + 1);
 
-const prevSlide = () => goToIndex(currentIndex.value - 1);
+const prevSlide = () => goToIndex(targetIndex() - 1);
 
 // Left/Right (and MediaRewind/MediaFastForward) seek a playing video by
 // SEEK_STEP_SECONDS; a second press in the same direction within
@@ -166,9 +269,9 @@ const prevSlide = () => goToIndex(currentIndex.value - 1);
 // can be scrubbed quickly. On a non-video slide there's nothing to seek, so
 // these keys fall back to plain next/prev slide navigation instead.
 const seekOrGoToIndex = (direction) => {
-    const el = videoEl.value;
+    const el = activeVideo();
     if (!el) {
-        goToIndex(currentIndex.value + direction);
+        goToIndex(targetIndex() + direction);
         return;
     }
     const now = Date.now();
@@ -201,7 +304,7 @@ const restartShow = () => {
     const wasIndex = currentIndex.value;
     goToIndex(0);
     if (wasIndex === 0) {
-        const el = videoEl.value;
+        const el = activeVideo();
         if (el) {
             el.currentTime = 0;
             if (!isPaused.value) el.play().catch(() => {});
@@ -211,7 +314,7 @@ const restartShow = () => {
 
 const togglePause = () => {
     isPaused.value = !isPaused.value;
-    const el = videoEl.value;
+    const el = activeVideo();
     if (isPaused.value) {
         clearAdvanceTimer();
         if (el) el.pause();
@@ -276,6 +379,7 @@ onUnmounted(() => {
     if (controlsHideTimer.value) clearTimeout(controlsHideTimer.value);
     if (seekHideTimer) clearTimeout(seekHideTimer);
     stopSlideshow();
+    leaveTimers.forEach(clearTimeout);
     if (document.fullscreenElement) {
         document.exitFullscreen();
     }
@@ -323,41 +427,16 @@ const handleShow = () => {
         <div v-if="show" ref="containerRef" class="fixed inset-0 bg-black z-50 flex items-center justify-center" :class="showControls ? 'cursor-auto' : 'cursor-none'" @mousemove="handleMouseMove">
             <!-- Slide Image -->
             <div class="relative w-full h-full flex items-center justify-center">
-                <transition
-                    enter-active-class="transition ease-out duration-1000"
-                    enter-from-class="opacity-0"
-                    enter-to-class="opacity-100"
-                    leave-active-class="transition ease-in duration-1000"
-                    leave-from-class="opacity-100"
-                    leave-to-class="opacity-0"
-                    mode="out-in"
-                >
-                    <div :key="currentIndex" class="relative h-full w-full">
-                        <video
-                            v-if="isVideoSlide(currentSlide)"
-                            ref="videoEl"
-                            :src="currentSlide.file_url"
-                            :loop="currentSlide.video_playback_mode === 'loop'"
-                            playsinline
-                            class="absolute inset-0 h-full w-full object-contain"
-                            @ended="onVideoEnded"
-                            @loadedmetadata="playWithSound"
-                        />
-                        <img
-                            v-else
-                            :src="currentSlide.file_url"
-                            :alt="currentSlide.title"
-                            class="absolute inset-0 h-full w-full object-contain"
-                        />
-                        <img
-                            v-if="currentSlide.overlay_url"
-                            :src="currentSlide.overlay_url"
-                            :alt="`${currentSlide.title} overlay`"
-                            class="absolute inset-0 h-full w-full object-contain"
-                        />
-                        <WidgetLayer v-if="currentSlide.overlay_widgets?.length" :widgets="currentSlide.overlay_widgets" :linger-ms="1100" />
-                    </div>
-                </transition>
+                <SlideStage
+                    v-for="stage in stages"
+                    :key="stage.id"
+                    :ref="(instance) => setStageRef(stage.id, instance)"
+                    :slide="stage.slide"
+                    :visible="stage.visible"
+                    :active="stage.id === activeId"
+                    @ready="onStageReady(stage.id)"
+                    @ended="onStageEnded(stage.id)"
+                />
 
                 <!-- Seek indicator -->
                 <div

@@ -17,15 +17,22 @@ const props = defineProps({
     // components) can fade it out instead of it vanishing at once.
     lingerMs: { type: Number, default: 0 },
 });
+// Fired once the widget has painted (or failed / timed out); see widgetHost.js.
+const emit = defineEmits(['ready']);
 
 const { locale } = useI18n();
 const page = usePage();
 const el = ref(null);
+const painted = ref(false);
 let handle = null;
 
 onMounted(() => {
     handle = mountWidget(el.value, props.placement, props.entryUrl, {
         mode: props.mode, locale: locale.value, location: page.props.widgetLocation ?? null,
+    });
+    handle.ready.then(() => {
+        painted.value = true;
+        emit('ready');
     });
 });
 onBeforeUnmount(() => {
@@ -36,10 +43,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <div ref="el" class="absolute overflow-hidden"
+    <div ref="el" class="absolute overflow-hidden transition-opacity duration-500"
         :style="{
             left: `${placement.x}px`, top: `${placement.y}px`,
             width: `${placement.w}px`, height: `${placement.h}px`,
-            opacity: placement.opacity ?? 1,
+            opacity: painted ? (placement.opacity ?? 1) : 0,
         }" />
 </template>
