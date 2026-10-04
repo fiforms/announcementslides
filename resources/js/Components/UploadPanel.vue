@@ -21,6 +21,10 @@ const props = defineProps({
     // Entity uploads: that entity's non-main shows ({id, name}). Global
     // uploads: active global "separate show" templates ({id, name}).
     shows:             { type: Array, default: () => [] },
+    // Entity uploads from a show's management page: the show already chosen
+    // there ({id, is_main}). Uploads go straight into it and the panel's own
+    // show picker is hidden.
+    fixedShow:         { type: Object, default: null },
 });
 
 const emit = defineEmits(['success']);
@@ -105,8 +109,13 @@ async function submit() {
         payload.share_nearby = shareNearby.value;
     }
 
-    payload.add_to_show = addToShow.value;
-    if (addToShow.value === 'separate') {
+    if (props.fixedShow) {
+        payload.add_to_show = props.fixedShow.is_main ? 'main' : 'separate';
+        if (!props.fixedShow.is_main) payload.show_id = props.fixedShow.id;
+    } else {
+        payload.add_to_show = addToShow.value;
+    }
+    if (!props.fixedShow && addToShow.value === 'separate') {
         if (targetShowId.value) {
             if (props.entityId) {
                 payload.show_id = targetShowId.value;
@@ -271,7 +280,7 @@ async function submit() {
                     </select>
                 </div>
 
-                <div class="sm:col-span-2 space-y-2">
+                <div v-if="!fixedShow" class="sm:col-span-2 space-y-2">
                     <label class="block text-sm font-medium text-gray-700">{{ $t('show_manage.add_to_show') }}</label>
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input v-model="addToShow" type="radio" value="main"

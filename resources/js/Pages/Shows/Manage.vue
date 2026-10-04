@@ -175,7 +175,6 @@ const zoneGroups = computed(() => {
 const uiLanguageId = computed(() => props.languages.find(l => l.abbreviation === locale.value)?.id ?? '');
 
 const showUploadPanel = ref(false);
-const otherShows = computed(() => props.shows.filter(s => !s.is_main));
 
 const inShow = ref([...props.showSlides]);
 const unused = ref([...props.unusedSlides]);
@@ -429,7 +428,7 @@ function persistLeaderOrder() {
                 :redirect-params="{ entity_id: entity.id, show_id: selectedShowId }"
                 :entity-id="entity.id"
                 :languages="languages"
-                :shows="otherShows"
+                :fixed-show="selectedShow"
                 @success="showUploadPanel = false"
             />
 
