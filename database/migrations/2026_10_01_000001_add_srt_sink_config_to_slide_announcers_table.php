@@ -8,7 +8,7 @@ return new class extends Migration
 {
     /**
      * LAN Video Receiver settings (SRT / RIST unicast / RIST multicast —
-     * see slideannouncer/local-app/backend/srt_sink.py), now editable from
+     * see kiosk-products/slideannouncer/backend/srt_sink.py), now editable from
      * both the device and this server's Slide Announcer page.
      * `srt_sink_config` holds the device's last-reported settings, or a
      * pending web edit. `srt_sink_config_revision` is bumped on every web

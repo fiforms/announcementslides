@@ -29,7 +29,7 @@ class SlideAnnouncerHeartbeatController extends Controller
             'architecture' => 'nullable|string|max:64',
             'cpu_temp_c' => 'nullable|numeric',
             // Device-generated (never operator-typed — see
-            // slideannouncer/local-app/backend/srt_sink.py), reported here
+            // kiosk-products/slideannouncer/backend/srt_sink.py), reported here
             // purely so an admin can read it off the fleet dashboard to
             // configure their SRT sender. Only present once the device has
             // enabled SRT Sink locally at least once; absent otherwise, in
@@ -134,7 +134,7 @@ class SlideAnnouncerHeartbeatController extends Controller
             'os_auto_update_enabled' => $device->auto_update_enabled,
             // Fleet-wide force-disable for SRT Sink (EntitySlideAnnouncerController::update) —
             // an explicit false here always overrides the device's own local
-            // Settings toggle; see slideannouncer/local-app/backend/srt_sink.py's
+            // Settings toggle; see kiosk-products/slideannouncer/backend/srt_sink.py's
             // effective_enabled() for how the device folds this in.
             'srt_sink_enabled' => $device->srt_sink_enabled,
             // Receiver settings edited on the Slide Announcer page, with the

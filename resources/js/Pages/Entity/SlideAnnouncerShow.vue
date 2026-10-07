@@ -116,7 +116,7 @@ function generatePassphrase() {
     form.rx_passphrase = Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
 }
 
-// Mirrors slideannouncer/local-app/backend/srt_sink.py's sender_url(): the
+// Mirrors kiosk-products/slideannouncer/backend/srt_sink.py's sender_url(): the
 // URL to configure a sender (OBS, vMix, an encoder) with. Built from the
 // form's current values so it previews an unsaved change; latency/buffer
 // are device-side tuning, taken from the device's last report.

@@ -104,7 +104,7 @@ Static outputs can't run JavaScript, so [OverlayCompositor](../app/Services/Over
 
 The shows sync ([SlideAnnouncerSyncController](../app/Http/Controllers/Api/SlideAnnouncerSyncController.php)) carries each slide's placements plus the bundles they need.
 
-- The device mirrors those bundles locally (`slideannouncer/local-app/backend/widgets.py`) and serves them from its own `/media/widgets/`, so widgets keep working through internet outages.
+- The device mirrors those bundles locally (`kiosk-products/slideannouncer/backend/widgets.py`) and serves them from its own `/media/widgets/`, so widgets keep working through internet outages.
 - `api.fetch()` goes through the device's backend to `/api/slide-announcers/widget-data/{slideMedia}/{element}/{endpoint}` (`WidgetDataController::device`, token-authenticated, limited to slides that device syncs). The device never fetches upstream URLs itself, and it serves the last good response, marked `stale: true`, while offline.
 - Because of that, a widget can't rely on anything outside its package at runtime (CDN scripts, web fonts).
 
