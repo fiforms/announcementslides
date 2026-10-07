@@ -43,6 +43,8 @@ Route::get('/widget-assets/{slug}/{version}/{path}', [WidgetAssetController::cla
     ->where('path', '.*')->name('widgets.asset');
 Route::get('/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'show'])
     ->middleware('throttle:120,1')->name('widget-data.show');
+Route::get('/widget-data/show/{show}/{element}/{endpoint}', [WidgetDataController::class, 'showOverlay'])
+    ->middleware('throttle:120,1')->name('widget-data.show-overlay');
 
 // Shared-link player: the unguessable token is the only credential, so no
 // login or session is needed. Throttled per IP against token guessing
@@ -51,6 +53,7 @@ Route::prefix('play/{token}')->name('play.')->middleware('throttle:240,1')->grou
     Route::get('/', [PlayController::class, 'show'])->name('show');
     Route::get('/slides', [PlayController::class, 'slides'])->name('slides');
     Route::get('/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'playLink'])->name('widget-data');
+    Route::get('/widget-data-show/{element}/{endpoint}', [WidgetDataController::class, 'playLinkShowOverlay'])->name('widget-data-show');
 });
 
 // ── Auth (Breeze) ─────────────────────────────────────────────────────────────
@@ -117,6 +120,8 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::delete('/{show}/slides/{slide}', [ShowController::class, 'detach'])->name('slides.detach');
         Route::post('/{show}/slides/detach-expired', [ShowController::class, 'detachExpired'])->name('slides.detachExpired');
         Route::post('/{show}/reorder', [ShowController::class, 'reorder'])->name('reorder');
+        Route::get('/{show}/overlay', [ShowController::class, 'showOverlay'])->name('overlay.show');
+        Route::put('/{show}/overlay', [ShowController::class, 'saveOverlay'])->name('overlay.save');
     });
 
     // ── Entity leader: entity-scoped slide management ──────────────────────

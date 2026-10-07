@@ -118,6 +118,18 @@ class Widget extends Model
     /**
      * The manifest subset the overlay editor needs (no secrets, no file list).
      */
+    /**
+     * The widgets the overlay editor can place: every enabled one, plus any
+     * already placed (by slug) so a disabled one still shows its placeholder.
+     */
+    public static function editorCatalog(array $placements = []): \Illuminate\Support\Collection
+    {
+        return static::orderBy('name')->get()
+            ->filter(fn (self $w) => $w->enabled || collect($placements)->contains('widget', $w->slug))
+            ->map(fn (self $w) => $w->editorResource() + ['enabled' => $w->enabled])
+            ->values();
+    }
+
     public function editorResource(): array
     {
         $m = $this->manifest;

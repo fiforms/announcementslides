@@ -8,12 +8,17 @@ use App\Models\Entity;
 use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Models\Widget;
+use App\Services\Widgets\OverlayWidgets;
+use App\Services\Widgets\WidgetPackageException;
 use App\Support\NearbyEntities;
 use App\Support\SortZones;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -140,6 +145,57 @@ class ShowController extends Controller
         $show->delete();
 
         return redirect()->route('shows.index', ['entity_id' => $entityId])->with('success', 'Show deleted.');
+    }
+
+    /**
+     * The show's pinned widget layer for the overlay editor: its element
+     * list (null when none yet) and the catalog of installed widgets.
+     */
+    public function showOverlay(Request $request, Show $show): JsonResponse
+    {
+        $entityId = $this->authorizedEntityId($request);
+        abort_unless($show->entity_id === $entityId, 404);
+
+        $overlay = $show->overlay;
+
+        return response()->json([
+            'source'  => $overlay?->source,
+            'overlay' => null,
+            'widgets' => Widget::editorCatalog($overlay?->overlay_settings['widgets'] ?? []),
+        ]);
+    }
+
+    /**
+     * Saves the editor's widget elements as the show's pinned layer. Same
+     * trust boundary as a slide overlay (OverlayWidgets::fromSource validates
+     * every placement); a save with no widgets removes the layer.
+     */
+    public function saveOverlay(Request $request, Show $show)
+    {
+        $entityId = $this->authorizedEntityId($request);
+        abort_unless($show->entity_id === $entityId, 404);
+
+        $request->validate(['source' => 'required|string|max:1048576']);
+        $source = json_decode($request->input('source'), true);
+        if (!is_array($source) || !is_int($source['v'] ?? null) || !is_array($source['elements'] ?? null)) {
+            throw ValidationException::withMessages(['source' => 'The overlay source is malformed.']);
+        }
+        // This layer is widgets only; anything else the editor sent is dropped.
+        $source['elements'] = array_values(array_filter($source['elements'], fn ($el) => is_array($el) && ($el['type'] ?? null) === 'widget'));
+
+        try {
+            [$source, $settings] = app(OverlayWidgets::class)->fromSource($source);
+        } catch (WidgetPackageException $e) {
+            throw ValidationException::withMessages(['source' => $e->errors]);
+        }
+
+        if (!$source['elements']) {
+            $show->overlay?->delete();
+        } else {
+            $show->overlay()->updateOrCreate([], ['source' => $source, 'overlay_settings' => $settings]);
+        }
+
+        return back()->with('success', 'Show overlay saved.');
     }
 
     public function attach(Request $request, Show $show)

@@ -248,12 +248,7 @@ trait ManagesSlideMedia
         $media = $slide->overlayMedia;
         $disk = Storage::disk('public');
 
-        // Installed, enabled widgets the editor can place (plus any already
-        // on this overlay, so a disabled one still shows its placeholder).
-        $widgets = Widget::orderBy('name')->get()
-            ->filter(fn (Widget $w) => $w->enabled || collect($media?->overlay_settings['widgets'] ?? [])->contains('widget', $w->slug))
-            ->map(fn (Widget $w) => $w->editorResource() + ['enabled' => $w->enabled])
-            ->values();
+        $widgets = Widget::editorCatalog($media?->overlay_settings['widgets'] ?? []);
 
         if (!$media || !$disk->exists($media->disk_path)) {
             return response()->json(['source' => null, 'overlay' => null, 'widgets' => $widgets]);

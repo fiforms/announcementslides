@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\PlayLink;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Models\User;
@@ -87,6 +88,45 @@ class WidgetDataController extends Controller
         abort_unless($widget, 404);
 
         return $this->respond($widget, $endpoint, $placement['params'] ?? [], 'play-link:' . $link->id, $this->args($request->query('args')));
+    }
+
+    /**
+     * Data for a widget on a show's pinned layer. Signed-in members of the
+     * show's entity (and site admins) only; players that aren't a member's
+     * browser use playLinkShowOverlay() or deviceShowOverlay().
+     */
+    public function showOverlay(Request $request, Show $show, string $element, string $endpoint): JsonResponse
+    {
+        $user = $request->user();
+        abort_unless($show->entity_id && $user && ($user->isAdmin() || in_array($show->entity_id, $user->memberEntityIds())), 404);
+
+        return $this->respondForShow($show, $element, $endpoint, $this->callerKey($request), $request);
+    }
+
+    public function deviceShowOverlay(Request $request, Show $show, string $element, string $endpoint): JsonResponse
+    {
+        $device = $request->user();
+        abort_unless($show->entity_id === $device->entity_id, 404);
+
+        return $this->respondForShow($show, $element, $endpoint, 'device:' . $device->id, $request);
+    }
+
+    public function playLinkShowOverlay(Request $request, string $token, string $element, string $endpoint): JsonResponse
+    {
+        $link = PlayLink::active()->where('token', $token)->first();
+        abort_unless($link, 404);
+
+        return $this->respondForShow($link->resolvedShow(), $element, $endpoint, 'play-link:' . $link->id, $request);
+    }
+
+    private function respondForShow(Show $show, string $element, string $endpoint, string $callerKey, Request $request): JsonResponse
+    {
+        $overlay = $show->overlay;
+        $placement = $overlay ? OverlayWidgets::placement($overlay, $element) : null;
+        $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
+        abort_unless($widget, 404);
+
+        return $this->respond($widget, $endpoint, $placement['params'] ?? [], $callerKey, $this->args($request->query('args')));
     }
 
     public function preview(Request $request): JsonResponse

@@ -63,6 +63,19 @@ const editingSlide = ref(null);
 const editTab = ref('details');
 const overlayEditor = ref(null);
 
+// The show's pinned widget layer (e.g. a clock above every slide), edited in
+// the same overlay editor in widgets-only mode, against the first slide.
+const showOverlayOpen = ref(false);
+const showOverlayEditor = ref(null);
+const showOverlayBackground = computed(() => {
+    const first = props.showSlides[0];
+    return first ? (first.thumbnail_url || first.file_url) : null;
+});
+function closeShowOverlay() {
+    if (showOverlayEditor.value?.isDirty() && !confirm(t('overlay_editor.confirm_discard'))) return;
+    showOverlayOpen.value = false;
+}
+
 // Unsaved overlay edits live only in the editor, which unmounts on tab
 // switch or close — confirm before throwing them away.
 function confirmDiscardOverlay() {
@@ -420,6 +433,16 @@ function persistLeaderOrder() {
                         </label>
                     </div>
                 </div>
+                <div class="flex flex-wrap items-center gap-3 rounded-lg border-2 border-gray-300 bg-white px-3 py-2">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $t('show_manage.show_overlay') }}</p>
+                        <p class="text-xs text-gray-500">{{ $t('show_manage.show_overlay_hint') }}</p>
+                    </div>
+                    <button type="button" @click="showOverlayOpen = true"
+                        class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                        {{ $t('show_manage.edit_show_overlay') }}
+                    </button>
+                </div>
             </div>
 
             <UploadPanel
@@ -541,6 +564,20 @@ function persistLeaderOrder() {
             </div>
 
             <SlideLightbox :slide="lightboxSlide" @close="closeLightbox" />
+
+            <div v-if="showOverlayOpen && selectedShow" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                @click.self="closeShowOverlay">
+                <div class="relative w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="text-sm font-semibold text-gray-900">{{ $t('show_manage.show_overlay_title', { show: showName(selectedShow) }) }}</h3>
+                        <button @click="closeShowOverlay" :aria-label="$t('show_manage.close')" class="text-gray-400 hover:text-gray-600">&times;</button>
+                    </div>
+                    <OverlayEditor ref="showOverlayEditor" widgets-only
+                        show-route="shows.overlay.show" save-route="shows.overlay.save"
+                        :route-model="{ show: selectedShow.id }" :route-params="{ entity_id: entity.id }"
+                        :background="showOverlayBackground" />
+                </div>
+            </div>
 
             <div v-if="editingSlide" class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
                 @click.self="closeEdit">

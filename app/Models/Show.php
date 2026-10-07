@@ -6,6 +6,7 @@ use App\Support\NearbyEntities;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 
@@ -67,6 +68,11 @@ class Show extends Model
             ->withPivot('sort_order', 'auto_added')
             ->withTimestamps()
             ->orderBy('show_slides.sort_order');
+    }
+
+    public function overlay(): HasOne
+    {
+        return $this->hasOne(ShowOverlay::class);
     }
 
     public static function mainFor(Entity $entity): self

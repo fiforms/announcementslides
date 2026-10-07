@@ -2,6 +2,7 @@
 
 namespace App\Services\Widgets;
 
+use App\Models\ShowOverlay;
 use App\Models\SlideMedia;
 use App\Models\Widget;
 
@@ -94,7 +95,28 @@ class OverlayWidgets
      */
     public function forPlayer(?SlideMedia $overlay): array
     {
-        $placements = $overlay?->overlay_settings['widgets'] ?? [];
+        return $this->playerPlacements(
+            $overlay?->overlay_settings['widgets'] ?? [],
+            fn (array $p) => route('widget-data.show', ['slideMedia' => $overlay->id, 'element' => $p['id'], 'endpoint' => '__endpoint__'])
+        );
+    }
+
+    /**
+     * forPlayer() for a show's pinned widget layer (widget-data.show-overlay).
+     * $playLinkToken swaps in the no-login shared-link endpoint.
+     */
+    public function forShowPlayer(?ShowOverlay $overlay, ?string $playLinkToken = null): array
+    {
+        return $this->playerPlacements(
+            $overlay?->overlay_settings['widgets'] ?? [],
+            fn (array $p) => $playLinkToken
+                ? route('play.widget-data-show', ['token' => $playLinkToken, 'element' => $p['id'], 'endpoint' => '__endpoint__'])
+                : route('widget-data.show-overlay', ['show' => $overlay->show_id, 'element' => $p['id'], 'endpoint' => '__endpoint__'])
+        );
+    }
+
+    private function playerPlacements(array $placements, callable $dataUrl): array
+    {
         if (!$placements) {
             return [];
         }
@@ -106,7 +128,7 @@ class OverlayWidgets
                 ...$p,
                 'version'   => $enabled[$p['widget']]->version,
                 'entry_url' => $enabled[$p['widget']]->entryUrl(),
-                'data_url'  => route('widget-data.show', ['slideMedia' => $overlay->id, 'element' => $p['id'], 'endpoint' => '__endpoint__']),
+                'data_url'  => $dataUrl($p),
             ])
             ->values()
             ->all();
@@ -116,13 +138,24 @@ class OverlayWidgets
      * Placements for a Slide Announcer device: like forPlayer() but with
      * no URLs — the device mirrors bundles locally and serves them (and
      * proxies data) from its own loopback nginx, so it adds its own. The
-     * overlay id rides along for the device's data requests.
+     * overlay id rides along for the device's data requests. Also used for a
+     * show's pinned layer (pass its overlay_settings widgets).
      */
     public function forDevice(?SlideMedia $overlay): array
     {
+        return $this->devicePlacements($overlay?->overlay_settings['widgets'] ?? []);
+    }
+
+    public function forShowDevice(?ShowOverlay $overlay): array
+    {
+        return $this->devicePlacements($overlay?->overlay_settings['widgets'] ?? []);
+    }
+
+    private function devicePlacements(array $placements): array
+    {
         $enabled = Widget::enabledBySlug();
 
-        return collect($overlay?->overlay_settings['widgets'] ?? [])
+        return collect($placements)
             ->filter(fn ($p) => isset($enabled[$p['widget'] ?? '']))
             ->map(fn ($p) => [...$p, 'version' => $enabled[$p['widget']]->version])
             ->values()
@@ -152,7 +185,7 @@ class OverlayWidgets
             ->all();
     }
 
-    public static function placement(SlideMedia $overlay, string $elementId): ?array
+    public static function placement(SlideMedia|ShowOverlay $overlay, string $elementId): ?array
     {
         return collect($overlay->overlay_settings['widgets'] ?? [])->firstWhere('id', $elementId);
     }
