@@ -72,6 +72,19 @@ One directory per hotfix, named for the version it bumps *to*:
   `$ROOT` (`systemctl --root="$ROOT" enable foo.service`, `rm -f "$ROOT/etc/…"`).
   A nonzero exit aborts the hotfix before the version is bumped.
 
+### Never change `/`'s mode
+
+The bundle's tarball is built from the files dir as `tar -C … .`, and its `./`
+entry is extracted onto the device's `/`. If that entry is `0700` (e.g. a
+`mktemp -d` staging dir, or a `files/` copied from one), `/` becomes `0700` and
+every non-root service (dbus, timesyncd, ...) fails to start: the device boots
+to a wall of `[FAILED] ... dbus.service` and `[DEPEND]` errors. The first 0.4.1
+platform hotfix did this. `make-hotfix-bundle.sh` now forces `0755` and aborts
+if the `./` entry isn't `drwxr-xr-x`, but if your `build.sh` stages files in a
+temp dir, `chmod 755` it, and check `tar -tvzf` on the built bundle's
+`files.tar.gz` before deploying. Full explanation and recovery steps:
+`slideannouncer/image-builder/hotfixes/README.md`.
+
 ## Commands
 
 | Command | Does |
