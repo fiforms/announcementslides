@@ -69,10 +69,11 @@ const seekDurationSeconds = ref(0);
 // swaps instantly; if it isn't ready when the delay runs out, the current
 // slide simply stays up until it is.
 //
-// A stage record is { id, index, slide, visible }. `visible` stages are on
-// screen (the active one, plus the outgoing one while it is faded under the
-// new one); at most one non-visible stage exists at a time — the incoming
-// one. The slide is a snapshot, so a live list refresh never changes what's
+// A stage record is { id, index, slide, visible, leaving }. `visible` stages
+// are on screen (the active one, plus the outgoing one while the new one
+// fades in over it); at most one non-visible, non-leaving stage exists at a
+// time — the incoming one. A `leaving` stage is fading out (used when the
+// new slide has no image to cover the old one). The slide is a snapshot, so a live list refresh never changes what's
 // on screen mid-slide.
 const FADE_MS = 1000;
 let stageSeq = 0;
@@ -87,7 +88,7 @@ let swapRequested = false;
 
 const activeStage = computed(() => stages.value.find(s => s.id === activeId.value) ?? null);
 const currentSlide = computed(() => activeStage.value?.slide ?? null);
-const incomingStage = () => stages.value.find(s => !s.visible) ?? null;
+const incomingStage = () => stages.value.find(s => !s.visible && !s.leaving) ?? null;
 const activeVideo = () => stageRefs.get(activeId.value)?.videoEl ?? null;
 
 // Where the show is heading: the incoming slide if a move is pending, so
@@ -108,7 +109,7 @@ function ensureIncoming(index) {
     const existing = incomingStage();
     if (existing?.index === index) return;
     if (existing) dropStage(existing.id);
-    stages.value.push({ id: ++stageSeq, index, slide: slidesList.value[index], visible: false });
+    stages.value.push({ id: ++stageSeq, index, slide: slidesList.value[index], visible: false, leaving: false });
 }
 
 function prefetchNext() {
@@ -130,7 +131,13 @@ function trySwap() {
     activeId.value = next.id;
     currentIndex.value = next.index;
     if (previous) {
-        // Drop the old stage once the new one has fully faded in over it.
+        // A slide with no image can't cover the old one, so fade the old one
+        // out alongside the new one fading in; otherwise the new one covers it.
+        if (!next.slide.file_url) {
+            previous.leaving = true;
+            previous.visible = false;
+        }
+        // Drop the old stage once the transition has finished.
         const timer = setTimeout(() => { leaveTimers.delete(timer); dropStage(previous.id); }, FADE_MS + 100);
         leaveTimers.add(timer);
     }
