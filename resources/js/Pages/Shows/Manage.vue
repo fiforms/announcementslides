@@ -71,6 +71,7 @@ const frameMedia = (type) => props.frame.media.find(m => m.media_type === type);
 const frameBase = computed(() => frameMedia('show-base'));
 const frameOverlay = computed(() => frameMedia('show-overlay'));
 const showOverlayOpen = ref(false);
+const settingsOpen = ref(false);
 const showOverlayEditor = ref(null);
 // Only a guide to place things against: the background if it's a picture,
 // else its poster frame, else the first slide.
@@ -461,7 +462,15 @@ function persistLeaderOrder() {
                 </div>
             </div>
 
-            <div v-if="isAdmin && selectedShow" class="space-y-3 rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-3">
+            <div v-if="isAdmin && selectedShow" class="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-3">
+                <button type="button" @click="settingsOpen = !settingsOpen" :aria-expanded="settingsOpen"
+                    class="flex w-full items-center justify-between text-left text-sm font-semibold text-gray-700">
+                    {{ $t('show_manage.settings') }}
+                    <svg class="h-4 w-4 text-gray-500 transition-transform" :class="{ 'rotate-180': settingsOpen }" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.17l3.71-3.94a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <div v-show="settingsOpen" class="mt-3 space-y-3">
                 <div class="rounded-lg border-2 border-gray-300 bg-white px-3 py-2">
                     <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $t('show_manage.auto_fill_options') }}</p>
                     <div class="flex flex-wrap items-center gap-4 text-sm text-gray-700">
@@ -550,6 +559,7 @@ function persistLeaderOrder() {
                             {{ $t('show_manage.frame_edit_overlay') }}
                         </button>
                     </div>
+                </div>
                 </div>
             </div>
 
