@@ -9,6 +9,7 @@ import { settings, refreshShows, activeShow } from '../slideshowState.js'
 import { menuOpen } from '@core/menuOverlay.js'
 import { startSrtStream, stopSrtStream, setDebugOverlay } from '../srtStreamPlayer.js'
 import SlideStage from '../components/SlideStage.vue'
+import ShowFrameLayer from '../components/ShowFrameLayer.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -78,6 +79,9 @@ const SEEK_INDICATOR_HOLD_MS = 1500
 // against a flat "playlist" of slide entries; only how that list gets
 // selected out of the multi-show sync response has changed.
 const playlist = computed(() => activeShow()?.slides || [])
+// The show's frame (background under, overlay + widgets over every slide),
+// mounted once outside the per-slide fade — see ShowFrameLayer.vue.
+const frame = computed(() => activeShow()?.frame || null)
 const status = ref(null)
 const currentIndex = ref(0)
 const paused = ref(false)
@@ -554,6 +558,13 @@ onUnmounted(() => {
 
 <template>
   <div class="kiosk">
+    <ShowFrameLayer
+      v-if="frame?.media_url"
+      :key="`base:${frame.media_url}`"
+      :frame="frame"
+      layer="base"
+      :suspended="paused || externalPlaybackActive"
+    />
     <SlideStage
       v-for="stage in stages"
       :key="stage.id"
@@ -563,6 +574,11 @@ onUnmounted(() => {
       :active="stage.id === activeId"
       @ready="onStageReady(stage.id)"
       @ended="onStageEnded(stage.id)"
+    />
+    <ShowFrameLayer
+      v-if="frame && (frame.overlay_media_url || frame.widgets?.length)"
+      :frame="frame"
+      layer="top"
     />
     <div v-if="!stages.length" class="empty-state">
       <p v-if="status && !status.paired">{{ t('slideshow.notPaired') }}</p>

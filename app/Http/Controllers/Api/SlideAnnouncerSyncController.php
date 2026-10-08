@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Services\ShowFrame;
 use App\Services\Widgets\OverlayWidgets;
 use App\Support\WidgetLocation;
 use App\Support\SlideAnnouncerVideoReceiver;
@@ -52,9 +53,14 @@ class SlideAnnouncerSyncController extends Controller
             'id' => (string) $show->id,
             'name' => $show->name,
             'is_main' => $show->is_main,
+            // The show's frame (background + overlay/widgets over every
+            // slide), or null. With a background video, slides containing
+            // videos aren't sent at all — never two videos at once.
+            'frame' => app(ShowFrame::class)->forDevice($show),
             'slides' => Slide::with(['primaryMedia', 'overlayMedia', 'language'])
                 ->orderedInShow($show->id)
                 ->current()
+                ->when($show->skipsVideoSlides(), fn ($q) => $q->withoutVideo())
                 ->get()
                 ->map(fn (Slide $slide) => $this->slideEntry($slide)),
         ]);
@@ -65,7 +71,8 @@ class SlideAnnouncerSyncController extends Controller
             // mirror into its own cache (it never loads code off the server
             // at display time, so widgets keep working offline).
             'widgets' => app(OverlayWidgets::class)->bundlesFor(
-                $shows->flatMap(fn ($show) => $show['slides']->flatMap(fn ($slide) => $slide['widgets']))->all()
+                $shows->flatMap(fn ($show) => $show['slides']->flatMap(fn ($slide) => $slide['widgets'])
+                    ->concat($show['frame']['widgets'] ?? []))->all()
             ),
             // This screen's location for widgets' api.location — its
             // church's, else the site default (App\Support\WidgetLocation).

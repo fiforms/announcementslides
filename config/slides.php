@@ -90,6 +90,19 @@ return [
         ],
     ],
 
+    // A show's frame media (see Show::media()), kept apart from media_types
+    // so these never appear in a slide's "add media" list.
+    'show_media_types' => [
+        'show-base' => [
+            'label' => 'Show background',
+            'mimes' => ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'video/mp4', 'video/quicktime', 'video/webm'],
+        ],
+        'show-overlay' => [
+            'label' => 'Show overlay',
+            'mimes' => ['image/png', 'image/webp', 'image/svg+xml'],
+        ],
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | AI upscaling and downscaling

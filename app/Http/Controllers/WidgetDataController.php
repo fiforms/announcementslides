@@ -3,7 +3,6 @@
 namespace App\Http\Controllers;
 
 use App\Models\PlayLink;
-use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Models\User;
@@ -21,7 +20,8 @@ use Illuminate\Http\Request;
  *
  * - show(): by reference to a saved placement (overlay + element id). The
  *   URL is built from that placement's validated parameters, and access
- *   follows the slide's own visibility.
+ *   follows the slide's own visibility (or, for a show's frame overlay, the
+ *   show's entity membership).
  * - preview(): for the overlay editor's live preview of unsaved changes —
  *   only for people who can edit overlays, tightly rate limited, and run
  *   through exactly the same parameter validation as a save.
@@ -36,9 +36,13 @@ class WidgetDataController extends Controller
 
     public function show(Request $request, SlideMedia $slideMedia, string $element, string $endpoint): JsonResponse
     {
-        abort_unless($slideMedia->media_type === 'slide-overlay', 404);
-        $slide = $slideMedia->slide;
-        abort_unless($slide && $this->canView($request->user(), $slide), 404);
+        if ($slideMedia->media_type === 'show-overlay') {
+            abort_unless($this->canViewShowFrame($request->user(), $slideMedia), 404);
+        } else {
+            abort_unless($slideMedia->media_type === 'slide-overlay', 404);
+            $slide = $slideMedia->slide;
+            abort_unless($slide && $this->canView($request->user(), $slide), 404);
+        }
 
         $placement = OverlayWidgets::placement($slideMedia, $element);
         $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
@@ -56,11 +60,16 @@ class WidgetDataController extends Controller
     public function device(Request $request, SlideMedia $slideMedia, string $element, string $endpoint): JsonResponse
     {
         $device = $request->user();
-        abort_unless($slideMedia->media_type === 'slide-overlay', 404);
-        $synced = Slide::current()->whereKey($slideMedia->slide_id)
-            ->whereHas('shows', fn ($q) => $q->where('entity_id', $device->entity_id))
-            ->exists();
-        abort_unless($synced, 404);
+        if ($slideMedia->media_type === 'show-overlay') {
+            // The frame of one of the device's own entity's shows.
+            abort_unless($slideMedia->show?->entity_id === $device->entity_id, 404);
+        } else {
+            abort_unless($slideMedia->media_type === 'slide-overlay', 404);
+            $synced = Slide::current()->whereKey($slideMedia->slide_id)
+                ->whereHas('shows', fn ($q) => $q->where('entity_id', $device->entity_id))
+                ->exists();
+            abort_unless($synced, 404);
+        }
 
         $placement = OverlayWidgets::placement($slideMedia, $element);
         $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
@@ -77,56 +86,23 @@ class WidgetDataController extends Controller
     public function playLink(Request $request, string $token, SlideMedia $slideMedia, string $element, string $endpoint): JsonResponse
     {
         $link = PlayLink::active()->where('token', $token)->first();
-        abort_unless($link && $slideMedia->media_type === 'slide-overlay', 404);
-        $inShow = Slide::current()->whereKey($slideMedia->slide_id)
-            ->whereHas('shows', fn ($q) => $q->whereKey($link->resolvedShow()->id))
-            ->exists();
-        abort_unless($inShow, 404);
+        abort_unless($link, 404);
+        if ($slideMedia->media_type === 'show-overlay') {
+            // The link's own show's frame.
+            abort_unless($slideMedia->show_id === $link->resolvedShow()->id, 404);
+        } else {
+            abort_unless($slideMedia->media_type === 'slide-overlay', 404);
+            $inShow = Slide::current()->whereKey($slideMedia->slide_id)
+                ->whereHas('shows', fn ($q) => $q->whereKey($link->resolvedShow()->id))
+                ->exists();
+            abort_unless($inShow, 404);
+        }
 
         $placement = OverlayWidgets::placement($slideMedia, $element);
         $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
         abort_unless($widget, 404);
 
         return $this->respond($widget, $endpoint, $placement['params'] ?? [], 'play-link:' . $link->id, $this->args($request->query('args')));
-    }
-
-    /**
-     * Data for a widget on a show's pinned layer. Signed-in members of the
-     * show's entity (and site admins) only; players that aren't a member's
-     * browser use playLinkShowOverlay() or deviceShowOverlay().
-     */
-    public function showOverlay(Request $request, Show $show, string $element, string $endpoint): JsonResponse
-    {
-        $user = $request->user();
-        abort_unless($show->entity_id && $user && ($user->isAdmin() || in_array($show->entity_id, $user->memberEntityIds())), 404);
-
-        return $this->respondForShow($show, $element, $endpoint, $this->callerKey($request), $request);
-    }
-
-    public function deviceShowOverlay(Request $request, Show $show, string $element, string $endpoint): JsonResponse
-    {
-        $device = $request->user();
-        abort_unless($show->entity_id === $device->entity_id, 404);
-
-        return $this->respondForShow($show, $element, $endpoint, 'device:' . $device->id, $request);
-    }
-
-    public function playLinkShowOverlay(Request $request, string $token, string $element, string $endpoint): JsonResponse
-    {
-        $link = PlayLink::active()->where('token', $token)->first();
-        abort_unless($link, 404);
-
-        return $this->respondForShow($link->resolvedShow(), $element, $endpoint, 'play-link:' . $link->id, $request);
-    }
-
-    private function respondForShow(Show $show, string $element, string $endpoint, string $callerKey, Request $request): JsonResponse
-    {
-        $overlay = $show->overlay;
-        $placement = $overlay ? OverlayWidgets::placement($overlay, $element) : null;
-        $widget = $placement ? Widget::where('slug', $placement['widget'])->where('enabled', true)->first() : null;
-        abort_unless($widget, 404);
-
-        return $this->respond($widget, $endpoint, $placement['params'] ?? [], $callerKey, $this->args($request->query('args')));
     }
 
     public function preview(Request $request): JsonResponse
@@ -216,6 +192,18 @@ class WidgetDataController extends Controller
 
         return $user && ($slide->uploaded_by === $user->id
             || ($slide->entity_id && in_array($slide->entity_id, $user->memberEntityIds())));
+    }
+
+    /**
+     * A show's frame widgets are read by signed-in members of the show's
+     * entity and site admins; everyone else plays them through a play link
+     * or a device.
+     */
+    private function canViewShowFrame(?User $user, SlideMedia $media): bool
+    {
+        $entityId = $media->show?->entity_id;
+
+        return $entityId && $user && ($user->isAdmin() || in_array($entityId, $user->memberEntityIds()));
     }
 
     private function callerKey(Request $request): string

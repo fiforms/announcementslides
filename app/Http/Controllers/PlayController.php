@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\PlayLink;
 use App\Models\Slide;
 use App\Models\Widget;
+use App\Services\ShowFrame;
 use App\Support\WidgetLocation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,10 +55,13 @@ class PlayController extends Controller
 
     private function payload(PlayLink $link): array
     {
+        $show = $link->resolvedShow();
         $slides = Slide::with(['primaryMedia', 'overlayMedia'])
-            ->orderedInShow($link->resolvedShow()->id)
+            ->orderedInShow($show->id)
             ->current()
             ->language($link->language_id)
+            // A background video plays alone: slides with videos are skipped.
+            ->when($show->skipsVideoSlides(), fn ($q) => $q->withoutVideo())
             ->get()
             ->map(fn (Slide $slide) => $this->slideResource($slide, $link))
             ->values();
@@ -66,6 +70,7 @@ class PlayController extends Controller
             'title' => $link->title,
             'delaySeconds' => $link->delay_seconds,
             'slides' => $slides,
+            'frame' => app(ShowFrame::class)->forPlayer($show, $link->token),
         ];
     }
 

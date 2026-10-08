@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import SlideStage from '@/Components/SlideStage.vue';
+import ShowFrameLayer from '@/Components/ShowFrameLayer.vue';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -10,6 +11,9 @@ const props = defineProps({
     // Unattended full-viewport playback (the shared-link player): no on-screen
     // controls, no close/fullscreen handling, plays on mount.
     kiosk: { type: Boolean, default: false },
+    // The show's frame (background under, overlay + widgets over every slide),
+    // or null. Mounted once, outside the per-slide fade.
+    frame: { type: Object, default: null },
     // Overrides the profile's slide delay when set.
     intervalSeconds: { type: Number, default: null },
 });
@@ -427,6 +431,7 @@ const handleShow = () => {
         <div v-if="show" ref="containerRef" class="fixed inset-0 bg-black z-50 flex items-center justify-center" :class="showControls ? 'cursor-auto' : 'cursor-none'" @mousemove="handleMouseMove">
             <!-- Slide Image -->
             <div class="relative w-full h-full flex items-center justify-center">
+                <ShowFrameLayer v-if="frame?.file_url" :frame="frame" layer="base" />
                 <SlideStage
                     v-for="stage in stages"
                     :key="stage.id"
@@ -437,6 +442,8 @@ const handleShow = () => {
                     @ready="onStageReady(stage.id)"
                     @ended="onStageEnded(stage.id)"
                 />
+
+                <ShowFrameLayer v-if="frame && (frame.overlay_url || frame.overlay_widgets?.length)" :frame="frame" layer="top" />
 
                 <!-- Seek indicator -->
                 <div

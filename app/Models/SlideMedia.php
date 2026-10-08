@@ -11,7 +11,7 @@ class SlideMedia extends Model
     protected $table = 'slide_media';
 
     protected $fillable = [
-        'slide_id', 'media_type', 'filename', 'original_filename', 'disk_path',
+        'slide_id', 'show_id', 'media_type', 'filename', 'original_filename', 'disk_path',
         'file_size', 'mime_type', 'thumbnail_path', 'image_width', 'image_height',
         'validation_issues', 'validation_status', 'overlay_settings', 'sort_order',
         'variants', 'active_variant',
@@ -33,6 +33,12 @@ class SlideMedia extends Model
     public function slide()
     {
         return $this->belongsTo(Slide::class);
+    }
+
+    /** Set (with slide_id null) for a show's frame media: show-base / show-overlay. */
+    public function show()
+    {
+        return $this->belongsTo(Show::class);
     }
 
     public function getFileUrlAttribute(): string

@@ -10,11 +10,13 @@ import MediaManager from '@/Components/MediaManager.vue';
 import OverlayEditor from '@/Components/OverlayEditor/OverlayEditor.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
 import { useLightbox } from '@/Composables/useLightbox.js';
+import { useChunkedUpload } from '@/Composables/useChunkedUpload';
 
 const props = defineProps({
     entity: { type: Object, required: true },
     shows: { type: Array, default: () => [] },
     selectedShowId: { type: Number, required: true },
+    frame: { type: Object, default: () => ({ id: null, media: [] }) },
     showSlides: { type: Array, default: () => [] },
     unusedSlides: { type: Array, default: () => [] },
     isAdmin: { type: Boolean, default: false },
@@ -63,17 +65,47 @@ const editingSlide = ref(null);
 const editTab = ref('details');
 const overlayEditor = ref(null);
 
-// The show's pinned widget layer (e.g. a clock above every slide), edited in
-// the same overlay editor in widgets-only mode, against the first slide.
+// The show's frame: a background (image/video) under every slide and an
+// overlay (edited in the overlay editor, widgets included) over every slide.
+const frameMedia = (type) => props.frame.media.find(m => m.media_type === type);
+const frameBase = computed(() => frameMedia('show-base'));
+const frameOverlay = computed(() => frameMedia('show-overlay'));
 const showOverlayOpen = ref(false);
 const showOverlayEditor = ref(null);
+// Only a guide to place things against: the background if it's a picture,
+// else its poster frame, else the first slide.
 const showOverlayBackground = computed(() => {
+    const base = frameBase.value;
+    if (base) return base.mime_type?.startsWith('image/') ? base.file_url : base.thumbnail_url;
     const first = props.showSlides[0];
     return first ? (first.thumbnail_url || first.file_url) : null;
 });
 function closeShowOverlay() {
     if (showOverlayEditor.value?.isDirty() && !confirm(t('overlay_editor.confirm_discard'))) return;
     showOverlayOpen.value = false;
+}
+
+const frameFileInput = ref(null);
+const frameUpload = ref({ busy: false, progress: 0, error: null });
+async function onFrameFilePicked(event) {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    const uploader = useChunkedUpload({
+        finalizeRoute: 'shows.media.store',
+        finalizeRouteParams: { show: props.selectedShowId, entity_id: props.entity.id },
+        buildFinalizePayload: (completed) => completed[0],
+    });
+    frameUpload.value = { busy: true, progress: 0, error: null };
+    // The chunk endpoint knows the file as a 'slide' (same file types).
+    const saved = await uploader.upload([file], { media_type: 'slide' });
+    frameUpload.value = { busy: false, progress: 0, error: saved ? null : uploader.uploadError.value };
+    if (saved) router.reload({ only: ['frame'] });
+}
+function removeFrameMedia(media) {
+    if (!confirm(t('show_manage.frame_remove_confirm'))) return;
+    router.delete(route('shows.media.destroy', { show: props.selectedShowId, media: media.id, entity_id: props.entity.id }),
+        { preserveScroll: true, only: ['frame'] });
 }
 
 // Unsaved overlay edits live only in the editor, which unmounts on tab
@@ -433,15 +465,49 @@ function persistLeaderOrder() {
                         </label>
                     </div>
                 </div>
-                <div class="flex flex-wrap items-center gap-3 rounded-lg border-2 border-gray-300 bg-white px-3 py-2">
-                    <div class="min-w-0 flex-1">
-                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $t('show_manage.show_overlay') }}</p>
-                        <p class="text-xs text-gray-500">{{ $t('show_manage.show_overlay_hint') }}</p>
+                <div class="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 space-y-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $t('show_manage.frame') }}</p>
+                        <p class="text-xs text-gray-500">{{ $t('show_manage.frame_hint') }}</p>
                     </div>
-                    <button type="button" @click="showOverlayOpen = true"
-                        class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
-                        {{ $t('show_manage.edit_show_overlay') }}
-                    </button>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="h-12 w-20 shrink-0 overflow-hidden rounded bg-slate-100">
+                            <img v-if="frameBase && (frameBase.thumbnail_url || frameBase.mime_type?.startsWith('image/'))"
+                                :src="frameBase.thumbnail_url || frameBase.file_url" alt="" class="h-full w-full object-cover" />
+                        </div>
+                        <div class="min-w-0 flex-1 text-sm text-gray-700">
+                            <p class="font-medium">{{ $t('show_manage.frame_background') }}</p>
+                            <p class="truncate text-xs text-gray-500">
+                                {{ frameBase ? frameBase.original_filename : $t('show_manage.frame_none') }}
+                            </p>
+                            <p v-if="frameBase?.mime_type?.startsWith('video/')" class="text-xs text-amber-700">{{ $t('show_manage.frame_video_note') }}</p>
+                            <p v-if="frameUpload.busy" class="text-xs text-gray-500">{{ $t('show_manage.frame_uploading') }}</p>
+                            <p v-if="frameUpload.error" class="text-xs text-red-600">{{ frameUpload.error }}</p>
+                        </div>
+                        <input ref="frameFileInput" type="file" class="hidden"
+                            accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/quicktime,video/webm"
+                            @change="onFrameFilePicked" />
+                        <button type="button" :disabled="frameUpload.busy" @click="frameFileInput.click()"
+                            class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                            {{ frameBase ? $t('show_manage.frame_replace') : $t('show_manage.frame_upload') }}
+                        </button>
+                        <button v-if="frameBase" type="button" @click="removeFrameMedia(frameBase)"
+                            class="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
+                            {{ $t('show_manage.frame_remove') }}
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-3">
+                        <div class="min-w-0 flex-1 text-sm text-gray-700">
+                            <p class="font-medium">{{ $t('show_manage.frame_overlay') }}</p>
+                            <p class="text-xs text-gray-500">{{ frameOverlay ? $t('show_manage.frame_overlay_set') : $t('show_manage.frame_overlay_hint') }}</p>
+                        </div>
+                        <button type="button" @click="showOverlayOpen = true"
+                            class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
+                            {{ $t('show_manage.frame_edit_overlay') }}
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -569,13 +635,14 @@ function persistLeaderOrder() {
                 @click.self="closeShowOverlay">
                 <div class="relative w-full max-w-6xl max-h-[90vh] overflow-y-auto rounded-xl bg-white p-6 shadow-lg space-y-4">
                     <div class="flex items-center justify-between">
-                        <h3 class="text-sm font-semibold text-gray-900">{{ $t('show_manage.show_overlay_title', { show: showName(selectedShow) }) }}</h3>
+                        <h3 class="text-sm font-semibold text-gray-900">{{ $t('show_manage.frame_overlay_title', { show: showName(selectedShow) }) }}</h3>
                         <button @click="closeShowOverlay" :aria-label="$t('show_manage.close')" class="text-gray-400 hover:text-gray-600">&times;</button>
                     </div>
-                    <OverlayEditor ref="showOverlayEditor" widgets-only
+                    <OverlayEditor ref="showOverlayEditor" :slide="frame"
                         show-route="shows.overlay.show" save-route="shows.overlay.save"
+                        destroy-route="shows.media.destroy"
                         :route-model="{ show: selectedShow.id }" :route-params="{ entity_id: entity.id }"
-                        :background="showOverlayBackground" />
+                        :reload-only="['frame']" :background="showOverlayBackground" />
                 </div>
             </div>
 

@@ -31,6 +31,14 @@ overlay editor or uploaded from the Media Manager), cached as
 manifest entry; the bundles they need are mirrored by widgets.py, and
 the playlist only lists placements whose bundle is on disk.
 
+A show's optional `frame` (a background image/video under every slide, and
+an overlay image + widgets over every slide) rides along in the show's
+manifest entry: its two files are cached as `show-<id>-base.<ext>` and
+`show-<id>-overlay.<ext>`, and the playlist's `frame` is what Slideshow.vue
+mounts once, outside the per-slide fade. With a background *video* the
+server sends no video slides at all (never two videos at once); the
+playlist builder drops any that linger from an older sync as well.
+
 Failure handling mirrors heartbeat.py: a network/timeout error leaves the
 last-synced manifest, media, and settings on disk untouched (the kiosk
 keeps showing cached slides) and only updates sync-status.json's
@@ -147,6 +155,75 @@ def _local_filename(slide: dict, suffix: str = "", url_key: str = "file_url", mi
     return f"{slide['id']}{suffix}{ext}"
 
 
+async def _sync_frame_file(client: httpx.AsyncClient, url, previous: dict, key: str, filename: str):
+    """One of a frame's two files: returns its local filename (or None if the
+    frame no longer has it). `previous` is the last manifest frame, whose
+    `<key>_url` / `<key>_local_filename` say what's already cached; a failed
+    download keeps the old file and retries next cycle."""
+    old_name = previous.get(f"{key}_local_filename")
+    if not url:
+        if old_name:
+            (MEDIA_DIR / old_name).unlink(missing_ok=True)
+        return None
+    if old_name == filename and previous.get(f"{key}_url") == url and (MEDIA_DIR / filename).exists():
+        return filename
+    try:
+        await _download(client, url, MEDIA_DIR / filename)
+    except httpx.HTTPError:
+        return old_name if old_name and (MEDIA_DIR / old_name).exists() else None
+    if old_name and old_name != filename:
+        (MEDIA_DIR / old_name).unlink(missing_ok=True)
+    return filename
+
+
+async def _sync_frame(client: httpx.AsyncClient, show_id: str, frame, previous) -> dict | None:
+    """The show's frame as a manifest entry, with its files cached, or None."""
+    previous = previous or {}
+    frame = frame or {}
+    ident = {"id": f"show-{show_id}", **frame}
+    base_name = _local_filename(ident, suffix="-base") if frame.get("file_url") else None
+    overlay_name = _local_filename(ident, suffix="-overlay", url_key="overlay_url", mime_key="overlay_mime_type") if frame.get("overlay_url") else None
+
+    base = await _sync_frame_file(client, frame.get("file_url"), previous, "base", base_name)
+    overlay = await _sync_frame_file(client, frame.get("overlay_url"), previous, "overlay", overlay_name)
+    if not frame:
+        return None
+
+    return {
+        "base_url": frame.get("file_url"),
+        "base_local_filename": base,
+        "mime_type": frame.get("mime_type"),
+        "overlay_url": frame.get("overlay_url"),
+        "overlay_local_filename": overlay,
+        "overlay_media_id": frame.get("overlay_media_id"),
+        "widgets": frame.get("widgets") or [],
+    }
+
+
+def _frame_files(frame) -> list:
+    return [name for name in ((frame or {}).get("base_local_filename"), (frame or {}).get("overlay_local_filename")) if name]
+
+
+def _playlist_frame(frame, widget_index: dict):
+    """A show's frame for the kiosk: only the parts whose file is on disk
+    (widgets: whose bundle is mirrored), or None if nothing is left."""
+    if not frame:
+        return None
+    base = frame.get("base_local_filename")
+    overlay = frame.get("overlay_local_filename")
+    base_ok = bool(base) and (MEDIA_DIR / base).exists()
+    overlay_ok = bool(overlay) and (MEDIA_DIR / overlay).exists()
+    placements = widgets.placements_for_playlist(frame, widget_index)
+    if not (base_ok or overlay_ok or placements):
+        return None
+    return {
+        "media_url": f"/media/{base}" if base_ok else None,
+        "mime_type": frame.get("mime_type") if base_ok else None,
+        "overlay_media_url": f"/media/{overlay}" if overlay_ok else None,
+        "widgets": placements,
+    }
+
+
 def _is_expired(entry: dict, now: datetime) -> bool:
     expires_at = entry.get("expires_at")
     if not expires_at:
@@ -172,6 +249,9 @@ def _build_active_playlist(manifest: dict) -> list:
     widget_index = widgets.read_index()
     shows = []
     for show_id, show in manifest.items():
+        frame = _playlist_frame(show.get("frame"), widget_index)
+        # A background video plays alone — never two videos at once.
+        skip_video = bool(frame and (frame["mime_type"] or "").startswith("video/"))
         slides = [
             {
                 "id": entry["id"],
@@ -189,8 +269,9 @@ def _build_active_playlist(manifest: dict) -> list:
             # server's display order for this show — no sort key to apply.
             for entry in show.get("slides", {}).values()
             if not _is_expired(entry, now) and (MEDIA_DIR / entry["local_filename"]).exists()
+            and not (skip_video and (entry.get("mime_type") or "").startswith("video/"))
         ]
-        shows.append({"id": show_id, "name": show.get("name"), "is_main": bool(show.get("is_main")), "slides": slides})
+        shows.append({"id": show_id, "name": show.get("name"), "is_main": bool(show.get("is_main")), "slides": slides, "frame": frame})
     return shows
 
 
@@ -302,6 +383,7 @@ async def sync_once() -> None:
                 "name": show.get("name"),
                 "is_main": bool(show.get("is_main")),
                 "slides": slides_manifest,
+                "frame": await _sync_frame(client, show_id, show.get("frame"), manifest.get(show_id, {}).get("frame")),
             }
 
         # Widget bundles the synced slides place (see widgets.py).
@@ -316,6 +398,12 @@ async def sync_once() -> None:
             (MEDIA_DIR / entry["local_filename"]).unlink(missing_ok=True)
             if entry.get("overlay_local_filename"):
                 (MEDIA_DIR / entry["overlay_local_filename"]).unlink(missing_ok=True)
+
+    # A show that disappeared entirely takes its frame files with it.
+    for show_id, show in manifest.items():
+        if show_id not in new_manifest:
+            for name in _frame_files(show.get("frame")):
+                (MEDIA_DIR / name).unlink(missing_ok=True)
 
     _write_json(MANIFEST_FILE, new_manifest)
     _write_json(SETTINGS_FILE, settings)

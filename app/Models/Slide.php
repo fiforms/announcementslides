@@ -87,6 +87,12 @@ class Slide extends Model
 
     // ── Scopes ────────────────────────────────────────────────────────────────
 
+    /** Slides whose primary media is not a video (see Show::skipsVideoSlides()). */
+    public function scopeWithoutVideo(Builder $query): Builder
+    {
+        return $query->whereDoesntHave('primaryMedia', fn ($q) => $q->where('mime_type', 'like', 'video/%'));
+    }
+
     public function scopeCurrent(Builder $query): Builder
     {
         return $query->where('status', 'published')

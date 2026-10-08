@@ -30,7 +30,7 @@ class GenerateThumbnail implements ShouldQueue
         // its own (it renders directly), but an SVG overlay still has to
         // refresh the slide's flattened composite.
         if ($this->media->mime_type === 'image/svg+xml') {
-            SyncOverlayThumbnail::dispatch($this->media->slide_id);
+            $this->media->slide_id && SyncOverlayThumbnail::dispatch($this->media->slide_id);
             return;
         }
 
@@ -42,7 +42,8 @@ class GenerateThumbnail implements ShouldQueue
 
         if (file_exists($thumbFullPath)) {
             $this->media->update(['thumbnail_path' => $thumbRelPath]);
-            SyncOverlayThumbnail::dispatch($this->media->slide_id);
+            // A show's frame media has no slide composite to refresh.
+            $this->media->slide_id && SyncOverlayThumbnail::dispatch($this->media->slide_id);
         }
     }
 

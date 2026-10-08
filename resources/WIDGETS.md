@@ -46,7 +46,7 @@ For the whole site:
 | Serving bundle files | [WidgetAssetController](../app/Http/Controllers/WidgetAssetController.php), route `widgets.asset`. It serves only files listed in the installed manifest, same-origin, with the right MIME type. Public, because public slides' widgets run for guests. |
 | Widget row | [Widget](../app/Models/Widget.php): `manifest`, `files`, `settings`, `extra_allow`, `enabled` |
 | Parameter validation | [WidgetParams](../app/Services/Widgets/WidgetParams.php), the trust boundary for non-admin input |
-| Placements | [OverlayWidgets](../app/Services/Widgets/OverlayWidgets.php) validates a slide overlay's widget elements into `slide_media.overlay_settings` |
+| Placements | [OverlayWidgets](../app/Services/Widgets/OverlayWidgets.php) validates an overlay's widget elements into `slide_media.overlay_settings` — a slide's overlay, or a show's frame overlay (`show-overlay`, drawn above every slide's own widgets) |
 | Browser host | [widgetHost.js](js/Composables/widgets/widgetHost.js) builds `api` and calls `mount`. [WidgetBox.vue](js/Components/Widgets/WidgetBox.vue) positions one placement, and [WidgetLayer.vue](js/Components/Widgets/WidgetLayer.vue) lays out all of a slide's. |
 | Data endpoints | [WidgetDataController](../app/Http/Controllers/WidgetDataController.php), [WidgetDataService](../app/Services/Widgets/WidgetDataService.php) |
 | Outbound requests | [SafeHttpFetcher](../app/Services/Widgets/SafeHttpFetcher.php), [UrlPolicy](../app/Services/Widgets/UrlPolicy.php) |
@@ -102,10 +102,10 @@ Static outputs can't run JavaScript, so [OverlayCompositor](../app/Services/Over
 
 ## Slide Announcer devices
 
-The shows sync ([SlideAnnouncerSyncController](../app/Http/Controllers/Api/SlideAnnouncerSyncController.php)) carries each slide's placements plus the bundles they need.
+The shows sync ([SlideAnnouncerSyncController](../app/Http/Controllers/Api/SlideAnnouncerSyncController.php)) carries each slide's placements, and each show's frame overlay placements, plus the bundles they need.
 
 - The device mirrors those bundles locally (`kiosk-products/slideannouncer/backend/widgets.py`) and serves them from its own `/media/widgets/`, so widgets keep working through internet outages.
-- `api.fetch()` goes through the device's backend to `/api/slide-announcers/widget-data/{slideMedia}/{element}/{endpoint}` (`WidgetDataController::device`, token-authenticated, limited to slides that device syncs). The device never fetches upstream URLs itself, and it serves the last good response, marked `stale: true`, while offline.
+- `api.fetch()` goes through the device's backend to `/api/slide-announcers/widget-data/{slideMedia}/{element}/{endpoint}` (`WidgetDataController::device`, token-authenticated, limited to slides and show frames that device syncs). The device never fetches upstream URLs itself, and it serves the last good response, marked `stale: true`, while offline.
 - Because of that, a widget can't rely on anything outside its package at runtime (CDN scripts, web fonts).
 
 ## Changing the widget format

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Jobs\GenerateThumbnail;
 use App\Jobs\SyncOverlayThumbnail;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Models\Widget;
@@ -243,8 +244,9 @@ trait ManagesSlideMedia
      * without a cross-origin fetch from the storage disk. `widgets` is the
      * catalog of installed widgets the editor can place.
      */
-    private function showOverlayForSlide(Slide $slide): JsonResponse
+    private function showOverlayForSlide(Slide|Show $slide): JsonResponse
     {
+        // A Show's frame overlay is edited exactly like a slide's.
         $media = $slide->overlayMedia;
         $disk = Storage::disk('public');
 
@@ -280,7 +282,7 @@ trait ManagesSlideMedia
      * SVG at all — they're validated and stored in overlay_settings, which
      * the players read (see OverlayWidgets).
      */
-    private function saveOverlayForSlide(Request $request, Slide $slide): SlideMedia
+    private function saveOverlayForSlide(Request $request, Slide|Show $slide): SlideMedia
     {
         $request->validate([
             'svg'    => 'required|string|max:8388608',
@@ -309,13 +311,15 @@ trait ManagesSlideMedia
         $disk = Storage::disk('public');
         $disk->put($diskPath, $svg);
 
-        $old = $slide->media()->where('media_type', 'slide-overlay')->get();
+        // A Show's frame overlay is stored as 'show-overlay', beside its base.
+        $type = $slide instanceof Show ? 'show-overlay' : 'slide-overlay';
+        $old = $slide->media()->where('media_type', $type)->get();
 
-        $media = DB::transaction(function () use ($slide, $old, $filename, $diskPath, $svg, $overlaySettings) {
+        $media = DB::transaction(function () use ($slide, $old, $type, $filename, $diskPath, $svg, $overlaySettings) {
             $old->each->delete();
 
             return $slide->media()->create([
-                'media_type'        => 'slide-overlay',
+                'media_type'        => $type,
                 'filename'          => $filename,
                 'original_filename' => 'overlay.svg',
                 'disk_path'         => $diskPath,
@@ -327,7 +331,9 @@ trait ManagesSlideMedia
 
         $disk->delete($old->flatMap(fn ($m) => array_filter([$m->disk_path, $m->thumbnail_path]))->all());
 
-        SyncOverlayThumbnail::dispatch($slide->id);
+        if ($slide instanceof Slide) {
+            SyncOverlayThumbnail::dispatch($slide->id);
+        }
 
         return $media;
     }
@@ -336,7 +342,7 @@ trait ManagesSlideMedia
      * Serializes a slide's attached media for Edit-page responses (list
      * views intentionally omit this to keep those payloads light).
      */
-    private function mediaResource(Slide $slide): array
+    private function mediaResource(Slide|Show $slide): array
     {
         return $slide->media->map(fn (SlideMedia $m) => [
             'id'                => $m->id,

@@ -18,5 +18,4 @@ Route::middleware(['auth:sanctum', 'slide-announcer.auth'])->group(function () {
     // `throttle` here: it keys on getAuthIdentifier(), which a device
     // isn't; WidgetDataService rate-limits upstream fetches per device.
     Route::get('/slide-announcers/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'device']);
-    Route::get('/slide-announcers/show-widget-data/{show}/{element}/{endpoint}', [WidgetDataController::class, 'deviceShowOverlay']);
 });

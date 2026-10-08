@@ -17,7 +17,8 @@ const emit = defineEmits(['apply', 'close']);
 const { t } = useI18n();
 
 const init = props.initial ?? {};
-const target = ref(init.target ?? (props.slide.link ? 'link' : 'canonical'));
+// A show's frame has no link or page of its own, only a typed-in URL.
+const target = ref(init.target ?? (props.slide.link ? 'link' : props.slide.canonical_url ? 'canonical' : 'custom'));
 const custom = ref(init.target === 'custom' ? init.data : '');
 const options = ref({
     foreground: init.foreground ?? QR_DEFAULTS.foreground,
@@ -62,14 +63,14 @@ const input = 'w-full rounded-md border border-gray-300 px-2 py-1.5 text-sm shad
 
             <fieldset class="space-y-2 text-sm">
                 <legend class="mb-1 text-xs font-medium text-gray-700">{{ t('overlay_editor.qr_target') }}</legend>
-                <label class="flex items-start gap-2" :class="!slide.link && 'opacity-50'">
+                <label v-if="slide.canonical_url" class="flex items-start gap-2" :class="!slide.link && 'opacity-50'">
                     <input v-model="target" type="radio" value="link" :disabled="!slide.link" class="mt-0.5" />
                     <span>
                         {{ t('overlay_editor.qr_target_link') }}
                         <span class="block break-all text-xs text-gray-500">{{ slide.link || t('overlay_editor.qr_no_link') }}</span>
                     </span>
                 </label>
-                <label class="flex items-start gap-2">
+                <label v-if="slide.canonical_url" class="flex items-start gap-2">
                     <input v-model="target" type="radio" value="canonical" class="mt-0.5" />
                     <span>
                         {{ t('overlay_editor.qr_target_canonical') }}

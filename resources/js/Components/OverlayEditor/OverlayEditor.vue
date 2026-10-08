@@ -17,21 +17,19 @@ import { loadRasterAsDataUri, prepareSvgImport, readFileAs } from '@/Composables
 // single SVG overlay (see ManagesSlideMedia::saveOverlayForSlide). An
 // overlay made elsewhere can be kept as a locked base layer to build on.
 //
-// With `widgetsOnly` it instead edits a show's pinned widget layer
-// (ShowController::saveOverlay): only widgets can be added, nothing is
-// compiled to SVG, and `routeModel` names the route's model (e.g. {show: 3})
-// in place of a slide. `backgroundUrl` is just a stand-in picture to place
-// widgets against.
+// It also edits a show's frame overlay (ShowController::saveOverlay): then
+// `slide` is the frame ({ id, media }), `routeModel` names the route's model
+// in place of the slide (e.g. { show: 3 }), and `background` is a stand-in
+// picture to place things against.
 const props = defineProps({
-    slide: { type: Object, default: null },
-    showRoute: { type: String, required: true },
-    saveRoute: { type: String, required: true },
-    destroyRoute: { type: String, default: null },
-    routeParams: { type: Object, default: () => ({}) },
-    reloadOnly: { type: Array, default: () => [] },
-    widgetsOnly: { type: Boolean, default: false },
+    slide: { type: Object, required: true },
     routeModel: { type: Object, default: null },
     background: { type: String, default: null },
+    showRoute: { type: String, required: true },
+    saveRoute: { type: String, required: true },
+    destroyRoute: { type: String, required: true },
+    routeParams: { type: Object, default: () => ({}) },
+    reloadOnly: { type: Array, default: () => [] },
 });
 
 const { t } = useI18n();
@@ -79,33 +77,25 @@ watch(() => widgetPreview.value && JSON.stringify(editor.elements.value.filter(e
     previewTimer = setTimeout(refreshPreview, 600);
 });
 
-const EMPTY_SVG = '<svg xmlns="http://www.w3.org/2000/svg"/>';
-const hasSaved = ref(false); // widgetsOnly: whether a layer is stored yet
-
-const primary = computed(() => props.slide?.media?.find(m => m.media_type === 'slide'));
+const primary = computed(() => props.slide.media?.find(m => m.media_type === 'slide'));
 const backgroundUrl = computed(() => {
-    if (props.widgetsOnly) return props.background;
+    if (props.background) return props.background;
     if (!primary.value) return props.slide.file_url;
     return primary.value.mime_type?.startsWith('image/') ? primary.value.file_url : primary.value.thumbnail_url;
 });
-const existingOverlay = computed(() => props.widgetsOnly
-    ? hasSaved.value
-    : props.slide.media?.find(m => m.media_type === 'slide-overlay'));
+const existingOverlay = computed(() => props.slide.media?.find(m => ['slide-overlay', 'show-overlay'].includes(m.media_type)));
 
 defineExpose({ isDirty: () => editor.dirty.value });
 
-function routeFor(name) {
-    return route(name, { ...(props.routeModel ?? { slide: props.slide.id }), ...props.routeParams });
+function routeFor(name, extra = {}) {
+    return route(name, { ...(props.routeModel ?? { slide: props.slide.id }), ...extra, ...props.routeParams });
 }
 
 onMounted(async () => {
     try {
         const { data } = await axios.get(routeFor(props.showRoute));
         widgetList.value = data.widgets ?? [];
-        if (props.widgetsOnly) {
-            hasSaved.value = !!data.source;
-            editor.reset(data.source ? fromSource(data.source, EMPTY_SVG) : []);
-        } else if (data.source && data.overlay?.svg) {
+        if (data.source && data.overlay?.svg) {
             editor.reset(fromSource(data.source, data.overlay.svg));
         } else {
             editor.reset([]);
@@ -234,26 +224,11 @@ function save() {
     error.value = null;
     const elements = editor.elements.value;
 
-    if (props.widgetsOnly) {
-        if (!elements.length && !hasSaved.value) return;
-        if (!elements.length && !confirm(t('overlay_editor.confirm_remove'))) return;
-        saving.value = true;
-        router.put(routeFor(props.saveRoute), { source: JSON.stringify(toSource(elements)) }, {
-            preserveScroll: true,
-            preserveState: true,
-            only: props.reloadOnly,
-            onSuccess: () => { editor.markSaved(); hasSaved.value = elements.length > 0; },
-            onError: errors => { error.value = Object.values(errors)[0] ?? t('overlay_editor.save_failed'); },
-            onFinish: () => { saving.value = false; },
-        });
-        return;
-    }
-
     if (!elements.length) {
         if (!existingOverlay.value) return;
         if (!confirm(t('overlay_editor.confirm_remove'))) return;
         saving.value = true;
-        router.delete(route(props.destroyRoute, { slide: props.slide.id, media: existingOverlay.value.id, ...props.routeParams }), {
+        router.delete(routeFor(props.destroyRoute, { media: existingOverlay.value.id }), {
             preserveScroll: true,
             preserveState: true,
             only: props.reloadOnly,
@@ -299,16 +274,14 @@ const toolButton = 'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <template v-if="!widgetsOnly">
-                    <button type="button" class="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
-                        @click="qrDialog = { initial: null }">
-                        {{ t('overlay_editor.add_qr') }}
-                    </button>
-                    <button type="button" :class="toolButton" @click="addText">{{ t('overlay_editor.add_text') }}</button>
-                    <button type="button" :class="toolButton" @click="addRect">{{ t('overlay_editor.add_rect') }}</button>
-                    <button type="button" :class="toolButton" @click="imageInput.click()">{{ t('overlay_editor.add_image') }}</button>
-                    <button type="button" :class="toolButton" @click="svgInput.click()">{{ t('overlay_editor.import_svg') }}</button>
-                </template>
+                <button type="button" class="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+                    @click="qrDialog = { initial: null }">
+                    {{ t('overlay_editor.add_qr') }}
+                </button>
+                <button type="button" :class="toolButton" @click="addText">{{ t('overlay_editor.add_text') }}</button>
+                <button type="button" :class="toolButton" @click="addRect">{{ t('overlay_editor.add_rect') }}</button>
+                <button type="button" :class="toolButton" @click="imageInput.click()">{{ t('overlay_editor.add_image') }}</button>
+                <button type="button" :class="toolButton" @click="svgInput.click()">{{ t('overlay_editor.import_svg') }}</button>
                 <div v-if="placeableWidgets.length" class="relative">
                     <button type="button" :class="toolButton" @click="widgetMenu = !widgetMenu">{{ t('overlay_editor.add_widget') }} ▾</button>
                     <div v-if="widgetMenu" class="absolute left-0 z-20 mt-1 w-64 rounded-lg border border-gray-200 bg-white p-1 shadow-lg">
@@ -350,7 +323,7 @@ const toolButton = 'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-
                         <OverlayCanvas :background-url="backgroundUrl" @edit-selected="editSelected" />
                         <WidgetLayer v-if="widgetPreview && previewWidgets.length" :widgets="previewWidgets" mode="editor" class="rounded-lg" />
                     </div>
-                    <p class="mt-1 text-xs text-gray-400">{{ t(widgetsOnly ? 'overlay_editor.show_canvas_hint' : 'overlay_editor.canvas_hint') }}</p>
+                    <p class="mt-1 text-xs text-gray-400">{{ t('overlay_editor.canvas_hint') }}</p>
                     <p v-if="hasWidgets" class="mt-0.5 text-xs text-gray-400">{{ t('overlay_editor.widget_hint') }}</p>
                 </div>
                 <div class="w-full shrink-0 space-y-5 lg:w-72">
@@ -360,6 +333,6 @@ const toolButton = 'rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-
             </div>
         </div>
 
-        <QrDialog v-if="qrDialog && slide" :slide="slide" :initial="qrDialog.initial" @apply="applyQr" @close="qrDialog = null" />
+        <QrDialog v-if="qrDialog" :slide="slide" :initial="qrDialog.initial" @apply="applyQr" @close="qrDialog = null" />
     </div>
 </template>

@@ -6,6 +6,7 @@ use App\Support\NearbyEntities;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
@@ -70,9 +71,34 @@ class Show extends Model
             ->orderBy('show_slides.sort_order');
     }
 
-    public function overlay(): HasOne
+    /**
+     * The show's frame media (see the show_id migration): an optional
+     * `show-base` image/video under every slide, and an optional
+     * `show-overlay` (SVG + widget placements) over every slide, above the
+     * slide's own overlay and widgets.
+     */
+    public function media(): HasMany
     {
-        return $this->hasOne(ShowOverlay::class);
+        return $this->hasMany(SlideMedia::class);
+    }
+
+    public function baseMedia(): HasOne
+    {
+        return $this->hasOne(SlideMedia::class)->where('media_type', 'show-base')->latest('id');
+    }
+
+    public function overlayMedia(): HasOne
+    {
+        return $this->hasOne(SlideMedia::class)->where('media_type', 'show-overlay')->latest('id');
+    }
+
+    /**
+     * With a looping base video, slides that contain a video are left out of
+     * playback entirely: two videos at once would be heavy and mix audio.
+     */
+    public function skipsVideoSlides(): bool
+    {
+        return (bool) $this->baseMedia?->isVideo();
     }
 
     public static function mainFor(Entity $entity): self

@@ -4,13 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesEntityAccess;
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
+use App\Jobs\GenerateThumbnail;
 use App\Models\Entity;
 use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
-use App\Models\Widget;
-use App\Services\Widgets\OverlayWidgets;
-use App\Services\Widgets\WidgetPackageException;
+use App\Models\SlideMedia;
 use App\Support\NearbyEntities;
 use App\Support\SortZones;
 use Illuminate\Http\RedirectResponse;
@@ -18,7 +17,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -58,6 +57,7 @@ class ShowController extends Controller
                 'auto_fill_global' => $s->auto_fill_global, 'auto_fill_nearby' => $s->auto_fill_nearby,
             ]),
             'selectedShowId' => $selectedShow->id,
+            'frame' => ['id' => $selectedShow->id, 'media' => $this->mediaResource($selectedShow->load('media'))],
             'showSlides' => $showSlides->map(fn ($s) => $this->slideResource($s, $selectedShow->is_main)),
             'unusedSlides' => $unusedSlides->map(fn ($s) => $this->slideResource($s)),
             'isAdmin' => $isAdmin,
@@ -147,55 +147,73 @@ class ShowController extends Controller
         return redirect()->route('shows.index', ['entity_id' => $entityId])->with('success', 'Show deleted.');
     }
 
-    /**
-     * The show's pinned widget layer for the overlay editor: its element
-     * list (null when none yet) and the catalog of installed widgets.
-     */
+    // ── The show's frame: base image/video and overlay ─────────────────────
+
+    /** The frame overlay for the overlay editor (same payload as a slide's). */
     public function showOverlay(Request $request, Show $show): JsonResponse
     {
-        $entityId = $this->authorizedEntityId($request);
-        abort_unless($show->entity_id === $entityId, 404);
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
 
-        $overlay = $show->overlay;
+        return $this->showOverlayForSlide($show);
+    }
 
-        return response()->json([
-            'source'  => $overlay?->source,
-            'overlay' => null,
-            'widgets' => Widget::editorCatalog($overlay?->overlay_settings['widgets'] ?? []),
-        ]);
+    public function saveOverlay(Request $request, Show $show)
+    {
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
+
+        $this->saveOverlayForSlide($request, $show);
+
+        return back()->with('success', 'Show overlay saved.');
     }
 
     /**
-     * Saves the editor's widget elements as the show's pinned layer. Same
-     * trust boundary as a slide overlay (OverlayWidgets::fromSource validates
-     * every placement); a save with no widgets removes the layer.
+     * Attaches the show's background (image or video), uploaded through the
+     * chunk endpoint like a slide's extra media. One per show: it replaces
+     * the previous one.
      */
-    public function saveOverlay(Request $request, Show $show)
+    public function storeMedia(Request $request, Show $show)
     {
-        $entityId = $this->authorizedEntityId($request);
-        abort_unless($show->entity_id === $entityId, 404);
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
 
-        $request->validate(['source' => 'required|string|max:1048576']);
-        $source = json_decode($request->input('source'), true);
-        if (!is_array($source) || !is_int($source['v'] ?? null) || !is_array($source['elements'] ?? null)) {
-            throw ValidationException::withMessages(['source' => 'The overlay source is malformed.']);
-        }
-        // This layer is widgets only; anything else the editor sent is dropped.
-        $source['elements'] = array_values(array_filter($source['elements'], fn ($el) => is_array($el) && ($el['type'] ?? null) === 'widget'));
+        $request->validate([
+            'filename'          => ['required', 'string', 'regex:/^[0-9a-f\-]{36}\.[a-z0-9]+$/'],
+            'disk_path'         => ['required', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.[a-z0-9]+$/'],
+            'original_filename' => 'required|string|max:255',
+            'file_size'         => 'required|integer|min:0',
+            'mime_type'         => ['required', 'string', Rule::in(config('slides.show_media_types.show-base.mimes'))],
+        ]);
 
-        try {
-            [$source, $settings] = app(OverlayWidgets::class)->fromSource($source);
-        } catch (WidgetPackageException $e) {
-            throw ValidationException::withMessages(['source' => $e->errors]);
-        }
+        $disk = Storage::disk('public');
+        abort_unless($disk->exists($request->disk_path), 422, 'Assembled file not found.');
 
-        if (!$source['elements']) {
-            $show->overlay?->delete();
-        } else {
-            $show->overlay()->updateOrCreate([], ['source' => $source, 'overlay_settings' => $settings]);
-        }
+        $old = $show->media()->where('media_type', 'show-base')->get();
+        $media = $show->media()->create([
+            'media_type'        => 'show-base',
+            'filename'          => $request->filename,
+            'original_filename' => $request->original_filename,
+            'disk_path'         => $request->disk_path,
+            'file_size'         => (int) $request->file_size,
+            'mime_type'         => $request->mime_type,
+        ]);
+        $old->each(function (SlideMedia $m) use ($disk) {
+            $disk->delete($m->allFilePaths());
+            $m->delete();
+        });
 
-        return back()->with('success', 'Show overlay saved.');
+        GenerateThumbnail::dispatch($media);
+
+        return back()->with('success', 'Show background saved.');
+    }
+
+    public function destroyMedia(Request $request, Show $show, SlideMedia $media)
+    {
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
+        abort_unless($media->show_id === $show->id, 404);
+
+        Storage::disk('public')->delete($media->allFilePaths());
+        $media->delete();
+
+        return back()->with('success', 'Removed.');
     }
 
     public function attach(Request $request, Show $show)
