@@ -213,12 +213,15 @@ class WidgetDataService
         }
 
         try {
-            $calendar = Reader::read($body, Reader::OPTION_FORGIVING | Reader::OPTION_IGNORE_INVALID_LINES);
+            $start = CarbonImmutable::now()->subDay();
+            $end = CarbonImmutable::now()->addDays($days);
+            $calendar = Reader::read(
+                $this->trimIcal($body, $start, $end),
+                Reader::OPTION_FORGIVING | Reader::OPTION_IGNORE_INVALID_LINES,
+            );
             if (!$calendar instanceof VCalendar) {
                 throw new WidgetFetchException('invalid_response');
             }
-            $start = CarbonImmutable::now()->subDay();
-            $end = CarbonImmutable::now()->addDays($days);
             $expanded = $calendar->expand($start, $end);
         } catch (WidgetFetchException $e) {
             throw $e;
@@ -260,6 +263,89 @@ class WidgetDataService
             'timezone' => (string) ($calendar->{'X-WR-TIMEZONE'} ?? ''),
             'events'   => array_slice($events, 0, config('widgets.fetch.ical_max_events')),
         ];
+    }
+
+    /**
+     * Cuts the events that cannot show up in [$start, $end] out of the raw
+     * feed before it is parsed. A church calendar accumulates years of past
+     * events and parsing the whole thing costs roughly 40× its size in
+     * memory; the window is a small fraction of it.
+     *
+     * Deliberately conservative — a date-only comparison with two days of
+     * slack either side (so time zones can't matter), and anything the text
+     * scan isn't sure about stays in:
+     *  - recurring events (RRULE/RDATE) are kept, they expand into the window;
+     *  - an edited instance (RECURRENCE-ID) is kept if either its new date or
+     *    the date it replaces is in the window, or the original would reappear;
+     *  - an event with a DURATION instead of a DTEND is kept if it starts
+     *    within a month before the window.
+     * Everything outside the VEVENTs (time zones, calendar properties) is
+     * left exactly as it was.
+     */
+    private function trimIcal(string $body, CarbonImmutable $start, CarbonImmutable $end): string
+    {
+        $firstAt = strpos($body, 'BEGIN:VEVENT');
+        $lastAt = strrpos($body, 'END:VEVENT');
+        if ($firstAt === false || $lastAt === false || $lastAt < $firstAt) {
+            return $body;
+        }
+        $lastAt += strlen('END:VEVENT');
+
+        $from = $start->subDays(2)->format('Ymd');
+        $to = $end->addDays(2)->format('Ymd');
+        $durationFrom = $start->subDays(32)->format('Ymd');
+        $date = fn (string $event, string $prop) => preg_match('/^' . $prop . '[^:\n]*:(\d{8})/m', $event, $m) ? $m[1] : null;
+
+        $kept = [];
+        foreach (preg_split('/(?=^BEGIN:VEVENT)/m', substr($body, $firstAt, $lastAt - $firstAt), -1, PREG_SPLIT_NO_EMPTY) as $chunk) {
+            // The event itself, then anything between it and the next one.
+            $cut = strpos($chunk, 'END:VEVENT');
+            if ($cut === false) {
+                $kept[] = $chunk;
+                continue;
+            }
+            $cut += strlen('END:VEVENT');
+            $event = substr($chunk, 0, $cut);
+            $rest = substr($chunk, $cut);
+
+            $text = preg_replace('/\r?\n[ \t]/', '', $event);
+            $keep = $this->icalEventInWindow($text, $date, $from, $to, $durationFrom);
+            if ($keep) {
+                $kept[] = $event;
+            }
+            // The line break after a kept event is needed; after a dropped
+            // one only a real component (e.g. a time zone) is.
+            if ($keep || trim($rest) !== '') {
+                $kept[] = $rest;
+            }
+        }
+
+        return substr($body, 0, $firstAt) . implode('', $kept) . substr($body, $lastAt);
+    }
+
+    private function icalEventInWindow(string $text, \Closure $date, string $from, string $to, string $durationFrom): bool
+    {
+        if (preg_match('/^(RRULE|RDATE)[:;]/m', $text)) {
+            return true;
+        }
+        $dtStart = $date($text, 'DTSTART');
+        if ($dtStart === null) {
+            return true;
+        }
+        $dtEnd = $date($text, 'DTEND');
+        if ($dtEnd === null && preg_match('/^DURATION[:;]/m', $text)) {
+            // End unknown without parsing the duration: assume a recent start can reach the window.
+            $dtEnd = $dtStart >= $durationFrom ? '99991231' : $dtStart;
+        }
+        $dtEnd ??= $dtStart;
+        $overlaps = $dtEnd >= $from && $dtStart <= $to;
+
+        $replaced = $date($text, 'RECURRENCE-ID');
+        if ($replaced !== null) {
+            return $overlaps || ($replaced >= $from && $replaced <= $to);
+        }
+
+        return $overlaps;
     }
 
     private function sortKey(array $event): string

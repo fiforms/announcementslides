@@ -54,7 +54,7 @@ return [
     'fetch' => [
         'timeout_seconds'   => 5,
         'max_redirects'     => 3,
-        'max_bytes'         => ['ical' => 5 * 1024 * 1024, 'json' => 2 * 1024 * 1024, 'text' => 2 * 1024 * 1024],
+        'max_bytes'         => ['ical' => 20 * 1024 * 1024, 'json' => 2 * 1024 * 1024, 'text' => 2 * 1024 * 1024],
         'min_ttl'           => 60,
         'default_ttl'       => 300,
         // How long a last-good response keeps being served when the
