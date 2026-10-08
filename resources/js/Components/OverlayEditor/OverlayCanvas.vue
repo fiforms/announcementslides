@@ -2,6 +2,7 @@
 import { computed, inject, onBeforeUnmount, onMounted, ref } from 'vue';
 import OverlayElement from './OverlayElement.vue';
 import { ASPECT_LOCKED, CANVAS } from '@/Composables/overlay/model.js';
+import { resolveSizing } from '@/Composables/overlay/widgetSizing.js';
 
 // The 1920×1080 editing surface: the slide itself as a reference backdrop
 // (not part of the overlay), the elements, invisible hit areas for
@@ -14,6 +15,7 @@ const props = defineProps({
 const emit = defineEmits(['edit-selected']);
 
 const editor = inject('overlayEditor');
+const widgetCatalog = inject('widgetCatalog', null);
 const svgEl = ref(null);
 const unitsPerPx = ref(1);
 
@@ -78,10 +80,10 @@ function onPointerMove(evt) {
     if (handle.includes('w')) w = orig.w - dx;
     if (handle.includes('s')) h = orig.h + dy;
     if (handle.includes('n')) h = orig.h - dy;
-    w = Math.max(MIN_SIZE, w);
-    h = Math.max(MIN_SIZE, h);
-
     const el = editor.find(gesture.id);
+    const sizing = el.type === 'widget' ? resolveSizing(widgetCatalog?.value?.[el.widget], el.params) : null;
+    w = Math.max(MIN_SIZE, sizing?.minWidth ?? 0, w);
+    h = Math.max(MIN_SIZE, h);
     const lockedType = el.type === 'widget' ? !!el.aspectLocked : ASPECT_LOCKED.has(el.type);
     const keepAspect = el.type === 'qr' || (lockedType !== evt.shiftKey);
     if (keepAspect) {
@@ -90,10 +92,23 @@ function onPointerMove(evt) {
         else h = w / ratio;
     }
 
+    if (sizing?.aspect) {
+        // Widgets accept a range of ratios, not just one: pull the dimension
+        // the user isn't dragging back inside it.
+        const { min, max } = sizing.aspect;
+        const vertical = handle === 'n' || handle === 's';
+        if (vertical) w = Math.min(Math.max(w, h * min), h * max);
+        else h = Math.min(Math.max(h, w / max), w / min);
+        if (vertical && sizing.minWidth && w < sizing.minWidth) {
+            w = sizing.minWidth;
+            h = Math.min(Math.max(h, w / max), w / min);
+        }
+    }
+
     if (handle.includes('w')) x = orig.x + orig.w - w;
     if (handle.includes('n')) y = orig.y + orig.h - h;
-    if (keepAspect && (handle === 'n' || handle === 's')) x = orig.x + (orig.w - w) / 2;
-    if (keepAspect && (handle === 'e' || handle === 'w')) y = orig.y + (orig.h - h) / 2;
+    if ((keepAspect || sizing?.aspect) && (handle === 'n' || handle === 's')) x = orig.x + (orig.w - w) / 2;
+    if ((keepAspect || sizing?.aspect) && (handle === 'e' || handle === 'w')) y = orig.y + (orig.h - h) / 2;
 
     editor.update(gesture.id, { x: Math.round(x), y: Math.round(y), w: Math.round(w), h: Math.round(h) }, false);
 }

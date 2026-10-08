@@ -83,7 +83,7 @@ class SlideAnnouncerWidgetsTest extends TestCase
         $slide = collect($response->json('shows.0.slides'))->firstWhere('id', $this->slide->id);
         $this->assertSame($this->overlay->id, $slide['overlay_media_id']);
         $this->assertSame('calendar', $slide['widgets'][0]['widget']);
-        $this->assertSame('1.0.2', $slide['widgets'][0]['version']);
+        $this->assertSame('1.2.0', $slide['widgets'][0]['version']);
         $this->assertSame(800, $slide['widgets'][0]['w']);
         $this->assertArrayNotHasKey('data_url', $slide['widgets'][0]);
 

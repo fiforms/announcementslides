@@ -143,6 +143,7 @@ class Widget extends Model
             'entry_url'    => $this->entryUrl(),
             'default_size' => $m['defaultSize'] ?? ['w' => 400, 'h' => 300],
             'aspect_locked' => (bool) ($m['aspectLocked'] ?? false),
+            'sizing'       => $m['sizing'] ?? null,
             'parameters'   => collect($m['parameters'] ?? [])->map(function ($p, $key) {
                 return array_filter([
                     'allow'     => $p['type'] === 'url' ? $this->allowFor($key) : null,

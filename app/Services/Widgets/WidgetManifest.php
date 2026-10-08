@@ -68,6 +68,8 @@ class WidgetManifest
             $errors[] = '"aspectLocked" must be true or false.';
         }
 
+        $sizing = null;
+
         if (isset($m['usesLocation']) && !is_bool($m['usesLocation'])) {
             $errors[] = '"usesLocation" must be true or false.';
         }
@@ -79,6 +81,11 @@ class WidgetManifest
         }
         foreach ($params as $key => $p) {
             $errors = [...$errors, ...self::validateParam((string) $key, $p)];
+        }
+
+        if (isset($m['sizing'])) {
+            [$sizing, $sizingErrors] = self::validateSizing($m['sizing'], $params);
+            $errors = [...$errors, ...$sizingErrors];
         }
 
         $settings = $m['settings'] ?? [];
@@ -116,10 +123,107 @@ class WidgetManifest
             'defaultSize'  => ['w' => $size['w'], 'h' => $size['h']],
             'aspectLocked' => (bool) ($m['aspectLocked'] ?? false),
             'usesLocation' => (bool) ($m['usesLocation'] ?? false),
+            'sizing'       => $sizing,
             'parameters'   => $params,
             'settings'     => $settings,
             'endpoints'    => $endpoints,
         ];
+    }
+
+    /**
+     * "sizing" limits the boxes a widget can be drawn in: an `aspect` range
+     * (width ÷ height), and a `minWidth` as a fraction of the slide's width.
+     * `by` names an enum parameter whose value picks a per-mode override in
+     * `modes`; an override replaces only the fields it names.
+     *
+     * @return array{0: ?array, 1: string[]}
+     */
+    private static function validateSizing(mixed $s, array $params): array
+    {
+        if (!is_array($s) || array_is_list($s)) {
+            return [null, ['"sizing" must be an object.']];
+        }
+
+        $errors = [];
+        $unknown = array_diff(array_keys($s), ['aspect', 'minWidth', 'by', 'modes']);
+        if ($unknown) {
+            $errors[] = '"sizing" has unknown keys: ' . implode(', ', $unknown) . '.';
+        }
+
+        [$base, $baseErrors] = self::validateSizingRule($s, '"sizing"');
+        $errors = [...$errors, ...$baseErrors];
+
+        $by = $s['by'] ?? null;
+        $modes = [];
+        if ($by !== null || isset($s['modes'])) {
+            $options = is_string($by) && ($params[$by]['type'] ?? null) === 'enum' ? $params[$by]['options'] : null;
+            if ($options === null) {
+                $errors[] = '"sizing.by" must name an enum parameter when "sizing.modes" is used.';
+            } elseif (!is_array($s['modes'] ?? null) || array_is_list($s['modes'])) {
+                $errors[] = '"sizing.modes" must be an object keyed by the values of "' . $by . '".';
+            } else {
+                foreach ($s['modes'] as $value => $rule) {
+                    if (!in_array((string) $value, array_map('strval', $options), true)) {
+                        $errors[] = "\"sizing.modes\": \"{$value}\" isn't an option of \"{$by}\".";
+                        continue;
+                    }
+                    if (!is_array($rule) || array_is_list($rule)) {
+                        $errors[] = "\"sizing.modes.{$value}\" must be an object.";
+                        continue;
+                    }
+                    // An entry replaces whole keys of the top level, so it only
+                    // has to be valid on its own.
+                    [$rule, $ruleErrors] = self::validateSizingRule($rule, "\"sizing.modes.{$value}\"");
+                    $errors = [...$errors, ...$ruleErrors];
+                    if (!$ruleErrors) {
+                        $modes[(string) $value] = $rule;
+                    }
+                }
+            }
+        }
+
+        if ($errors) {
+            return [null, $errors];
+        }
+
+        return [
+            $base || $modes ? array_filter(['aspect' => $base['aspect'] ?? null, 'minWidth' => $base['minWidth'] ?? null, 'by' => $modes ? $by : null, 'modes' => $modes ?: null], fn ($v) => $v !== null) : null,
+            [],
+        ];
+    }
+
+    /** @return array{0: array, 1: string[]} */
+    private static function validateSizingRule(array $r, string $where): array
+    {
+        $errors = [];
+        $out = [];
+
+        if (isset($r['aspect'])) {
+            $a = $r['aspect'];
+            // A bare number pins the ratio; an object gives a range. Either
+            // side of the range may be left out.
+            if (is_int($a) || is_float($a)) {
+                $a = ['min' => $a, 'max' => $a];
+            }
+            $min = is_array($a) ? ($a['min'] ?? 0.05) : null;
+            $max = is_array($a) ? ($a['max'] ?? 20) : null;
+            $num = fn ($v) => (is_int($v) || is_float($v)) && $v >= 0.05 && $v <= 20;
+            if (!is_array($a) || !$num($min) || !$num($max) || $min > $max) {
+                $errors[] = "{$where}: \"aspect\" must be a ratio, or {\"min\", \"max\"} with 0.05 ≤ min ≤ max ≤ 20 (width ÷ height).";
+            } else {
+                $out['aspect'] = ['min' => $min + 0, 'max' => $max + 0];
+            }
+        }
+
+        if (isset($r['minWidth'])) {
+            if (!(is_int($r['minWidth']) || is_float($r['minWidth'])) || $r['minWidth'] <= 0 || $r['minWidth'] > 1) {
+                $errors[] = "{$where}: \"minWidth\" must be a fraction of the slide width, above 0 and at most 1.";
+            } else {
+                $out['minWidth'] = $r['minWidth'] + 0;
+            }
+        }
+
+        return [$out, $errors];
     }
 
     private static function validateParam(string $key, mixed $p): array

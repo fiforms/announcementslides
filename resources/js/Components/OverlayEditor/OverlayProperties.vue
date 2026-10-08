@@ -1,7 +1,8 @@
 <script setup>
-import { computed, inject, nextTick, ref } from 'vue';
+import { computed, inject, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
 import { BACKGROUND_OPACITY_TYPES, FONTS } from '@/Composables/overlay/model.js';
+import { fitBox, resolveSizing } from '@/Composables/overlay/widgetSizing.js';
 
 // Edits the selected element's fields in place; `change` events (which
 // bubble, and fire once an edit is finished) record an undo step.
@@ -12,6 +13,16 @@ const textArea = ref(null);
 const el = computed(() => editor.selected.value);
 const widgetCatalog = inject('widgetCatalog', null);
 const widget = computed(() => el.value?.type === 'widget' ? widgetCatalog?.value?.[el.value.widget] ?? null : null);
+
+// Changing a parameter (a widget's mode) can change the sizes it accepts.
+// Snap the box into the new rules; the `change` event that follows records
+// it in the same undo step as the parameter.
+watch(() => resolveSizing(widget.value, el.value?.params), sizing => {
+    if (!sizing || !el.value || el.value.type !== 'widget') return;
+    const { x, y, w, h } = el.value;
+    const fitted = fitBox({ x, y, w, h }, sizing);
+    if (fitted.w !== w || fitted.h !== h) editor.update(el.value.id, fitted, false);
+}, { flush: 'sync' });
 
 // Text, QR codes and rectangles fade only their background (and only have
 // the slider while they have one); images and imported artwork fade whole.
