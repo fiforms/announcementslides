@@ -6,6 +6,8 @@
         "build": "vite build",
         "dev": "vite",
         "test:slideannouncer": "PRODUCT_ROOT=$PWD/kiosk-products/slideannouncer slideannouncer/local-app/run-tests.sh -q",
+        "hotfix:new:slideannouncer": "kiosk-products/slideannouncer/hotfixes/new.sh",
+        "hotfix:slideannouncer": "kiosk-products/slideannouncer/hotfixes/build.sh",
         "package:slideannouncer": "PRODUCT_ROOT=$PWD/kiosk-products/slideannouncer slideannouncer/local-app/package.sh",
         "build:slideannouncer": "npm run test:slideannouncer && PRODUCT_ROOT=$PWD/kiosk-products/slideannouncer slideannouncer/image-builder/build.sh"
     },

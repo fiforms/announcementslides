@@ -44,7 +44,10 @@ function formatDateTime(iso) {
 // convenience to auto-fill the form; the server re-validates everything
 // on finalize() regardless.
 function parseReleaseFilename(filename) {
-    const match = /^slideannouncer-(\d+\.\d+\.\d+)(?:\.hotfix\.from\.(\d+\.\d+\.\d+))?\.(?:raucb|tar\.gz|img\.xz)$/i.exec(filename);
+    // Versions are <platform X.Y.Z> or the pair <platform>_<product>.
+    const v = '\\d+\\.\\d+\\.\\d+(?:_\\d+\\.\\d+\\.\\d+)?';
+    const match = new RegExp(`^slideannouncer-(${v})(?:\\.hotfix\\.from\\.(${v}))?\\.(?:raucb|tar\\.gz|img\\.xz)$`, 'i').exec(filename)
+        ?? new RegExp(`^slide-announcer-local-app-(${v})(?:-.+)?\\.tar\\.gz$`, 'i').exec(filename);
     if (!match) return null;
     const [, version, base] = match;
     return {
@@ -272,12 +275,12 @@ async function copyToClipboard(text, which) {
                     <div class="grid grid-cols-2 gap-4">
                         <label class="block">
                             <span class="text-sm font-medium text-gray-700">{{ $t('slide_announcers.version') }}</span>
-                            <input type="text" v-model="version" :disabled="isUploading" :placeholder="$t('slide_announcers.placeholder_eg', { example: '2026.08.1 / 0.2.0' })"
+                            <input type="text" v-model="version" :disabled="isUploading" :placeholder="$t('slide_announcers.placeholder_eg', { example: '0.4.0_0.1.1 / 0.2.0' })"
                                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
                         </label>
                         <label class="block" v-if="releaseType === 'hotfix'">
                             <span class="text-sm font-medium text-gray-700">{{ $t('slide_announcers.required_base_version') }}</span>
-                            <input type="text" v-model="requiredBaseVersion" :disabled="isUploading" :placeholder="$t('slide_announcers.placeholder_eg', { example: '1.2.0' })"
+                            <input type="text" v-model="requiredBaseVersion" :disabled="isUploading" :placeholder="$t('slide_announcers.placeholder_eg', { example: '0.4.0_0.1.0' })"
                                 class="mt-1 block w-full rounded-lg border-gray-300 shadow-sm">
                             <span class="text-xs text-gray-500">{{ $t('slide_announcers.required_base_help') }}</span>
                         </label>

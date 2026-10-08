@@ -105,8 +105,8 @@ class SlideAnnouncerReleaseController extends Controller
             'uploads.0.disk_path' => ['required', 'string', 'regex:#^slide-announcer/uploads/[0-9a-f\-]{36}\.(raucb|tar\.gz|img\.xz)$#'],
             'kind' => ['required', 'string', Rule::in(SlideAnnouncerRelease::KINDS)],
             'release_type' => ['required', 'string', Rule::in(SlideAnnouncerRelease::RELEASE_TYPES)],
-            'version' => ['required', 'string', 'regex:/^\d+\.\d+\.\d+$/'],
-            'required_base_version' => ['required_if:release_type,hotfix', 'nullable', 'string', 'regex:/^\d+\.\d+\.\d+$/'],
+            'version' => ['required', 'string', 'regex:/^' . SlideAnnouncerRelease::VERSION_PATTERN . '$/'],
+            'required_base_version' => ['required_if:release_type,hotfix', 'nullable', 'string', 'regex:/^' . SlideAnnouncerRelease::VERSION_PATTERN . '$/'],
             'architecture' => 'required|string|max:64',
             // Optional initial tag — a release can be published untagged
             // (archived from the moment it lands) or tagged immediately,

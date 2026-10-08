@@ -816,7 +816,8 @@ server, not this repo).
   tarball onto `/data/local-app/releases/<version>/` + swaps `current` —
   but **only if `/data` has no local-app installed yet, or an older one
   than what's embedded in this image; it never downgrades** (comparing
-  only the release's `X.Y.Z`, not its git-hash build suffix). This one
+  only the release's version pair, `<platform>_<product>`, not its git-hash build
+  suffix — see `docs/PRODUCTS.md`). This one
   mechanism covers both "fresh card" (nothing installed, seed
   unconditionally) and "a RAUC OS update ships a newer local-app than
   what's on `/data`" (picked up automatically on the reboot into the new

@@ -17,6 +17,14 @@ class SlideAnnouncerRelease extends Model
     // never an OTA candidate.
     const RELEASE_TYPES = ['full', 'hotfix', 'disk_image'];
 
+    /**
+     * A release/device version: <platform X.Y.Z> optionally paired with the
+     * product's own version as <platform>_<product> (0.4.0_0.1.1). A plain
+     * X.Y.Z is a version from before products had their own, and counts as
+     * product 0.0.0. Regex source, for validation rules and filename parsing.
+     */
+    const VERSION_PATTERN = '\d+\.\d+\.\d+(?:_\d+\.\d+\.\d+)?';
+
     protected $fillable = [
         'kind',
         'version',
@@ -77,8 +85,40 @@ class SlideAnnouncerRelease extends Model
     }
 
     /**
-     * Parses a filename like "slideannouncer-1.2.0.raucb" or
-     * "slideannouncer-1.2.1.hotfix.from.1.2.0.raucb" into version/
+     * [platform X, Y, Z, product X, Y, Z] from the leading
+     * <platform>[_<product>] of a version string (whatever follows is
+     * ignored, e.g. the git-hash suffix a device's app version carries), with
+     * 0.0.0 for a missing product part; null if it doesn't start like one.
+     * Compares correctly as an array: platform first, then product.
+     */
+    public static function versionCore(?string $version): ?array
+    {
+        if ($version === null || ! preg_match('/^(\d+)\.(\d+)\.(\d+)(?:_(\d+)\.(\d+)\.(\d+))?/', $version, $m)) {
+            return null;
+        }
+
+        return array_map('intval', array_pad(array_slice($m, 1), 6, 0));
+    }
+
+    /**
+     * Orders two versions by their platform+product pair. Anything that
+     * doesn't parse falls back to PHP's version_compare().
+     */
+    public static function compareVersions(string $a, string $b): int
+    {
+        $coreA = static::versionCore($a);
+        $coreB = static::versionCore($b);
+
+        return $coreA && $coreB ? $coreA <=> $coreB : version_compare($a, $b);
+    }
+
+    /**
+     * Parses a filename like "slideannouncer-1.2.0.raucb", a pair-versioned
+     * "slideannouncer-0.4.0_0.1.1.raucb", or
+     * "slideannouncer-1.2.1.hotfix.from.1.2.0.raucb" (versions may be pairs
+     * in both places), or a local-app build archive
+     * "slide-announcer-local-app-0.4.0_0.1.1-<hash>….tar.gz" (as
+     * local-app/package.sh names it), into version/
      * release_type/required_base_version. Returns null for anything else
      * — the admin GUI falls back to manual entry when this doesn't match,
      * it never blocks the upload. kind/release_type still stay explicit
@@ -87,11 +127,13 @@ class SlideAnnouncerRelease extends Model
      */
     public static function parseFilename(string $filename): ?array
     {
-        $pattern = '/^slideannouncer-(?<version>\d+\.\d+\.\d+)'
-            . '(?:\.hotfix\.from\.(?<base>\d+\.\d+\.\d+))?'
+        $v = self::VERSION_PATTERN;
+        $pattern = "/^slideannouncer-(?<version>{$v})"
+            . "(?:\\.hotfix\\.from\\.(?<base>{$v}))?"
             . '\.(?:raucb|tar\.gz|img\.xz)$/i';
+        $appArchive = "/^slide-announcer-local-app-(?<version>{$v})(?:-.+)?\\.tar\\.gz$/i";
 
-        if (! preg_match($pattern, $filename, $matches)) {
+        if (! preg_match($pattern, $filename, $matches) && ! preg_match($appArchive, $filename, $matches)) {
             return null;
         }
 

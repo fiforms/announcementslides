@@ -157,6 +157,10 @@ and is built into the platform with `PRODUCT_ROOT`. The server side of the
 pairing/heartbeat contract is the `SlideAnnouncer*Controller`s; see
 `slideannouncer/docs/DEVICE_CONTRACT.md` and `PRODUCTS.md`.
 
+### Device and release versions
+
+A device's version is the pair `<platform>_<product>` (e.g. `0.4.1_0.1.0`), with an underscore so it is safe in file names and URLs. The local app is `local-app/VERSION` + the product's `VERSION`; the OS image is `image-builder/VERSION` + the product's `image/VERSION` (see `slideannouncer/docs/PRODUCTS.md`). The server treats a plain `X.Y.Z` (a device from before pairs) as product `0.0.0`. [SlideAnnouncerRelease](app/Models/SlideAnnouncerRelease.php) accepts both forms in uploads and filenames (`VERSION_PATTERN`, `parseFilename()`, which also reads a local-app archive's name), orders them platform-then-product (`compareVersions()`, used by the heartbeat to decide a full release is newer), and matches hotfixes by **exact** `required_base_version`. So a product-only change (`0.4.0_0.1.0` → `0.4.0_0.1.1`) and a platform-only one (`0.4.0_0.1.0` → `0.4.1_0.1.0`) are each a release or hotfix of their own.
+
 ## Frontend layout
 
 Under [resources/js/](resources/js/):

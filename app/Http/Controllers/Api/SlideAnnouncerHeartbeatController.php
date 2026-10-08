@@ -166,6 +166,6 @@ class SlideAnnouncerHeartbeatController extends Controller
             return $release->version !== $currentVersion;
         }
 
-        return $currentVersion === null || version_compare($release->version, $currentVersion, '>');
+        return $currentVersion === null || SlideAnnouncerRelease::compareVersions($release->version, $currentVersion) > 0;
     }
 }
