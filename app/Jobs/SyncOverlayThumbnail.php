@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Storage;
 
 /**
  * Keeps Slide::overlay_thumbnail_path in sync with the slide's current
- * primary + overlay media: when both exist, flattens the overlay on top of
+ * primary + overlay media: when both exist (or only the overlay does — a slide
+ * with no image, drawn on black), flattens the overlay on top of
  * the primary's thumbnail (same "stack and object-contain" compositing as
  * the lightbox/slideshow) into one JPEG, so every place that just renders
  * Slide::thumbnail_url (cards, rows, listings) shows the combined image
@@ -42,15 +43,20 @@ class SyncOverlayThumbnail implements ShouldQueue
         $primary = $slide->primaryMedia;
         $overlay = $slide->overlayMedia;
 
-        if (!$primary?->thumbnail_path || !$overlay) {
+        // A slide with an image waits for that image's own thumbnail; one with
+        // no image at all gets its overlay (and widget stand-ins) on black.
+        if (!$overlay || ($primary && !$primary->thumbnail_path)) {
             $this->clear($slide);
             return;
         }
 
         $disk = Storage::disk('public');
         $destRelPath = "thumbs/{$slide->id}-composite.jpg";
+        $base = $primary ? $disk->path($primary->thumbnail_path) : null;
+        // Same width as every other thumbnail (GenerateThumbnail), 16:9.
+        $size = $primary ? [null, null] : [600, 338];
 
-        if ($compositor->flatten($disk->path($primary->thumbnail_path), $overlay, $disk->path($destRelPath))) {
+        if ($compositor->flatten($base, $overlay, $disk->path($destRelPath), ...$size)) {
             $slide->update(['overlay_thumbnail_path' => $destRelPath]);
         }
     }

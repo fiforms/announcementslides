@@ -112,4 +112,24 @@ class SyncOverlayThumbnailTest extends TestCase
 
         $this->assertNull($slide->refresh()->overlay_thumbnail_path);
     }
+
+    public function test_an_overlay_alone_is_flattened_onto_black_for_a_slide_with_no_image(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $slide = Slide::create(['title' => 'S', 'status' => 'published', 'uploaded_by' => $user->id]);
+        $this->putPngWithAlpha('slides/overlay.png');
+        $slide->media()->create([
+            'media_type' => 'slide-overlay', 'filename' => 'overlay.png', 'original_filename' => 'overlay.png',
+            'disk_path' => 'slides/overlay.png', 'file_size' => 10, 'mime_type' => 'image/png',
+        ]);
+
+        (new SyncOverlayThumbnail($slide->id))->handle(new OverlayCompositor());
+
+        $slide->refresh();
+        $this->assertNotNull($slide->overlay_thumbnail_path);
+        [$w, $h] = getimagesize(Storage::disk('public')->path($slide->overlay_thumbnail_path));
+        $this->assertSame([600, 338], [$w, $h]);
+        $this->assertStringContainsString($slide->overlay_thumbnail_path, $slide->thumbnail_url);
+    }
 }

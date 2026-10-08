@@ -368,16 +368,15 @@ class SlideController extends Controller
         $disk = Storage::disk('public');
 
         foreach ($slides as $slide) {
+            // A slide may have no image: its overlay (and widget stand-ins) is
+            // then drawn on black. With neither, there's nothing to export.
             $media = $slide->primaryMedia;
-            if (! $media) {
-                continue;
-            }
-            $fullPath = $disk->path($media->disk_path);
+            $fullPath = $media ? $disk->path($media->disk_path) : null;
 
             // Videos aren't embedded yet — export a full-size still frame
             // instead, falling back to the small listing thumbnail if ffmpeg
-            // can't produce one (and skipping the slide if there's neither).
-            if ($media->isVideo()) {
+            // can't produce one (and drawing no base if there's neither).
+            if ($media?->isVideo()) {
                 $framePath = sys_get_temp_dir() . '/slide-frame-' . Str::uuid() . '.jpg';
                 if ($frames->extract($fullPath, $framePath, logContext: ['slide_media_id' => $media->id])) {
                     $tempImages[] = $framePath;
@@ -385,7 +384,7 @@ class SlideController extends Controller
                 } elseif ($media->thumbnail_path) {
                     $fullPath = $disk->path($media->thumbnail_path);
                 } else {
-                    continue;
+                    $fullPath = null;
                 }
             }
 
@@ -400,7 +399,7 @@ class SlideController extends Controller
                 }
             }
 
-            if (file_exists($fullPath)) {
+            if ($fullPath && file_exists($fullPath)) {
                 $newSlide = $presentation->createSlide();
 
                 // Set black background

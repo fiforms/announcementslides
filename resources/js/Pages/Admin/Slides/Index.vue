@@ -84,7 +84,7 @@ function formatBytes(bytes) {
 }
 
 async function submitUpload() {
-    if (!selectedFiles.value.length || !form.title) return;
+    if (!selectedFiles.value.length && !form.title) return;
 
     const payload = {
         title:            form.title,
@@ -271,8 +271,8 @@ function statusBadge(status) {
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div class="sm:col-span-2">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.caption_title') }} <span class="text-red-500">*</span></label>
-                        <input v-model="form.title" type="text" required
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('admin.caption_title') }} <span v-if="!selectedFiles.length" class="text-red-500">*</span></label>
+                        <input v-model="form.title" type="text"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                             placeholder="e.g. Camp Meeting 2026" />
                         <p v-if="form.errors.title" class="mt-1 text-xs text-red-600">{{ form.errors.title }}</p>
@@ -365,9 +365,9 @@ function statusBadge(status) {
                 </div>
 
                 <div class="flex gap-3 pt-2">
-                    <button type="submit" :disabled="busy || !selectedFiles.length || !form.title"
+                    <button type="submit" :disabled="busy || (!selectedFiles.length && !form.title)"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                        {{ resize.isResizing.value ? 'Resizing…' : isUploading ? `${$t('admin.uploading')} ${overallProgress}%` : $t('upload.btn_upload', { n: selectedFiles.length }) }}
+                        {{ resize.isResizing.value ? 'Resizing…' : isUploading ? `${$t('admin.uploading')} ${overallProgress}%` : selectedFiles.length ? $t('upload.btn_upload', { n: selectedFiles.length }) : $t('upload.btn_create') }}
                     </button>
                     <button type="button" :disabled="busy" @click="showUploadPanel = false"
                         class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">

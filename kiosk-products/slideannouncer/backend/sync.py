@@ -24,6 +24,11 @@ slide's stored file in place without changing its storage path, so a URL
 change is a reliable proxy for "content changed" without a real version
 field.
 
+A slide may have no image at all (`file_url` null: overlay and/or widgets
+only, or just an invisible placeholder). It has no cached base file
+(`local_filename` None), and the playlist keeps it only if it has an overlay
+or widgets to show.
+
 `overlay_url` is a slide's optional 'slide-overlay' media (made in the
 overlay editor or uploaded from the Media Manager), cached as
 `<id>-overlay.<ext>` and drawn over the slide by Slideshow.vue. A slide's
@@ -258,25 +263,36 @@ def _build_active_playlist(manifest: dict) -> list:
         frame = _playlist_frame(show.get("frame"), widget_index)
         # A background video plays alone — never two videos at once.
         skip_video = bool(frame and ((frame["mime_type"] or "").startswith("video/") or frame["youtube_url"]))
-        slides = [
-            {
+        slides = []
+        # dict insertion order (preserved through json dump/load) is the
+        # server's display order for this show — no sort key to apply.
+        for entry in show.get("slides", {}).values():
+            if _is_expired(entry, now):
+                continue
+            if skip_video and (entry.get("mime_type") or "").startswith("video/"):
+                continue
+            base = entry.get("local_filename")
+            base_ok = bool(base) and (MEDIA_DIR / base).exists()
+            overlay = entry.get("overlay_local_filename")
+            overlay_ok = bool(overlay) and (MEDIA_DIR / overlay).exists()
+            placements = widgets.placements_for_playlist(entry, widget_index)
+            # A slide with no image still plays if it has an overlay or
+            # widgets; one with nothing to show is left out (an invisible
+            # placeholder on the server).
+            if not (base_ok or overlay_ok or placements):
+                continue
+            slides.append({
                 "id": entry["id"],
                 # Language code (None = untagged, shows for everyone). Every
                 # language is synced; main.py's slideshow() filters by the
                 # device's current language at read time.
                 "language": entry.get("language"),
-                "media_url": f"/media/{entry['local_filename']}",
-                "mime_type": entry.get("mime_type"),
+                "media_url": f"/media/{base}" if base_ok else None,
+                "mime_type": entry.get("mime_type") if base_ok else None,
                 "video_playback_mode": entry.get("video_playback_mode"),
-                "overlay_media_url": f"/media/{entry['overlay_local_filename']}" if entry.get("overlay_local_filename") else None,
-                "widgets": widgets.placements_for_playlist(entry, widget_index),
-            }
-            # dict insertion order (preserved through json dump/load) is the
-            # server's display order for this show — no sort key to apply.
-            for entry in show.get("slides", {}).values()
-            if not _is_expired(entry, now) and (MEDIA_DIR / entry["local_filename"]).exists()
-            and not (skip_video and (entry.get("mime_type") or "").startswith("video/"))
-        ]
+                "overlay_media_url": f"/media/{overlay}" if overlay_ok else None,
+                "widgets": placements,
+            })
         shows.append({"id": show_id, "name": show.get("name"), "is_main": bool(show.get("is_main")), "slides": slides, "frame": frame})
     return shows
 
@@ -342,13 +358,18 @@ async def sync_once() -> None:
                     slides_manifest[slide_id] = downloaded_this_cycle[slide_id]
                     continue
 
-                local_filename = _local_filename(slide)
+                # A slide with no image (overlay/widgets only) has no file_url.
+                file_url = slide.get("file_url")
+                local_filename = _local_filename(slide) if file_url else None
                 previous = old_flat.get(slide_id)
-                changed = previous is None or previous.get("file_url") != slide["file_url"]
+                changed = bool(file_url) and (previous is None or previous.get("file_url") != file_url)
+                if not file_url and previous and previous.get("local_filename"):
+                    # The image was removed from this slide server-side.
+                    (MEDIA_DIR / previous["local_filename"]).unlink(missing_ok=True)
 
                 if changed:
                     try:
-                        await _download(client, slide["file_url"], MEDIA_DIR / local_filename)
+                        await _download(client, file_url, MEDIA_DIR / local_filename)
                     except httpx.HTTPError:
                         # Keep whatever was already cached for this id rather
                         # than dropping the slide over one bad download — it'll
@@ -401,7 +422,8 @@ async def sync_once() -> None:
     # cached media, same as the old flat-list behavior.
     for slide_id, entry in old_flat.items():
         if slide_id not in seen_slide_ids:
-            (MEDIA_DIR / entry["local_filename"]).unlink(missing_ok=True)
+            if entry.get("local_filename"):
+                (MEDIA_DIR / entry["local_filename"]).unlink(missing_ok=True)
             if entry.get("overlay_local_filename"):
                 (MEDIA_DIR / entry["overlay_local_filename"]).unlink(missing_ok=True)
 

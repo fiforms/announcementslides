@@ -26,6 +26,11 @@ const showValidationDetails = ref(false);
             :class="[dimmed ? 'border-gray-100 bg-gray-50 opacity-75' : 'border-gray-200', draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer']">
             <div class="relative h-10 w-16 flex-shrink-0 rounded overflow-hidden bg-slate-100">
                 <img v-if="slide.thumbnail_url" :src="slide.thumbnail_url" class="h-full w-full object-cover" />
+                <div v-else-if="!slide.file_url && !slide.overlay_url"
+                    class="flex h-full w-full items-center justify-center bg-slate-200 text-slate-400"
+                    :title="$t('show_manage.slide_invisible')">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A9.8 9.8 0 0112 5c4.5 0 8.3 3 9.5 7a10 10 0 01-2.3 3.8M6.2 6.2A10 10 0 002.5 12c1.2 4 5 7 9.5 7 1.6 0 3.1-.4 4.4-1" /></svg>
+                </div>
                 <button v-if="slide.validation_issues?.length" @click.stop="showValidationDetails = !showValidationDetails"
                     class="absolute top-0.5 right-0.5" :title="$t('show_manage.quality_warnings')">
                     <svg class="h-4 w-4 text-yellow-400 drop-shadow" fill="currentColor" viewBox="0 0 20 20">

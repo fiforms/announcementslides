@@ -109,7 +109,8 @@ const previewSrc = computed(() => {
         </div>
 
         <!-- Download button -->
-        <div v-if="showDownload" class="px-3 pb-3" @click.stop>
+        <!-- A slide with no image has no file to download. -->
+        <div v-if="showDownload && slide.file_url" class="px-3 pb-3" @click.stop>
             <a :href="route('slides.download', slide.id)"
                 class="flex items-center justify-center gap-1.5 w-full rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors">
                 <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

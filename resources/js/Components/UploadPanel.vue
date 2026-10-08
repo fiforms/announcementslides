@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import DropZone from '@/Components/DropZone.vue';
@@ -52,7 +52,11 @@ const targetShowId  = ref('');
 const newShowName   = ref('');
 
 const busy = computed(() => isUploading.value || resize.isResizing.value);
-const canSubmit = computed(() => selectedFiles.value.length > 0 && title.value.trim());
+// An image, or at least a title: a slide may have no image (overlay/widgets
+// only, or a placeholder), but we don't want blank entries in the list.
+const canSubmit = computed(() => selectedFiles.value.length > 0 || !!title.value.trim());
+// Nearby sharing vouches for an image, so it needs one.
+watch(() => selectedFiles.value.length, n => { if (!n) shareNearby.value = false; });
 
 async function onFilesSelected(files) {
     selectedFiles.value = files;
@@ -221,10 +225,11 @@ async function submit() {
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="sm:col-span-2">
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('upload.title_label') }} <span class="text-red-500">*</span></label>
-                    <input v-model="title" type="text" required
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('upload.title_label') }} <span v-if="!selectedFiles.length" class="text-red-500">*</span></label>
+                    <input v-model="title" type="text"
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         :placeholder="$t('show_manage.title_placeholder')" />
+                    <p v-if="!selectedFiles.length" class="mt-1 text-xs text-gray-500">{{ $t('upload.no_image_hint') }}</p>
                 </div>
 
                 <div class="sm:col-span-2">
@@ -310,10 +315,11 @@ async function submit() {
 
                 <div v-if="entityId" class="sm:col-span-2">
                     <label class="flex items-start gap-2">
-                        <input v-model="shareNearby" type="checkbox"
-                            class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                        <input v-model="shareNearby" type="checkbox" :disabled="!selectedFiles.length"
+                            class="mt-0.5 disabled:opacity-50 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
                         <span class="text-sm font-medium text-gray-700">{{ $t('show_manage.share_nearby') }}</span>
                     </label>
+                    <p v-if="!selectedFiles.length" class="mt-1 text-xs text-gray-500">{{ $t('upload.share_needs_image') }}</p>
                     <div v-if="shareNearby" class="mt-2 rounded-lg bg-indigo-50 border border-indigo-200 px-4 py-3 text-sm text-indigo-800">
                         {{ $t('show_manage.share_nearby_info') }}
                         <p class="mt-2 text-xs text-indigo-700">{{ $t('show_manage.share_nearby_quality') }}</p>
@@ -328,7 +334,7 @@ async function submit() {
             <div class="flex gap-3 pt-2">
                 <button type="submit" :disabled="busy || !canSubmit"
                     class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                    {{ resize.isResizing.value ? $t('show_manage.resizing') : isUploading ? $t('upload.btn_uploading', { pct: overallProgress }) : $t('upload.btn_upload', { n: selectedFiles.length }) }}
+                    {{ resize.isResizing.value ? $t('show_manage.resizing') : isUploading ? $t('upload.btn_uploading', { pct: overallProgress }) : selectedFiles.length ? $t('upload.btn_upload', { n: selectedFiles.length }) : $t('upload.btn_create') }}
                 </button>
             </div>
         </form>

@@ -84,7 +84,9 @@ class ChunkedUploadController extends Controller
     public function finalize(Request $request, ImageValidationService $validationService)
     {
         $request->validate([
-            'uploads'                     => 'required|array|min:1',
+            // No files at all creates a slide with no image (overlay and/or
+            // widgets only, or just a title); it then needs a title.
+            'uploads'                     => 'sometimes|array',
             'uploads.*.filename'          => ['required', 'string', 'regex:/^[0-9a-f\-]{36}\.[a-z0-9]+$/'],
             'uploads.*.disk_path'         => ['required', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.[a-z0-9]+$/'],
             'uploads.*.original_filename' => 'required|string|max:255',
@@ -102,7 +104,7 @@ class ChunkedUploadController extends Controller
             'uploads.*.resize.original.original_filename' => 'required_with:uploads.*.resize|string|max:255',
             'uploads.*.resize.original.file_size'  => 'required_with:uploads.*.resize|integer|min:0',
             'uploads.*.resize.original.mime_type'  => ['required_with:uploads.*.resize', 'string', Rule::in(['image/jpeg', 'image/png', 'image/webp'])],
-            'title'                       => 'required|string|max:255',
+            'title'                       => ['nullable', 'string', 'max:255', Rule::requiredIf(empty($request->input('uploads')))],
             'notes'                       => 'nullable|string',
             'text_description'            => 'nullable|string',
             'link'                        => 'nullable|url|max:2048',
@@ -118,6 +120,7 @@ class ChunkedUploadController extends Controller
             'global_template_id'          => 'nullable|integer|exists:global_show_templates,id',
         ]);
 
+        $uploads  = $request->input('uploads', []);
         $user     = $request->user();
         $entityId = null;
         $status   = 'published';
@@ -141,7 +144,8 @@ class ChunkedUploadController extends Controller
         }
 
         // Nearby sharing only applies to entity-scoped (local) slides.
-        $shareNearby = $entityId !== null && $request->boolean('share_nearby');
+        // ...and only with an image: a slide with none has no quality to vouch for.
+        $shareNearby = $entityId !== null && $request->boolean('share_nearby') && !empty($uploads);
 
         // Contributors and viewers may not publish/submit global slides (no
         // entity) that fail any quality check — those are hard-blocked rather
@@ -156,7 +160,7 @@ class ChunkedUploadController extends Controller
         $validated = [];
         $blocked   = [];
 
-        foreach ($request->uploads as $upload) {
+        foreach ($uploads as $upload) {
             if (!Storage::disk('public')->exists($upload['disk_path'])) {
                 return response()->json(['message' => 'Assembled file not found: ' . $upload['original_filename']], 422);
             }
@@ -185,7 +189,7 @@ class ChunkedUploadController extends Controller
         if (!empty($blocked)) {
             // Remove the orphaned assembled files — there is no slide record to
             // own them, and the user must upload an acceptable replacement.
-            foreach ($request->uploads as $upload) {
+            foreach ($uploads as $upload) {
                 Storage::disk('public')->delete(array_filter([
                     $upload['disk_path'],
                     $upload['resize']['original']['disk_path'] ?? null,
@@ -200,9 +204,12 @@ class ChunkedUploadController extends Controller
 
         $slides = [];
 
-        foreach ($validated as [$upload, $validation, $originalValidation]) {
+        // With no uploads, one slide with no image.
+        foreach ($validated ?: [[null, null, null]] as [$upload, $validation, $originalValidation]) {
             $slide = Slide::create([
-                'title'             => $request->title,
+                'title'             => filled($request->title)
+                    ? $request->title
+                    : trim(preg_replace('/[-_]+/', ' ', pathinfo($upload['original_filename'], PATHINFO_FILENAME))),
                 'notes'             => $request->notes,
                 'text_description'  => $request->text_description,
                 'link'              => $request->link,
@@ -214,6 +221,11 @@ class ChunkedUploadController extends Controller
                 'language_id'       => $request->language_id,
                 'share_nearby'      => $shareNearby,
             ]);
+
+            if (!$upload) {
+                $slides[] = $slide;
+                continue;
+            }
 
             $media = $slide->media()->create([
                 'media_type'        => 'slide',

@@ -120,6 +120,11 @@ class SlideAnnouncerLanguageSyncTest extends TestCase
         $en = Slide::create(['title' => 'English', 'status' => 'published', 'uploaded_by' => $by, 'language_id' => $this->en->id]);
         $untagged = Slide::create(['title' => 'Untagged', 'status' => 'published', 'uploaded_by' => $by]);
         foreach ([$es, $en, $untagged] as $slide) {
+            // A slide with no image or overlay is invisible to players, so give each one.
+            $slide->media()->create([
+                'media_type' => 'slide', 'filename' => "{$slide->id}.jpg", 'original_filename' => 'a.jpg',
+                'disk_path' => "slides/{$slide->id}.jpg", 'file_size' => 1, 'mime_type' => 'image/jpeg',
+            ]);
             Show::syncAutoFillForSlide($slide);
         }
 

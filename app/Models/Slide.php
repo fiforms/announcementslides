@@ -67,9 +67,10 @@ class Slide extends Model
     }
 
     /**
-     * The slide's primary ('slide' type) media row. Every Slide has exactly
-     * one, seeded at creation time; this is what the file_url/thumbnail_url/
-     * mime_type/etc. proxy accessors below resolve against.
+     * The slide's primary ('slide' type) media row — its image or video, or
+     * null for a slide with no image (overlay/widgets only, or hidden). This
+     * is what the file_url/thumbnail_url/mime_type/etc. proxy accessors
+     * below resolve against.
      */
     public function primaryMedia()
     {
@@ -86,6 +87,22 @@ class Slide extends Model
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
+
+    /**
+     * Slides with something to show: an image/video, or an overlay (widgets
+     * live on the overlay row). Players leave the rest out — a slide with
+     * nothing is an invisible placeholder that stays in the show for editing.
+     */
+    public function scopeWithContent(Builder $query): Builder
+    {
+        return $query->where(fn ($q) => $q->whereHas('primaryMedia')->orWhereHas('overlayMedia'));
+    }
+
+    /** Slides that have a base image/video (what the legacy flat device sync needs). */
+    public function scopeWithBase(Builder $query): Builder
+    {
+        return $query->whereHas('primaryMedia');
+    }
 
     /** Slides whose primary media is not a video (see Show::skipsVideoSlides()). */
     public function scopeWithoutVideo(Builder $query): Builder

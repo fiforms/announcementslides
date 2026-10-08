@@ -57,6 +57,10 @@ function toggleShareNearby(slide) {
     // Turning sharing ON requires the slide to meet quality requirements, since
     // it will appear on nearby congregations' dashboards. The server enforces
     // this too; this is just immediate feedback.
+    if (!slide.share_nearby && !slide.file_url) {
+        alert('A slide with no image can\'t be shared with nearby churches.');
+        return;
+    }
     if (!slide.share_nearby && slide.validation_status && slide.validation_status !== 'ok') {
         alert(
             'This slide can\'t be shared with nearby churches because it doesn\'t meet the quality requirements:\n\n'
@@ -174,8 +178,9 @@ function statusBadge(status) {
                                         Edit
                                     </Link>
                                     <button @click="toggleShareNearby(slide)"
-                                        :title="slide.share_nearby ? 'Stop sharing with nearby churches' : 'Share with nearby churches'"
-                                        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors"
+                                        :title="slide.share_nearby ? 'Stop sharing with nearby churches' : !slide.file_url ? 'A slide with no image can\'t be shared' : 'Share with nearby churches'"
+                                        :disabled="!slide.share_nearby && !slide.file_url"
+                                        class="rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                         :class="slide.share_nearby
                                             ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                                             : 'border-gray-300 text-gray-700 hover:bg-gray-50'">

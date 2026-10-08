@@ -83,12 +83,16 @@ trait ManagesSlideMedia
     {
         abort_unless($media->slide_id === $slide->id, 404);
 
-        if ($media->media_type === 'slide' && $slide->media()->where('media_type', 'slide')->count() <= 1) {
-            abort(422, 'A slide must keep at least one "slide" media file.');
-        }
-
         Storage::disk('public')->delete($media->allFilePaths());
         $media->delete();
+
+        // A slide may have no image (overlay/widgets only, or hidden), but then
+        // it can't be shared with nearby churches: there's no image to vouch for.
+        if ($media->media_type === 'slide' && $slide->share_nearby
+            && !$slide->media()->where('media_type', 'slide')->exists()) {
+            $slide->update(['share_nearby' => false]);
+            Show::removeAutoAddedLinksElsewhere($slide, exceptEntityId: $slide->entity_id);
+        }
 
         SyncOverlayThumbnail::dispatch($slide->id);
     }

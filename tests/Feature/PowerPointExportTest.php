@@ -166,4 +166,31 @@ class PowerPointExportTest extends TestCase
         $this->assertCount(1, $images);
         $this->assertSame(Storage::disk('public')->get('thumbs/base.jpg'), $images[0]);
     }
+
+    public function test_a_slide_with_no_image_draws_its_overlay_on_black(): void
+    {
+        Storage::fake('public');
+        $slide = $this->makeSlide(withOverlay: true);
+        $slide->primaryMedia->delete();
+
+        $images = $this->exportedImages($slide->fresh());
+
+        $this->assertCount(1, $images);
+        $img = imagecreatefromstring($images[0]);
+        $this->assertSame([1920, 1080], [imagesx($img), imagesy($img)]);
+        $rgb = fn (int $x, int $y) => [(imagecolorat($img, $x, $y) >> 16) & 255, (imagecolorat($img, $x, $y) >> 8) & 255, imagecolorat($img, $x, $y) & 255];
+        $this->assertSame([0, 0, 0], $rgb(20, 20));
+        $center = $rgb(960, 540);
+        $this->assertGreaterThan(200, $center[0]);
+        $this->assertLessThan(60, $center[2]);
+    }
+
+    public function test_a_slide_with_neither_image_nor_overlay_is_left_out(): void
+    {
+        Storage::fake('public');
+        $slide = $this->makeSlide(withOverlay: false);
+        $slide->primaryMedia->delete();
+
+        $this->assertCount(0, $this->exportedImages($slide->fresh()));
+    }
 }

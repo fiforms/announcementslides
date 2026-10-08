@@ -81,17 +81,22 @@ class RevelationSnapshotBuilder
         $position = 0;
 
         foreach ($slides as $slide) {
-            $media = $slide->primaryMedia;
-            if (! $media || ! file_exists($disk->path($media->disk_path))) {
+            // A slide may have no image: it is exported if it has an overlay
+            // (with its widgets); one with neither has nothing to show.
+            $media   = $slide->primaryMedia;
+            $overlay = $slide->overlayMedia;
+            $hasBase    = $media && file_exists($disk->path($media->disk_path));
+            $hasOverlay = $overlay && file_exists($disk->path($overlay->disk_path));
+            if (! $hasBase && ! $hasOverlay) {
                 continue;
             }
             $position++;
 
-            $baseName = self::entryName($position, $total, $media->downloadName());
-            $files[$baseName] = $disk->path($media->disk_path);
-
-            $overlay = $slide->overlayMedia;
-            if (! $overlay || ! file_exists($disk->path($overlay->disk_path))) {
+            if ($hasBase) {
+                $baseName = self::entryName($position, $total, $media->downloadName());
+                $files[$baseName] = $disk->path($media->disk_path);
+            }
+            if (! $hasOverlay) {
                 $sections[] = $this->image('fill', $baseName);
                 continue;
             }
@@ -100,7 +105,9 @@ class RevelationSnapshotBuilder
             $overlayName = self::entryName($position, $total, "overlay.{$ext}");
             $files[$overlayName] = $disk->path($overlay->disk_path);
 
-            $section = $this->image('fill:background', $baseName) . "\n\n" . $this->image('fill', $overlayName);
+            $section = $hasBase
+                ? $this->image('fill:background', $baseName) . "\n\n" . $this->image('fill', $overlayName)
+                : $this->image('fill', $overlayName);
             $installed = Widget::enabledBySlug();
             foreach ($this->widgets->forDevice($overlay) as $placement) {
                 $usesLocation = (bool) ($installed[$placement['widget']]->manifest['usesLocation'] ?? false);
@@ -253,13 +260,13 @@ class RevelationSnapshotBuilder
     /** The first slide's stored composite thumbnail, else its primary's. */
     private function thumbnailPath(Collection $slides): ?string
     {
-        $first = $slides->first(fn (Slide $s) => $s->primaryMedia);
+        $first = $slides->first(fn (Slide $s) => $s->primaryMedia || $s->overlayMedia);
         if (! $first) {
             return null;
         }
 
         $disk = Storage::disk('public');
-        foreach ([$first->overlay_thumbnail_path, $first->primaryMedia->thumbnail_path] as $rel) {
+        foreach ([$first->overlay_thumbnail_path, $first->primaryMedia?->thumbnail_path] as $rel) {
             if ($rel && $disk->exists($rel)) {
                 return $disk->path($rel);
             }

@@ -46,6 +46,10 @@ function toggleShareNearby() {
     // Turning sharing ON requires the slide to meet quality requirements, since
     // it will appear on nearby congregations' dashboards. The server enforces
     // this too; this is just immediate feedback.
+    if (!props.slide.share_nearby && !props.slide.file_url) {
+        alert('A slide with no image can\'t be shared with nearby churches.');
+        return;
+    }
     if (!props.slide.share_nearby && props.slide.validation_status && props.slide.validation_status !== 'ok') {
         alert(
             'This slide can\'t be shared with nearby churches because it doesn\'t meet the quality requirements:\n\n'
@@ -127,10 +131,12 @@ function toggleShareNearby() {
                 <div>
                     <label class="flex items-center gap-2">
                         <input :checked="slide.share_nearby" @change="toggleShareNearby" type="checkbox"
-                            class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
+                            :disabled="!slide.share_nearby && !slide.file_url"
+                            class="rounded disabled:opacity-50 border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500" />
                         <span class="text-sm font-medium text-gray-700">Share with nearby churches</span>
                     </label>
-                    <p class="mt-1 text-xs text-gray-500">When on, this slide can appear on nearby churches' dashboards if they enable "include nearby".</p>
+                    <p class="mt-1 text-xs text-gray-500">When on, this slide can appear on nearby churches' dashboards if they enable "include nearby".
+                        <span v-if="!slide.file_url">Needs an image.</span></p>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">

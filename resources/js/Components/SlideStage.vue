@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, ref, watch } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import WidgetLayer from '@/Components/Widgets/WidgetLayer.vue';
 
 // One slide's full visual stack: media, overlay image and widget layer.
@@ -24,7 +24,9 @@ const READY_TIMEOUT_MS = 20000;
 
 const videoEl = ref(null);
 
-const waiting = new Set(['media']);
+// A slide may have no image (overlay/widgets only): then there's no media to wait for.
+const waiting = new Set();
+if (props.slide.file_url) waiting.add('media');
 if (props.slide.overlay_url) waiting.add('overlay');
 if (props.slide.overlay_widgets?.length) waiting.add('widgets');
 
@@ -49,6 +51,9 @@ async function finish() {
 function settle(name) {
     if (waiting.delete(name) && !waiting.size) finish();
 }
+
+// Nothing to wait for (e.g. a slide with no image and no overlay): ready now.
+onMounted(() => { if (!waiting.size) finish(); });
 
 const timeout = setTimeout(() => {
     if (done) return;
@@ -97,7 +102,7 @@ defineExpose({ videoEl });
 <template>
     <div class="absolute inset-0 transition-opacity duration-1000 ease-in-out" :class="visible ? 'opacity-100' : 'opacity-0'">
         <video
-            v-if="slide.mime_type?.startsWith('video/')"
+            v-if="slide.file_url && slide.mime_type?.startsWith('video/')"
             ref="videoEl"
             :src="slide.file_url"
             :loop="slide.video_playback_mode === 'loop'"
@@ -109,7 +114,7 @@ defineExpose({ videoEl });
             @ended="emit('ended')"
         />
         <img
-            v-else
+            v-else-if="slide.file_url"
             :src="slide.file_url"
             :alt="slide.title"
             class="absolute inset-0 h-full w-full object-contain"

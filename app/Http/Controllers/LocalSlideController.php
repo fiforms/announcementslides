@@ -170,7 +170,10 @@ class LocalSlideController extends Controller
         $this->authorizeSlideAction($request, $slide);
 
         // Shared slides appear on other congregations' dashboards, so they must
-        // clear the same quality bar enforced at upload time.
+        // clear the same quality bar enforced at upload time — which needs an image.
+        if (!$slide->primaryMedia) {
+            return back()->with('error', 'This slide can\'t be shared with nearby churches because it has no image.');
+        }
         if ($slide->validation_status !== 'ok') {
             return back()->with('error',
                 'This slide can\'t be shared with nearby churches because it doesn\'t meet the quality requirements: '

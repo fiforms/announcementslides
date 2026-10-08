@@ -57,10 +57,9 @@ function formatBytes(bytes) {
     return `${n.toFixed(n < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
 }
 
-function isLastPrimary(media) {
-    return media.media_type === 'slide'
-        && props.slide.media.filter(m => m.media_type === 'slide').length <= 1;
-}
+// A slide may have no image: removing the Slide file leaves the slide in its
+// show (shown only if it has an overlay or widgets).
+const hasBase = computed(() => props.slide.media.some(m => m.media_type === 'slide'));
 
 async function onFileSelected(event) {
     const file = event.target.files?.[0];
@@ -159,7 +158,10 @@ function switchVersion(media, version) {
 }
 
 function removeMedia(media) {
-    if (!confirm(t('show_manage.media_remove_confirm', { type: labelFor(media.media_type) }))) return;
+    const message = media.media_type === 'slide'
+        ? t('show_manage.media_remove_base_confirm')
+        : t('show_manage.media_remove_confirm', { type: labelFor(media.media_type) });
+    if (!confirm(message)) return;
     router.delete(route(props.destroyRoute, { ...props.routeParams, slide: props.slide.id, media: media.id }), {
         preserveScroll: true,
         preserveState: true,
@@ -171,6 +173,7 @@ function removeMedia(media) {
 <template>
     <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-4">
         <h3 class="text-sm font-semibold text-gray-900">{{ $t('show_manage.media_files') }}</h3>
+        <p v-if="!hasBase" class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">{{ $t('show_manage.media_no_base') }}</p>
 
         <ul class="divide-y divide-gray-100 rounded-lg border border-gray-200">
             <li v-for="media in slide.media" :key="media.id"
@@ -234,9 +237,8 @@ function removeMedia(media) {
                     class="rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50">
                     {{ $t('show_manage.media_download') }}
                 </a>
-                <button type="button" @click="removeMedia(media)" :disabled="isLastPrimary(media)"
-                    :title="isLastPrimary(media) ? $t('show_manage.media_keep_one') : $t('show_manage.media_remove')"
-                    class="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:cursor-not-allowed">
+                <button type="button" @click="removeMedia(media)" :title="$t('show_manage.media_remove')"
+                    class="rounded-lg border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50">
                     {{ $t('show_manage.media_remove') }}
                 </button>
             </li>

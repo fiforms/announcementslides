@@ -29,6 +29,8 @@ class SlideAnnouncerSyncController extends Controller
         $slides = Slide::with(['primaryMedia', 'overlayMedia'])
             ->orderedInShow($mainShow->id)
             ->current()
+            // The legacy kiosk build needs a file for every slide.
+            ->withBase()
             ->get()
             ->map(fn (Slide $slide) => $this->slideEntry($slide));
 
@@ -60,6 +62,7 @@ class SlideAnnouncerSyncController extends Controller
             'slides' => Slide::with(['primaryMedia', 'overlayMedia', 'language'])
                 ->orderedInShow($show->id)
                 ->current()
+                ->withContent()
                 ->when($show->skipsVideoSlides(), fn ($q) => $q->withoutVideo())
                 ->get()
                 ->map(fn (Slide $slide) => $this->slideEntry($slide)),

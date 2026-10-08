@@ -59,6 +59,7 @@ class PlayController extends Controller
         $slides = Slide::with(['primaryMedia', 'overlayMedia'])
             ->orderedInShow($show->id)
             ->current()
+            ->withContent()
             ->language($link->language_id)
             // A background video plays alone: slides with videos are skipped.
             ->when($show->skipsVideoSlides(), fn ($q) => $q->withoutVideo())

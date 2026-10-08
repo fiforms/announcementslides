@@ -33,11 +33,13 @@ class OverlayCompositor
      * Writes $overlay composited over $basePath to $destPath as a JPEG.
      * The canvas is $canvasWidth x $canvasHeight on black (the base is
      * object-contained onto it), or the base's own size when omitted.
+     * With a null $basePath (a slide with no image) the overlay is drawn on
+     * plain black, 1920x1080 unless a canvas size is given.
      * Returns false (a no-op, not a fatal error) if either image can't be
      * decoded.
      */
     public function flatten(
-        string $basePath,
+        ?string $basePath,
         SlideMedia $overlay,
         string $destPath,
         ?int $canvasWidth = null,
@@ -45,17 +47,17 @@ class OverlayCompositor
         int $quality = 85,
     ): bool {
         $overlayPath = Storage::disk('public')->path($overlay->disk_path);
-        if (!file_exists($basePath) || !file_exists($overlayPath)) {
+        if (!file_exists($overlayPath) || ($basePath !== null && !file_exists($basePath))) {
             return false;
         }
 
-        $base = $this->decode($basePath);
-        if (!$base) {
+        $base = $basePath !== null ? $this->decode($basePath) : null;
+        if ($basePath !== null && !$base) {
             return false;
         }
 
-        $canvasWidth ??= imagesx($base);
-        $canvasHeight ??= imagesy($base);
+        $canvasWidth ??= $base ? imagesx($base) : 1920;
+        $canvasHeight ??= $base ? imagesy($base) : 1080;
 
         $rasterizedOverlayPath = $overlay->mime_type === 'image/svg+xml'
             ? $this->rasterizeSvg($overlayPath, $canvasWidth, $canvasHeight)
@@ -68,7 +70,7 @@ class OverlayCompositor
         }
 
         if (!$overlaySrc) {
-            imagedestroy($base);
+            $base && imagedestroy($base);
             return false;
         }
 
@@ -76,7 +78,7 @@ class OverlayCompositor
         imagefill($canvas, 0, 0, imagecolorallocate($canvas, 0, 0, 0));
         imagealphablending($canvas, true);
 
-        $this->drawContained($canvas, $base);
+        $base && $this->drawContained($canvas, $base);
         $this->drawContained($canvas, $overlaySrc);
         $this->drawWidgetStandIns($canvas, $overlay);
 
@@ -86,7 +88,7 @@ class OverlayCompositor
         }
         imagejpeg($canvas, $destPath, $quality);
 
-        imagedestroy($base);
+        $base && imagedestroy($base);
         imagedestroy($overlaySrc);
         imagedestroy($canvas);
 

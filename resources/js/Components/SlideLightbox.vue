@@ -116,9 +116,12 @@ async function copy(text, field) {
                         controls autoplay loop
                         class="w-full rounded-lg object-contain shadow-2xl"
                         :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
-                    <img v-else :src="slide.file_url || slide.thumbnail_url"
+                    <img v-else-if="slide.file_url || slide.thumbnail_url" :src="slide.file_url || slide.thumbnail_url"
                         :alt="slide.title"
                         class="w-full rounded-lg object-contain shadow-2xl"
+                        :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
+                    <!-- A slide with no image: a black 16:9 stage for its overlay and widgets. -->
+                    <div v-else class="aspect-video w-full rounded-lg bg-black shadow-2xl"
                         :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
                     <img v-if="slide.overlay_url" :src="slide.overlay_url" :alt="`${slide.title} overlay`"
                         class="pointer-events-none absolute inset-0 h-full w-full object-contain" />
