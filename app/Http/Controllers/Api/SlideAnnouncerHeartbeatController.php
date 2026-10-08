@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Language;
 use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerRelease;
-use App\Support\SlideAnnouncerVideoReceiver;
+use App\Support\SlideAnnouncer\HeartbeatExtensions;
 use Illuminate\Http\Request;
 
 class SlideAnnouncerHeartbeatController extends Controller
@@ -28,23 +28,11 @@ class SlideAnnouncerHeartbeatController extends Controller
             'os_version' => 'nullable|string|max:255',
             'architecture' => 'nullable|string|max:64',
             'cpu_temp_c' => 'nullable|numeric',
-            // Device-generated (never operator-typed — see
-            // kiosk-products/slideannouncer/backend/srt_sink.py), reported here
-            // purely so an admin can read it off the fleet dashboard to
-            // configure their SRT sender. Only present once the device has
-            // enabled SRT Sink locally at least once; absent otherwise, in
-            // which case the previously-stored value (if any) is left alone.
-            'srt_sink_passphrase' => 'nullable|string|max:255',
             // The device's own mDNS name (e.g. slideannouncer-123456, or a
             // slideannouncer.yaml override — see firstboot.py's
             // set_hostname()), reported every heartbeat so the fleet
-            // dashboard can build the same "Connect With" srt:// URL the
-            // device's own Settings > Video Receiver screen shows.
+            // dashboard can show how to reach the device on its LAN.
             'hostname' => 'nullable|string|max:255',
-            // The device's full LAN Video Receiver settings plus the last
-            // web-edit revision it applied — absent from older app versions.
-            // See App\Support\SlideAnnouncerVideoReceiver.
-            'srt_sink_config' => 'nullable|array',
             // A language the device's user picked locally (setup wizard or
             // Settings > Advanced) that the server hasn't seen yet, with the
             // `language_revision` the device had last synced when they
@@ -54,7 +42,7 @@ class SlideAnnouncerHeartbeatController extends Controller
             'language_change' => 'nullable|array',
             'language_change.code' => 'required_with:language_change|string|max:10',
             'language_change.base_revision' => 'required_with:language_change|integer|min:0',
-        ]);
+        ] + HeartbeatExtensions::rules());
 
         $device = $request->user();
         $ip = $request->ip();
@@ -74,14 +62,11 @@ class SlideAnnouncerHeartbeatController extends Controller
             'last_ip' => $ip,
             'last_cpu_temp_c' => $data['cpu_temp_c'] ?? $device->last_cpu_temp_c,
             'last_seen_at' => now(),
-            'srt_sink_passphrase' => $data['srt_sink_passphrase'] ?? $device->srt_sink_passphrase,
             'hostname' => $data['hostname'] ?? $device->hostname,
         ]);
 
-        if (isset($data['srt_sink_config'])) {
-            SlideAnnouncerVideoReceiver::absorbReport($device, $data['srt_sink_config']);
-            $device->save();
-        }
+        HeartbeatExtensions::absorb($device, $data);
+        $device->save();
 
         SlideAnnouncerHeartbeat::create([
             'slide_announcer_id' => $device->id,
@@ -132,16 +117,7 @@ class SlideAnnouncerHeartbeatController extends Controller
             // dance) without guessing from the URL/filename.
             'os_release_type' => $osUpdateAvailable ? $activeOsRelease->release_type : null,
             'os_auto_update_enabled' => $device->auto_update_enabled,
-            // Fleet-wide force-disable for SRT Sink (EntitySlideAnnouncerController::update) —
-            // an explicit false here always overrides the device's own local
-            // Settings toggle; see kiosk-products/slideannouncer/backend/srt_sink.py's
-            // effective_enabled() for how the device folds this in.
-            'srt_sink_enabled' => $device->srt_sink_enabled,
-            // Receiver settings edited on the Slide Announcer page, with the
-            // revision the device uses to tell a new edit from one it's
-            // already applied. Also sent with every slide sync.
-            'srt_sink_config' => SlideAnnouncerVideoReceiver::push($device),
-        ]);
+        ] + HeartbeatExtensions::respond($device));
     }
 
     /**
