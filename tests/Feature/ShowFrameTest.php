@@ -354,4 +354,41 @@ class ShowFrameTest extends TestCase
         $this->actingAs($admin)->get(route('admin.widgets.index'))
             ->assertInertia(fn ($page) => $page->where('widgets', fn ($w) => collect($w)->firstWhere('slug', 'clock')['used_by'] === 1));
     }
+
+    public function test_the_dashboard_slideshow_gets_the_frame_for_members_only(): void
+    {
+        $this->slide('image/jpeg', 'img');
+        $this->saveBase('video/mp4');
+        $this->saveOverlay([$this->element()])->assertSessionHasNoErrors();
+        $url = route('slides.index', ['entity_id' => $this->entity->id]);
+
+        $this->actingAs($this->leader)->get($url)->assertInertia(fn ($page) => $page
+            ->where('frame.mime_type', 'video/mp4')
+            ->where('frame.overlay_widgets.0.widget', 'clock')
+            ->where('frame.overlay_widgets.0.data_url', fn ($u) => str_contains($u, '/widget-data/')));
+
+        // A user from another church, a guest, and the global dashboard get none.
+        $this->actingAs(User::factory()->create())->get($url)->assertInertia(fn ($page) => $page->where('frame', null));
+        $this->app['auth']->forgetGuards();
+        $this->get($url)->assertInertia(fn ($page) => $page->where('frame', null));
+        $this->actingAs($this->leader)->get(route('slides.index'))->assertInertia(fn ($page) => $page->where('frame', null));
+    }
+
+    public function test_the_dashboard_lists_neither_empty_slides_nor_leaks_another_shows_frame(): void
+    {
+        $this->slide('image/jpeg', 'img');
+        $empty = Slide::create(['title' => 'Empty', 'status' => 'published', 'uploaded_by' => $this->leader->id, 'entity_id' => $this->entity->id]);
+        $this->show->slides()->attach($empty->id, ['sort_order' => 999999]);
+        $this->saveBase('image/jpeg');
+
+        $other = Entity::create(['name' => 'Entity B']);
+        $outsider = User::factory()->create();
+        $outsider->entities()->attach($other->id, ['role' => 'admin']);
+
+        $this->actingAs($this->leader)->get(route('slides.index', ['entity_id' => $this->entity->id]))
+            ->assertInertia(fn ($page) => $page->has('slides', 1));
+        // Naming this show while acting for another entity doesn't hand out its frame.
+        $this->actingAs($outsider)->get(route('slides.index', ['entity_id' => $other->id, 'show_id' => $this->show->id]))
+            ->assertInertia(fn ($page) => $page->where('frame', null));
+    }
 }

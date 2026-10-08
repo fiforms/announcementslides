@@ -18,6 +18,7 @@ const props = defineProps({
     selectedLanguage: { type: String, default: null },
     entityId: { type: Number, default: null },
     showId: { type: Number, default: null },
+    frame: { type: Object, default: null },
     availableShows: { type: Array, default: () => [] },
     initialSlide: { type: Object, default: null },
 });
@@ -141,13 +142,19 @@ function downloadRevelationAll() {
 const showSlideshow = ref(false);
 const slideshowSlides = ref([]);
 
+// With a background video (uploaded or YouTube) in the show's frame, slides
+// that are themselves videos are skipped, so two videos never play at once.
+const frameHasVideo = computed(() => !!props.frame && (!!props.frame.youtube_url || !!props.frame.mime_type?.startsWith('video/')));
+const playable = (list) => list.filter(s => (s.file_url || s.overlay_url)
+    && !(frameHasVideo.value && s.mime_type?.startsWith('video/')));
+
 function openSlideshowSelected() {
-    slideshowSlides.value = props.slides.filter(s => selectedIds.value.has(s.id));
+    slideshowSlides.value = playable(props.slides.filter(s => selectedIds.value.has(s.id)));
     showSlideshow.value = true;
 }
 
 function openSlideshowAll() {
-    slideshowSlides.value = props.slides;
+    slideshowSlides.value = playable(props.slides);
     showSlideshow.value = true;
 }
 
@@ -331,7 +338,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
             <p class="text-sm text-gray-400">{{ $t('slides.check_back_soon') }}</p>
         </div>
         <!-- Slideshow Modal -->
-        <SlideshowModal :show="showSlideshow" :slides="slideshowSlides" @close="showSlideshow = false" />
+        <SlideshowModal :show="showSlideshow" :slides="slideshowSlides" :frame="frame" @close="showSlideshow = false" />
         <RevelationInfoModal :show="showRevelationInfo" @close="showRevelationInfo = false" />
 
         <SlideLightbox :slide="lightboxSlide" :start-expanded="lightboxStartExpanded" @close="closeLightbox" />

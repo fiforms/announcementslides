@@ -17,6 +17,7 @@ use App\Support\WidgetLocation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use App\Services\ShowFrame;
 use Inertia\Inertia;
 use Inertia\Response;
 use PhpOffice\PhpPresentation\DocumentLayout;
@@ -87,9 +88,23 @@ class SlideController extends Controller
 
         // Shows hold every language, so the language selector is purely a
         // display filter (untagged slides always show).
+        // Slides with no image and no overlay are invisible placeholders kept
+        // in the show for editing; they aren't listed or played here.
         $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->orderedInShow($showId)->current()
+            ->withContent()
             ->language($languageId);
         $slides = $slidesQuery->get()->map(fn ($s) => $this->slideResource($s));
+
+        // The show's frame (background under, overlay + widgets over every
+        // slide) for the slideshow. Only an entity's own show has one, and
+        // its widgets' data is only readable by that entity's members, so
+        // it goes to them (and site admins) alone.
+        $user = $request->user();
+        $frameShow = $entityId ? Show::find($showId) : null;
+        $frame = $frameShow && $frameShow->entity_id === $entityId
+            && $user && ($user->isAdmin() || in_array($entityId, $user->memberEntityIds()))
+            ? app(ShowFrame::class)->forPlayer($frameShow)
+            : null;
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
@@ -109,6 +124,7 @@ class SlideController extends Controller
             'selectedLanguage' => $languageCode,
             'entityId' => $entityId,
             'showId' => $showId,
+            'frame' => $frame,
             'availableShows' => $availableShows,
             'initialSlide' => $initialSlide,
         ]);
