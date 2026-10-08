@@ -2,7 +2,7 @@
 # Scaffolds a new hotfix directory:
 #
 #   ./new.sh <required-version> <new-version> "<what it fixes>"
-#   (or: npm run hotfix:new:slideannouncer -- 0.4.0 0.4.1 "what it fixes")
+#   (or: npm run hotfix:new:product 0.4.1_0.1.0 0.4.1_0.1.1 "what it fixes")
 #
 # <required-version> must be exactly what /opt/slide-announcer/VERSION reads
 # on the devices it should patch, and <new-version> is what it becomes. Both
@@ -76,4 +76,4 @@ chmod +x "${DEST}/script.sh"
 echo "Created ${DEST}"
 echo "  1. put the files to patch under ${DEST}/files/ (same layout as the device's /)"
 echo "  2. edit build.sh's header comment (and script.sh, or delete it)"
-echo "  3. build: npm run hotfix:slideannouncer -- ${NEW}"
+echo "  3. build: npm run hotfix:build:product ${NEW}"

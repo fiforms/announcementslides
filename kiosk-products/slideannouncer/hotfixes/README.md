@@ -53,11 +53,11 @@ Devices from before pairs existed report a plain `0.4.0`; the platform's
 
 ```bash
 # bump kiosk-products/slideannouncer/image/VERSION to 0.1.1 first, then:
-npm run hotfix:new:slideannouncer -- 0.4.1_0.1.0 0.4.1_0.1.1 "what it fixes"
+npm run hotfix:new:product 0.4.1_0.1.0 0.4.1_0.1.1 "what it fixes"
 # put the files to patch under kiosk-products/slideannouncer/hotfixes/0.4.1_0.1.1/files/
 #   (same layout as the device's /, e.g. files/etc/systemd/system/foo.service)
 # edit 0.4.1_0.1.1/build.sh's header comment, and script.sh (or delete it)
-npm run hotfix:slideannouncer -- 0.4.1_0.1.1
+npm run hotfix:build:product 0.4.1_0.1.1
 ```
 
 One directory per hotfix, named for the version it bumps *to*:
@@ -71,6 +71,14 @@ One directory per hotfix, named for the version it bumps *to*:
   the version bump, for things a file copy can't do. It is not chrooted: use
   `$ROOT` (`systemctl --root="$ROOT" enable foo.service`, `rm -f "$ROOT/etc/…"`).
   A nonzero exit aborts the hotfix before the version is bumped.
+
+## Commands
+
+| Command | Does |
+|---|---|
+| `npm run hotfix:new:product <required> <new> "what it fixes"` | scaffold a product hotfix directory |
+| `npm run hotfix:build:product <new>` | build one of this product's hotfixes (directory name, e.g. `0.4.1_0.1.1`) |
+| `npm run hotfix:build:core <version>` | build one of the platform's hotfixes from the submodule, for this product (directory name, e.g. `0.4.1`) |
 
 ## Building
 

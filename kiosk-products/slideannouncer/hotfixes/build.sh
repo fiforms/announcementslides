@@ -1,7 +1,7 @@
 #!/bin/bash
 # Builds one of this product's hotfix bundles:
 #
-#   ./build.sh <new-version>        (or: npm run hotfix:slideannouncer -- <new-version>)
+#   ./build.sh <new-version>        (or: npm run hotfix:build:product <new-version>)
 #
 # Runs <new-version>/build.sh with PRODUCT_ROOT set, so the bundle is
 # stamped with this product's RAUC `compatible` and named
