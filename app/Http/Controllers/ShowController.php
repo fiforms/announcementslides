@@ -148,6 +148,12 @@ class ShowController extends Controller
         abort_unless($show->entity_id === $entityId, 404);
         abort_if($show->is_main, 422, "The main show can't be deleted.");
 
+        // The show's frame files go with it.
+        $disk = Storage::disk('public');
+        $show->media->each(function (SlideMedia $m) use ($disk) {
+            $disk->delete($m->allFilePaths());
+            $m->delete();
+        });
         $show->delete();
 
         return redirect()->route('shows.index', ['entity_id' => $entityId])->with('success', 'Show deleted.');

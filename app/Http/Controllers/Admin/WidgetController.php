@@ -175,8 +175,10 @@ class WidgetController extends Controller
     private function usageCounts(): array
     {
         $counts = [];
-        SlideMedia::where('media_type', 'slide-overlay')->whereNotNull('overlay_settings')
-            ->whereHas('slide')
+        // Slide overlays and show frame overlays alike (a row whose slide or
+        // show has been deleted no longer counts).
+        SlideMedia::whereIn('media_type', ['slide-overlay', 'show-overlay'])->whereNotNull('overlay_settings')
+            ->where(fn ($q) => $q->whereHas('slide')->orWhereHas('show'))
             ->select('id', 'overlay_settings')
             ->each(function (SlideMedia $m) use (&$counts) {
                 foreach (collect($m->overlay_settings['widgets'] ?? [])->pluck('widget')->unique() as $slug) {

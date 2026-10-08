@@ -8,6 +8,7 @@ use App\Models\PlayLink;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideAnnouncer;
+use App\Models\SlideMedia;
 use App\Models\User;
 use App\Services\Widgets\HostResolver;
 use App\Services\Widgets\WidgetInstaller;
@@ -326,5 +327,31 @@ class ShowFrameTest extends TestCase
         $show = collect($sync->json('shows'))->firstWhere('id', (string) $this->show->id);
         $this->assertSame($url, $show['frame']['youtube_url']);
         $this->assertSame([$img->id], array_column($show['slides'], 'id'));
+    }
+
+    public function test_deleting_a_show_removes_its_frame_files(): void
+    {
+        $extra = Show::create(['entity_id' => $this->entity->id, 'name' => 'Extra', 'is_main' => false]);
+        $this->show = $extra;
+        $this->saveBase('image/jpeg');
+        $this->saveOverlay([$this->element()])->assertSessionHasNoErrors();
+        $paths = $extra->media->pluck('disk_path');
+        $this->assertCount(2, $paths);
+
+        $this->actingAs($this->leader)
+            ->delete(route('shows.destroy', ['show' => $extra->id, 'entity_id' => $this->entity->id]))
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame(0, SlideMedia::where('show_id', $extra->id)->count());
+        $paths->each(fn ($p) => Storage::disk('public')->assertMissing($p));
+    }
+
+    public function test_the_widgets_admin_page_counts_frame_placements(): void
+    {
+        $this->saveOverlay([$this->element()])->assertSessionHasNoErrors();
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)->get(route('admin.widgets.index'))
+            ->assertInertia(fn ($page) => $page->where('widgets', fn ($w) => collect($w)->firstWhere('slug', 'clock')['used_by'] === 1));
     }
 }
