@@ -559,8 +559,8 @@ onUnmounted(() => {
 <template>
   <div class="kiosk">
     <ShowFrameLayer
-      v-if="frame?.media_url"
-      :key="`base:${frame.media_url}`"
+      v-if="frame?.media_url || frame?.youtube_url"
+      :key="`base:${frame.media_url || frame.youtube_url}`"
       :frame="frame"
       layer="base"
       :suspended="paused || externalPlaybackActive"

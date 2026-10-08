@@ -16,7 +16,7 @@ const props = defineProps({
     entity: { type: Object, required: true },
     shows: { type: Array, default: () => [] },
     selectedShowId: { type: Number, required: true },
-    frame: { type: Object, default: () => ({ id: null, media: [] }) },
+    frame: { type: Object, default: () => ({ id: null, media: [], youtube: null }) },
     showSlides: { type: Array, default: () => [] },
     unusedSlides: { type: Array, default: () => [] },
     isAdmin: { type: Boolean, default: false },
@@ -83,6 +83,21 @@ const showOverlayBackground = computed(() => {
 function closeShowOverlay() {
     if (showOverlayEditor.value?.isDirty() && !confirm(t('overlay_editor.confirm_discard'))) return;
     showOverlayOpen.value = false;
+}
+
+// A YouTube video/playlist as the background instead of a file. The server
+// parses the link (only the ids are kept) and rejects anything else.
+const youtubeForm = useForm({ url: '', muted: props.frame.youtube?.muted ?? false });
+watch(() => props.frame.youtube, (yt) => { youtubeForm.muted = yt?.muted ?? false; });
+function saveYoutube() {
+    youtubeForm.put(route('shows.youtube.save', { show: props.selectedShowId, entity_id: props.entity.id }), {
+        preserveScroll: true, only: ['frame'], onSuccess: () => youtubeForm.reset('url'),
+    });
+}
+function removeYoutube() {
+    if (!confirm(t('show_manage.frame_remove_confirm'))) return;
+    router.put(route('shows.youtube.save', { show: props.selectedShowId, entity_id: props.entity.id }),
+        { url: '' }, { preserveScroll: true, only: ['frame'] });
 }
 
 const frameFileInput = ref(null);
@@ -496,6 +511,33 @@ function persistLeaderOrder() {
                             class="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
                             {{ $t('show_manage.frame_remove') }}
                         </button>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-sm font-medium text-gray-700">{{ $t('show_manage.frame_youtube') }}</p>
+                        <form class="flex flex-wrap items-center gap-2" @submit.prevent="saveYoutube">
+                            <input v-model="youtubeForm.url" type="text" :placeholder="$t('show_manage.frame_youtube_placeholder')"
+                                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <label class="flex items-center gap-1 text-sm text-gray-700">
+                                <input v-model="youtubeForm.muted" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
+                                {{ $t('show_manage.frame_youtube_muted') }}
+                            </label>
+                            <button type="submit" :disabled="youtubeForm.processing || !youtubeForm.url"
+                                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                                {{ $t('show_manage.frame_youtube_use') }}
+                            </button>
+                            <button v-if="frame.youtube" type="button" @click="removeYoutube"
+                                class="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
+                                {{ $t('show_manage.frame_remove') }}
+                            </button>
+                        </form>
+                        <p v-if="youtubeForm.errors.url" class="text-xs text-red-600">{{ youtubeForm.errors.url }}</p>
+                        <p v-if="frame.youtube" class="text-xs text-gray-500">
+                            {{ $t(`show_manage.frame_youtube_current_${frame.youtube.kind}`, { id: frame.youtube.id }) }}
+                            <span v-if="frame.youtube.muted">· {{ $t('show_manage.frame_youtube_muted') }}</span>
+                        </p>
+                        <p v-if="frame.youtube" class="text-xs text-amber-700">{{ $t('show_manage.frame_video_note') }}</p>
+                        <p class="text-xs text-gray-500">{{ $t('show_manage.frame_youtube_hint') }}</p>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">

@@ -119,6 +119,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{show}/reorder', [ShowController::class, 'reorder'])->name('reorder');
         Route::get('/{show}/overlay', [ShowController::class, 'showOverlay'])->name('overlay.show');
         Route::put('/{show}/overlay', [ShowController::class, 'saveOverlay'])->name('overlay.save');
+        Route::put('/{show}/youtube', [ShowController::class, 'saveYoutube'])->name('youtube.save');
         Route::post('/{show}/media', [ShowController::class, 'storeMedia'])->name('media.store');
         Route::delete('/{show}/media/{media}', [ShowController::class, 'destroyMedia'])->name('media.destroy');
     });

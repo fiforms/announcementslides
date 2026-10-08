@@ -34,7 +34,8 @@ the playlist only lists placements whose bundle is on disk.
 A show's optional `frame` (a background image/video under every slide, and
 an overlay image + widgets over every slide) rides along in the show's
 manifest entry: its two files are cached as `show-<id>-base.<ext>` and
-`show-<id>-overlay.<ext>`, and the playlist's `frame` is what Slideshow.vue
+`show-<id>-overlay.<ext>` (a YouTube background is only a URL, nothing to
+cache), and the playlist's `frame` is what Slideshow.vue
 mounts once, outside the per-slide fade. With a background *video* the
 server sends no video slides at all (never two videos at once); the
 playlist builder drops any that linger from an older sync as well.
@@ -193,6 +194,9 @@ async def _sync_frame(client: httpx.AsyncClient, show_id: str, frame, previous) 
         "base_url": frame.get("file_url"),
         "base_local_filename": base,
         "mime_type": frame.get("mime_type"),
+        # A YouTube background is just a server-built embed URL (nothing to
+        # cache); the kiosk checks it before mounting an iframe.
+        "youtube_url": frame.get("youtube_url"),
         "overlay_url": frame.get("overlay_url"),
         "overlay_local_filename": overlay,
         "overlay_media_id": frame.get("overlay_media_id"),
@@ -214,9 +218,11 @@ def _playlist_frame(frame, widget_index: dict):
     base_ok = bool(base) and (MEDIA_DIR / base).exists()
     overlay_ok = bool(overlay) and (MEDIA_DIR / overlay).exists()
     placements = widgets.placements_for_playlist(frame, widget_index)
-    if not (base_ok or overlay_ok or placements):
+    youtube = frame.get("youtube_url")
+    if not (base_ok or overlay_ok or placements or youtube):
         return None
     return {
+        "youtube_url": youtube,
         "media_url": f"/media/{base}" if base_ok else None,
         "mime_type": frame.get("mime_type") if base_ok else None,
         "overlay_media_url": f"/media/{overlay}" if overlay_ok else None,
@@ -251,7 +257,7 @@ def _build_active_playlist(manifest: dict) -> list:
     for show_id, show in manifest.items():
         frame = _playlist_frame(show.get("frame"), widget_index)
         # A background video plays alone — never two videos at once.
-        skip_video = bool(frame and (frame["mime_type"] or "").startswith("video/"))
+        skip_video = bool(frame and ((frame["mime_type"] or "").startswith("video/") or frame["youtube_url"]))
         slides = [
             {
                 "id": entry["id"],

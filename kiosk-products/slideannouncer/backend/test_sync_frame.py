@@ -126,3 +126,17 @@ def test_a_background_video_drops_video_slides_from_the_playlist():
     playlist = sync._build_active_playlist(manifest_with(slides, entry))
 
     assert [s["id"] for s in playlist[0]["slides"]] == ["1"]
+
+
+def test_a_youtube_background_is_carried_without_a_file_and_drops_video_slides():
+    yt = "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ?playlist=dQw4w9WgXcQ&loop=1"
+    entry = run_sync("3", {**frame(base=None, overlay=None), "youtube_url": yt})
+
+    assert entry["youtube_url"] == yt and entry["base_local_filename"] is None
+    slides = {"1": slide("1", "image/jpeg"), "2": slide("2", "video/mp4")}
+
+    playlist = sync._build_active_playlist(manifest_with(slides, entry))
+
+    assert playlist[0]["frame"]["youtube_url"] == yt
+    assert playlist[0]["frame"]["media_url"] is None
+    assert [s["id"] for s in playlist[0]["slides"]] == ["1"]

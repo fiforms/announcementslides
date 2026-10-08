@@ -12,12 +12,14 @@ use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Support\NearbyEntities;
 use App\Support\SortZones;
+use App\Support\YoutubeSource;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -57,7 +59,11 @@ class ShowController extends Controller
                 'auto_fill_global' => $s->auto_fill_global, 'auto_fill_nearby' => $s->auto_fill_nearby,
             ]),
             'selectedShowId' => $selectedShow->id,
-            'frame' => ['id' => $selectedShow->id, 'media' => $this->mediaResource($selectedShow->load('media'))],
+            'frame' => [
+                'id' => $selectedShow->id,
+                'media' => $this->mediaResource($selectedShow->load('media')),
+                'youtube' => YoutubeSource::describe($selectedShow->frame_youtube),
+            ],
             'showSlides' => $showSlides->map(fn ($s) => $this->slideResource($s, $selectedShow->is_main)),
             'unusedSlides' => $unusedSlides->map(fn ($s) => $this->slideResource($s)),
             'isAdmin' => $isAdmin,
@@ -186,6 +192,9 @@ class ShowController extends Controller
         $disk = Storage::disk('public');
         abort_unless($disk->exists($request->disk_path), 422, 'Assembled file not found.');
 
+        // An uploaded background replaces a YouTube one, and vice versa.
+        $show->update(['frame_youtube' => null]);
+
         $old = $show->media()->where('media_type', 'show-base')->get();
         $media = $show->media()->create([
             'media_type'        => 'show-base',
@@ -201,6 +210,38 @@ class ShowController extends Controller
         });
 
         GenerateThumbnail::dispatch($media);
+
+        return back()->with('success', 'Show background saved.');
+    }
+
+    /**
+     * Sets (or, with an empty `url`, clears) a YouTube video or playlist as
+     * the show's background. Only the parsed ids are kept; it replaces any
+     * uploaded background.
+     */
+    public function saveYoutube(Request $request, Show $show)
+    {
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
+
+        $request->validate(['url' => 'nullable|string|max:500', 'muted' => 'boolean']);
+
+        if (!filled($request->input('url'))) {
+            $show->update(['frame_youtube' => null]);
+
+            return back()->with('success', 'Removed.');
+        }
+
+        $source = YoutubeSource::parse($request->input('url'));
+        if (!$source) {
+            throw ValidationException::withMessages(['url' => 'That is not a YouTube video or playlist link.']);
+        }
+
+        $disk = Storage::disk('public');
+        $show->media()->where('media_type', 'show-base')->get()->each(function (SlideMedia $m) use ($disk) {
+            $disk->delete($m->allFilePaths());
+            $m->delete();
+        });
+        $show->update(['frame_youtube' => $source + ['muted' => $request->boolean('muted')]]);
 
         return back()->with('success', 'Show background saved.');
     }

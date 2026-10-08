@@ -256,4 +256,75 @@ class ShowFrameTest extends TestCase
         $this->assertSame('clock', $show['frame']['widgets'][0]['widget']);
         $this->assertContains('clock', array_column($response->json('widgets'), 'slug'));
     }
+
+    // ── YouTube background ───────────────────────────────────────────────────
+
+    private function saveYoutube(string $url, bool $muted = false)
+    {
+        return $this->actingAs($this->leader)->put(
+            route('shows.youtube.save', ['show' => $this->show->id, 'entity_id' => $this->entity->id]),
+            ['url' => $url, 'muted' => $muted]
+        );
+    }
+
+    public function test_a_youtube_background_stores_only_ids_and_replaces_an_uploaded_one(): void
+    {
+        $this->saveBase('image/jpeg');
+
+        $this->saveYoutube('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=5s', muted: true)->assertSessionHasNoErrors();
+
+        $show = $this->show->fresh();
+        $this->assertSame(['video_id' => 'dQw4w9WgXcQ', 'muted' => true], $show->frame_youtube);
+        $this->assertNull($show->baseMedia);
+
+        // ...and uploading a file replaces the YouTube one.
+        $this->saveBase('image/jpeg');
+        $this->assertNull($this->show->fresh()->frame_youtube);
+        $this->assertNotNull($this->show->fresh()->baseMedia);
+
+        $this->saveYoutube('')->assertSessionHasNoErrors();
+        $this->assertNull($this->show->fresh()->frame_youtube);
+    }
+
+    public function test_a_link_that_is_not_youtube_is_rejected(): void
+    {
+        $this->saveYoutube('https://evil.example/watch?v=dQw4w9WgXcQ')->assertSessionHasErrors('url');
+        $this->saveYoutube('javascript:alert(1)')->assertSessionHasErrors('url');
+        $this->assertNull($this->show->fresh()->frame_youtube);
+    }
+
+    public function test_only_the_entitys_admins_can_set_a_youtube_background(): void
+    {
+        $viewer = User::factory()->create();
+        $viewer->entities()->attach($this->entity->id, ['role' => 'viewer']);
+
+        $this->actingAs($viewer)->put(
+            route('shows.youtube.save', ['show' => $this->show->id, 'entity_id' => $this->entity->id]),
+            ['url' => 'dQw4w9WgXcQ']
+        )->assertForbidden();
+    }
+
+    public function test_players_get_a_built_embed_url_and_video_slides_are_skipped(): void
+    {
+        $img = $this->slide('image/jpeg', 'img');
+        $this->slide('video/mp4', 'vid');
+        $this->saveYoutube('PLabcdefghijklmnopqrstuvwxyz012345', muted: true);
+        $link = PlayLink::create(['entity_id' => $this->entity->id, 'title' => 'Hall', 'delay_seconds' => 20]);
+        $this->app['auth']->forgetGuards();
+
+        $response = $this->getJson(route('play.slides', ['token' => $link->token]))->assertOk();
+        $this->assertSame([$img->id], array_column($response->json('slides'), 'id'));
+        $url = $response->json('frame.youtube_url');
+        $this->assertStringStartsWith('https://www.youtube-nocookie.com/embed/videoseries?list=PLabcdefghijklmnopqrstuvwxyz012345&', $url);
+        $this->assertStringContainsString('loop=1', $url);
+        $this->assertStringContainsString('mute=1', $url);
+        $this->assertNull($response->json('frame.file_url'));
+
+        $device = SlideAnnouncer::create(['entity_id' => $this->entity->id, 'name' => 'Lobby']);
+        $this->app['auth']->forgetGuards();
+        $sync = $this->withToken($device->createToken('d')->plainTextToken)->getJson('/api/slide-announcers/shows')->assertOk();
+        $show = collect($sync->json('shows'))->firstWhere('id', (string) $this->show->id);
+        $this->assertSame($url, $show['frame']['youtube_url']);
+        $this->assertSame([$img->id], array_column($show['slides'], 'id'));
+    }
 }

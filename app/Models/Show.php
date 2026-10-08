@@ -35,7 +35,7 @@ class Show extends Model
 
     protected $fillable = [
         'entity_id', 'global_template_id', 'name', 'is_main', 'language_id',
-        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'created_by',
+        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'created_by',
     ];
 
     protected function casts(): array
@@ -45,6 +45,7 @@ class Show extends Model
             'auto_fill_global' => 'boolean',
             'auto_fill_nearby' => 'boolean',
             'auto_delete_when_empty' => 'boolean',
+            'frame_youtube' => 'array',
         ];
     }
 
@@ -93,12 +94,13 @@ class Show extends Model
     }
 
     /**
-     * With a looping base video, slides that contain a video are left out of
-     * playback entirely: two videos at once would be heavy and mix audio.
+     * With a looping background video (an uploaded one or a YouTube
+     * video/playlist), slides that contain a video are left out of playback
+     * entirely: two videos at once would be heavy and mix audio.
      */
     public function skipsVideoSlides(): bool
     {
-        return (bool) $this->baseMedia?->isVideo();
+        return !empty($this->frame_youtube) || (bool) $this->baseMedia?->isVideo();
     }
 
     public static function mainFor(Entity $entity): self

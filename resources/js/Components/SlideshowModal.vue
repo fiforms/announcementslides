@@ -431,7 +431,7 @@ const handleShow = () => {
         <div v-if="show" ref="containerRef" class="fixed inset-0 bg-black z-50 flex items-center justify-center" :class="showControls ? 'cursor-auto' : 'cursor-none'" @mousemove="handleMouseMove">
             <!-- Slide Image -->
             <div class="relative w-full h-full flex items-center justify-center">
-                <ShowFrameLayer v-if="frame?.file_url" :frame="frame" layer="base" />
+                <ShowFrameLayer v-if="frame?.file_url || frame?.youtube_url" :frame="frame" layer="base" />
                 <SlideStage
                     v-for="stage in stages"
                     :key="stage.id"

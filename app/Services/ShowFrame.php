@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Show;
+use App\Support\YoutubeSource;
 use App\Services\Widgets\OverlayWidgets;
 
 /**
@@ -25,7 +26,8 @@ class ShowFrame
     public function forPlayer(Show $show, ?string $playLinkToken = null): ?array
     {
         [$base, $overlay] = [$show->baseMedia, $show->overlayMedia];
-        if (!$base && !$overlay) {
+        $youtube = $this->youtubeUrl($show);
+        if (!$base && !$overlay && !$youtube) {
             return null;
         }
 
@@ -42,22 +44,33 @@ class ShowFrame
         return [
             'file_url'        => $base?->file_url,
             'mime_type'       => $base?->mime_type,
+            'youtube_url'     => $youtube,
             'overlay_url'     => $overlay?->file_url,
             'overlay_widgets' => $widgets->values()->all(),
         ];
+    }
+
+    /** The embed URL of a YouTube background, built from the stored ids, or null. */
+    private function youtubeUrl(Show $show): ?string
+    {
+        $stored = $show->frame_youtube;
+
+        return $stored ? YoutubeSource::embedUrl($stored, (bool) ($stored['muted'] ?? false)) : null;
     }
 
     /** For a Slide Announcer device (no URLs for widgets — it serves bundles itself). */
     public function forDevice(Show $show): ?array
     {
         [$base, $overlay] = [$show->baseMedia, $show->overlayMedia];
-        if (!$base && !$overlay) {
+        $youtube = $this->youtubeUrl($show);
+        if (!$base && !$overlay && !$youtube) {
             return null;
         }
 
         return [
             'file_url'         => $base?->file_url,
             'mime_type'        => $base?->mime_type,
+            'youtube_url'      => $youtube,
             'overlay_url'      => $overlay?->file_url,
             'overlay_mime_type' => $overlay?->mime_type,
             'overlay_media_id' => $overlay?->id,
