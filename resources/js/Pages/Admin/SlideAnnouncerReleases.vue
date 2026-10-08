@@ -32,6 +32,11 @@ function typeShort(type) {
     return ['full', 'hotfix', 'disk_image'].includes(type) ? t(`slide_announcers.type_short_${type}`) : type;
 }
 
+const CHANNEL_ORDER = ['developer', 'testing', 'stable'];
+function sortedChannels(channels) {
+    return [...channels].sort((a, b) => CHANNEL_ORDER.indexOf(a.channel) - CHANNEL_ORDER.indexOf(b.channel));
+}
+
 function channelLabel(channel) {
     return CHANNELS.includes(channel) ? t(`slide_announcers.channel_${channel}`) : channel;
 }
@@ -159,12 +164,13 @@ async function submit() {
         return;
     }
 
-    releases.value.unshift(result.release);
+    // Tagging on upload can evict another release's tag server-side, so
+    // refetch rather than just prepending the new row to a stale list.
+    router.reload({ only: ['releases'] });
     selectedFile.value = null;
     releaseType.value = 'full';
     version.value = '';
     requiredBaseVersion.value = '';
-    architecture.value = '';
     initialChannel.value = '';
     notes.value = '';
 }
@@ -360,7 +366,7 @@ async function copyToClipboard(text, which) {
                                 <td class="px-4 py-3 font-mono">{{ release.version }}</td>
                                 <td class="px-4 py-3">{{ release.architecture }}</td>
                                 <td class="px-4 py-3">
-                                    <span v-for="c in release.channels" :key="c.channel" :class="channelBadgeClass(c.channel)"
+                                    <span v-for="c in sortedChannels(release.channels)" :key="c.channel" :class="channelBadgeClass(c.channel)"
                                         class="rounded-full px-2 py-0.5 text-xs font-medium mr-1">
                                         {{ channelLabel(c.channel) }}
                                     </span>
@@ -440,7 +446,7 @@ async function copyToClipboard(text, which) {
                 <div>
                     <dt class="text-sm text-gray-500 mb-1">{{ $t('slide_announcers.col_channels') }}</dt>
                     <div class="flex flex-wrap items-center gap-2">
-                        <span v-for="c in detailsRelease.channels" :key="c.channel"
+                        <span v-for="c in sortedChannels(detailsRelease.channels)" :key="c.channel"
                             :class="channelBadgeClass(c.channel)"
                             class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
                             {{ channelLabel(c.channel) }}
