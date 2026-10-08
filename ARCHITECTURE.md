@@ -179,6 +179,7 @@ In [app/Console/Commands/](app/Console/Commands/) — primarily for bootstrappin
 - **Churches/entities:** `church:load` (scrape a conference from adventistdirectory.org into `adventist_entities`), `church:list`, `church:detail`, `entity:sync` (distill into `entities`), `entity:assign` (grant/revoke a user's entity role)
 - **Languages:** `language:add`, `language:list`
 - **Widgets:** `widget:install <dir|zip>…` (same checks as the admin upload; e.g. `php artisan widget:install resources/widgets/clock resources/widgets/calendar`)
+- **Thumbnails:** `slide:resync-thumbnails [--all] [--now]` rebuilds slide+overlay composite previews (fixes stale "ghost" previews); queued by default.
 
 ## Where to start when changing things
 

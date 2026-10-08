@@ -51,13 +51,19 @@ class SyncOverlayThumbnail implements ShouldQueue
         }
 
         $disk = Storage::disk('public');
-        $destRelPath = "thumbs/{$slide->id}-composite.jpg";
+        // A fresh filename per run: the URL changes whenever the composite does,
+        // so browsers never keep showing a stale one.
+        $destRelPath = "thumbs/{$slide->id}-composite-" . bin2hex(random_bytes(4)) . '.jpg';
         $base = $primary ? $disk->path($primary->thumbnail_path) : null;
         // Same width as every other thumbnail (GenerateThumbnail), 16:9.
         $size = $primary ? [null, null] : [600, 338];
 
         if ($compositor->flatten($base, $overlay, $disk->path($destRelPath), ...$size)) {
+            $old = $slide->overlay_thumbnail_path;
             $slide->update(['overlay_thumbnail_path' => $destRelPath]);
+            $old && $disk->delete($old);
+        } else {
+            $this->clear($slide);
         }
     }
 

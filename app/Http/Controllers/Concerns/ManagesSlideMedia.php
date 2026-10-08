@@ -94,7 +94,9 @@ trait ManagesSlideMedia
             Show::removeAutoAddedLinksElsewhere($slide, exceptEntityId: $slide->entity_id);
         }
 
-        SyncOverlayThumbnail::dispatch($slide->id);
+        // Synchronous so the page reloaded after the removal doesn't show the
+        // old composite while the queued job is still waiting.
+        SyncOverlayThumbnail::dispatchSync($slide->id);
     }
 
     /**
