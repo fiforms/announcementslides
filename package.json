@@ -10,7 +10,7 @@
         "hotfix:build:product": "kiosk-products/slideannouncer/hotfixes/build.sh",
         "hotfix:build:core": "kiosk-products/slideannouncer/hotfixes/build-core.sh",
         "package:slideannouncer": "PRODUCT_ROOT=$PWD/kiosk-products/slideannouncer slideannouncer/local-app/package.sh",
-        "build:slideannouncer": "npm run test:slideannouncer && PRODUCT_ROOT=$PWD/kiosk-products/slideannouncer slideannouncer/image-builder/build.sh"
+        "build:slideannouncer": "npm run test:slideannouncer && PRODUCT_ROOT=$PWD/kiosk-products/slideannouncer slideannouncer/image-builder/build.sh --virt"
     },
     "devDependencies": {
         "@inertiajs/vue3": "^2.0.0",
