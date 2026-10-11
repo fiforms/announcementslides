@@ -88,6 +88,14 @@ FRAG_DURATION_US = 100_000
 # the passphrase changing, and restart accordingly). Not a UDP poll
 # interval — see module docstring for why there's no raw socket here.
 CONFIG_POLL_INTERVAL_SECONDS = 2.0
+# How long a live stream may produce no ffmpeg output before it's treated
+# as ended. SRT's caller disconnecting makes ffmpeg exit on its own, but
+# RIST (unicast or multicast) has no connection to tear down — when the
+# sender simply stops, ffmpeg keeps listening forever with no output and
+# no exit, which left _state.active true and the kiosk frozen on the last
+# frame. Only applies once output has started; an idle listener that has
+# never seen a caller still waits indefinitely.
+STREAM_IDLE_TIMEOUT_SECONDS = 10.0
 # Bounds memory for the rolling cache. serve_client() locates the real
 # keyframe within this window (see _parse_fragment_keyframe()) rather
 # than assuming one is there, so this only needs to be "usually enough
@@ -804,7 +812,20 @@ async def _pump_stdout(proc, stderr_tail: deque) -> None:
     try:
         while True:
             read_started_at = time.time()
-            chunk = await proc.stdout.read(65536)
+            try:
+                chunk = await asyncio.wait_for(
+                    proc.stdout.read(65536),
+                    timeout=STREAM_IDLE_TIMEOUT_SECONDS if validated else None,
+                )
+            except asyncio.TimeoutError:
+                print(
+                    f"[srt-stream-bridge] no output for {STREAM_IDLE_TIMEOUT_SECONDS:.0f}s — "
+                    "source stopped, restarting listener",
+                    flush=True,
+                )
+                if proc.returncode is None:
+                    proc.kill()
+                break
             if not chunk:
                 break
             if not validated:
