@@ -8,7 +8,7 @@ challenge-response and persists the resulting trust record.
 The live command channel (Socket.IO connection to each paired master,
 listening for `peer-command` events, and driving the kiosk's already-running
 Chromium via its remote-debugging port) is deliberately NOT here — it's
-system/scripts/revelation-peer-daemon.py, a separate always-on systemd
+system/scripts/slide-announcer-revelation-peer, a separate always-on systemd
 unit, reading the trust file this module writes rather than importing it
 (this module lives in the versioned local-app release; the daemon is
 fixed OS-image infra — see that script's own docstring). That daemon also
@@ -58,13 +58,13 @@ PEER_PUBLIC_KEY_FILE = Path("/data/status/revelation-peer-key.pub.pem")
 PEER_PROTOCOL = 2
 # Device-global (not per-master) — how this follower should present
 # whatever Revelation pushes it, independent of which master sent it. Read
-# by revelation-peer-daemon.py on every open-presentation command (see that
+# by slide-announcer-revelation-peer on every open-presentation command (see that
 # script's own copy of these constants/apply_display_settings()) rather
 # than per-peer, since a church running one follower per room wants "this
 # room always shows lower-thirds" regardless of who's presenting.
 REVELATION_DISPLAY_SETTINGS_FILE = Path("/data/status/revelation-display-settings.json")
 # Settings > Advanced's on/off switch for the whole feature ("1"/"0").
-# revelation-peer-daemon.py reads the same file every trust poll and drops
+# slide-announcer-revelation-peer reads the same file every trust poll and drops
 # all its connections while it's "0". Absent means "never chosen": on if
 # this device already has a paired master (so devices paired before the
 # switch existed keep working), off otherwise.
