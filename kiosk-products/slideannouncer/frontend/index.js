@@ -8,9 +8,13 @@ import MenuOverlay from './views/MenuOverlay.vue'
 import SrtSink from './views/settings/SrtSink.vue'
 import RevelationPeering from './views/settings/RevelationPeering.vue'
 import AdvancedFeatures from './views/settings/AdvancedFeatures.vue'
+import en from './locales/en.json'
+import es from './locales/es.json'
 
 export default {
   name: 'slideannouncer',
+  // This product's UI strings; merged over the core locales (add a language here too).
+  messages: { en, es },
   // Mounted at /kiosk — the screen the device boots to.
   mainView: Slideshow,
   // Drawn over every route, opened by the Menu key.

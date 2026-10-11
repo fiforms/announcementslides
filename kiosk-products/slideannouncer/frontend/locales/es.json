@@ -1,0 +1,89 @@
+{
+    "menu": {
+        "mainShow": "Programa Principal",
+        "playing": "Reproduciendo",
+        "settings": "Configuración…"
+    },
+    "slideshow": {
+        "notPaired": "Aún no emparejado. Use Menú o la tecla Escape para abrir Configuración.",
+        "waiting": "Esperando diapositivas…",
+        "needsAttention": "Requiere atención — revise Configuración",
+        "paused": "En pausa",
+        "muted": "Silenciado"
+    },
+    "settingsLayout": {
+        "videoReceiver": "Receptor de Video LAN",
+        "revelationPeering": "Emparejamiento Revelation"
+    },
+    "settings": {
+        "srtSink": {
+            "serverDisabled": "Activado aquí, pero desactivado para toda la flota desde el panel de administración — contacte al administrador de AnnouncementSlides de su iglesia.",
+            "passphrase": "Frase de contraseña",
+            "regenerate": "Regenerar",
+            "regenerating": "Regenerando…",
+            "connectWith": "Conectar con",
+            "displayQrCode": "Mostrar Código QR",
+            "close": "Cerrar",
+            "latencyTitle": "Latencia SRT",
+            "latencyHint": "Bájela para menos retraso en una red cableada limpia; súbala si la imagen se entrecorta.",
+            "debugOverlayTitle": "Superposición de Depuración",
+            "debugOverlayHint": "Muestra estadísticas de reproducción sobre el video.",
+            "intro": "Recibe una transmisión de video en vivo (OBS, vMix, etc.) desde su red local mediante SRT o RIST y la muestra en pantalla completa.",
+            "playbackTitle": "Reproducción",
+            "mode": "Modo",
+            "modeSrt": "SRT",
+            "modeRistUnicast": "RIST Unicast Receptor",
+            "modeRistCaller": "RIST Unicast Llamador",
+            "modeRistMulticast": "RIST Multicast",
+            "edit": "Editar",
+            "multicastGroup": "IP Multicast",
+            "port": "Puerto",
+            "senderHost": "Host del emisor",
+            "modeHint": {
+                "srt": "Este dispositivo espera que un emisor (OBS, vMix, un codificador) se conecte a él mediante SRT. Pegue la URL de conexión de abajo en el emisor.",
+                "rist_unicast": "Este dispositivo espera que un emisor se conecte a él mediante RIST. Ideal cuando un emisor alimenta solo este dispositivo.",
+                "rist_caller": "Este dispositivo se conecta a un emisor que espera receptores (en OBS, una salida RIST en modo escucha, p. ej. rist://@0.0.0.0:5000). Permite que un emisor alimente varios dispositivos. La reproducción empieza sola cuando el emisor arranca y termina cuando se detiene.",
+                "rist_multicast": "Este dispositivo se une a un grupo multicast al que transmite el emisor. Permite que un emisor alimente varios dispositivos en una red cableada; el grupo, el puerto y la frase de contraseña deben coincidir con los del emisor."
+            },
+            "multicastPassphraseHint": "Debe coincidir con el del emisor",
+            "senderUrl": "URL del emisor",
+            "ristBufferTitle": "Búfer RIST",
+            "multicastWifiWarning": "⚠ Este dispositivo está en WiFi. No se recomienda video multicast por WiFi — habrá cortes y saltos. Use una conexión Ethernet por cable."
+        },
+        "revelation": {
+            "default": "Predeterminado",
+            "variant_normal": "Normal",
+            "variant_notes": "Notas (Vista Dividida)",
+            "variant_confidence": "Monitor de Confianza",
+            "variant_lowerthirds": "Tercios Inferiores",
+            "variant_remotepreview": "Notas (Vista Previa de Diapositiva)",
+            "variant_notesteleprompter": "Notas (Teleprompter)",
+            "language_en": "English",
+            "language_es": "Español",
+            "pairedTitle": "Emparejado",
+            "noPeers": "Aún no está emparejado con ninguna instancia de Revelation.",
+            "connected": "Conectado",
+            "notConnected": "No conectado",
+            "needsRepair": "Requiere volver a emparejar — desempareje y empareje de nuevo",
+            "unpair": "Desemparejar",
+            "nearbyTitle": "Instancias de Revelation Cercanas",
+            "rescan": "Volver a buscar",
+            "scanning": "Buscando…",
+            "noneFound": "No se encontraron instancias de Revelation en esta red.",
+            "paired": "Emparejado",
+            "pairWith": "Emparejar con {name}",
+            "pin": "PIN de emparejamiento",
+            "pair": "Emparejar",
+            "pairing": "Emparejando…",
+            "intro": "Se conecta como par al software Revelation Snapshot Presenter (snapshots.vrbm.org).",
+            "variantLabel": "Variante de Pantalla de Revelation",
+            "languageLabel": "Variante de Idioma"
+        },
+        "advanced": {
+            "featuresTitle": "Funciones Opcionales",
+            "featureOffHint": "Esta función está desactivada — actívela en Configuración > Avanzado.",
+            "revelationHint": "Permite que un presentador de Revelation en su red tome esta pantalla para una presentación en vivo.",
+            "srtSinkHint": "Recibe una transmisión de video en vivo (OBS, vMix, etc.) desde la red de su iglesia mediante SRT."
+        }
+    }
+}
