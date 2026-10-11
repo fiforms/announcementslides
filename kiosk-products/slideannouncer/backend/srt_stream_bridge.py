@@ -735,6 +735,24 @@ def _ffmpeg_cmd(input_args: list[str]) -> list[str]:
         "-fflags", "nobuffer",
         "-flags", "low_delay",
         *input_args,
+        # Video is mandatory, audio is optional. Without explicit maps,
+        # ffmpeg's default stream selection quietly drops a video stream
+        # whose parameters it never managed to read — which happens
+        # whenever the sender's keyframe interval is longer than the probe
+        # window (`-analyzeduration`, e.g. a master's `probeMs`): the first
+        # keyframe, and with it the SPS/PPS, hasn't arrived by the time
+        # probing ends. With a video-only source that leaves nothing to
+        # write, so ffmpeg exits and run_forever() restarts it until a
+        # keyframe lands inside the window (a slow pickup, but a working
+        # one). With audio present the audio stream is still perfectly
+        # readable, so ffmpeg carries on with audio only: an init segment
+        # with no video track, no codecs= string (_mime_codec_from_moov()
+        # returns None), and a black screen that never recovers because
+        # nothing exits to trigger a retry. Mapping the video explicitly
+        # makes that case exit like the video-only one does; the trailing
+        # `?` on the audio map keeps a silent source valid.
+        "-map", "0:v:0",
+        "-map", "0:a:0?",
         "-c:v", "copy",
         # Video stays a pure stream copy — no decode/re-encode, the whole
         # point of this design. Audio is a real encode, not a copy: confirmed
