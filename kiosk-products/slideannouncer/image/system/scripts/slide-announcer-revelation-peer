@@ -31,6 +31,8 @@ paired with; that's entirely the trust store's job.
 import base64
 import hashlib
 import json
+import os
+import re
 import secrets
 import socket
 import threading
@@ -63,6 +65,16 @@ REPAIR_CODES = {"not-paired", "invalid-signature", "invalid-pin", "pin-lockout"}
 REVELATION_DISPLAY_SETTINGS_FILE = Path("/data/status/revelation-display-settings.json")
 # Settings > Advanced on/off switch — see revelation.py's REVELATION_ENABLED_FILE.
 REVELATION_ENABLED_FILE = Path("/data/status/revelation-enabled")
+
+# Protocol 2.1 `rist-screen`: a master streams its screen as a RIST
+# *listener* and asks followers to call it. This daemon only validates the
+# command and records it here; the backend's srt_stream_bridge.py (same
+# user) owns ffmpeg and the kiosk player, and picks this file up on its
+# config poll. Removing the file is "stop". Holds the passphrase, so 0o640
+# like srt-sink.json. Mirrors srt_sink.py's RIST_PUSH_FILE.
+RIST_PUSH_FILE = Path("/data/status/rist-push.json")
+RIST_STREAM_ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
+RIST_ENCRYPTION_MODES = ("none", "128", "256")
 
 KIOSK_URL = "http://localhost/kiosk"
 CDP_PORT = 9222
@@ -279,7 +291,85 @@ def apply_display_settings(url: str) -> str:
     return urlunsplit(parts._replace(query=urlencode(query)))
 
 
-def handle_peer_command(command: dict) -> None:
+def _int_in_range(value, low: int, high: int, default: int | None = None) -> int | None:
+    # bool is an int subclass; "5100" strings are not accepted — the doc
+    # says integer.
+    if isinstance(value, bool) or not isinstance(value, int):
+        return default
+    return value if low <= value <= high else None
+
+
+def parse_rist_screen_start(payload: dict) -> dict | None:
+    """Validates a `rist-screen` start payload exactly as PEERING.md's
+    follower rules list; None if any field is out of range. latencyMs and
+    probeMs are documented as optional-with-defaults on the wire, so absent
+    ones get the doc's example values."""
+    stream_id = payload.get("streamId")
+    if not isinstance(stream_id, str) or not RIST_STREAM_ID.fullmatch(stream_id):
+        return None
+    port = _int_in_range(payload.get("port"), 1024, 65535)
+    encryption = payload.get("encryption", "none")
+    if isinstance(encryption, int) and not isinstance(encryption, bool):
+        encryption = str(encryption)
+    latency_ms = _int_in_range(payload.get("latencyMs", 0), 0, 30000)
+    probe_ms = _int_in_range(payload.get("probeMs", 3000), 1000, 20000)
+    secret = payload.get("secret") or ""
+    if port is None or latency_ms is None or probe_ms is None or encryption not in RIST_ENCRYPTION_MODES:
+        return None
+    if encryption != "none" and not (isinstance(secret, str) and 1 <= len(secret) <= 127):
+        return None
+    return {
+        "streamId": stream_id,
+        "port": port,
+        "encryption": encryption,
+        "secret": secret if encryption != "none" else "",
+        "latencyMs": latency_ms,
+        "probeMs": probe_ms,
+    }
+
+
+def write_rist_push(record: dict) -> None:
+    # Write-then-rename so the backend never reads a half-written file,
+    # created 0o640 from the start (it holds the passphrase).
+    RIST_PUSH_FILE.parent.mkdir(parents=True, exist_ok=True)
+    tmp = RIST_PUSH_FILE.with_suffix(".tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o640)
+    with os.fdopen(fd, "w") as handle:
+        json.dump(record, handle)
+    os.replace(tmp, RIST_PUSH_FILE)
+
+
+def clear_rist_push() -> None:
+    RIST_PUSH_FILE.unlink(missing_ok=True)
+
+
+def handle_rist_screen(payload: dict, master_host: str) -> None:
+    action = payload.get("action")
+    if action == "stop":
+        # Always honoured, from any master, whatever started the stream.
+        log("rist-screen stop")
+        clear_rist_push()
+        return
+    if action != "start":
+        log(f"rist-screen: ignoring unknown action {action!r}")
+        return
+    params = parse_rist_screen_start(payload)
+    if params is None:
+        log("rist-screen start rejected: payload failed validation")
+        return
+    try:
+        current = json.loads(RIST_PUSH_FILE.read_text())
+    except (OSError, json.JSONDecodeError):
+        current = None
+    if current and current.get("streamId") == params["streamId"]:
+        return  # a repeat start for the stream already playing changes nothing
+    # The host is never taken from the payload: it is the address this
+    # worker already holds for the master that sent the command.
+    log(f"rist-screen start {params['streamId']} -> {master_host}:{params['port']} (encryption {params['encryption']})")
+    write_rist_push({**params, "host": master_host})
+
+
+def handle_peer_command(command: dict, master_host: str | None = None) -> None:
     command_type = command.get("type")
     if command_type == "open-presentation":
         url = (command.get("payload") or {}).get("url")
@@ -290,6 +380,10 @@ def handle_peer_command(command: dict) -> None:
     elif command_type == "close-presentation":
         log("close-presentation -> back to kiosk")
         cdp_navigate(KIOSK_URL)
+    elif command_type == "rist-screen":
+        payload = command.get("payload")
+        if isinstance(payload, dict) and master_host:
+            handle_rist_screen(payload, master_host)
     else:
         log(f"ignoring unknown command type {command_type!r}")
 
@@ -374,7 +468,7 @@ def peer_worker(peer: dict, own_instance_id: str, discovery: _DiscoveryListener,
         def on_peer_command(data):
             connections[instance_id]["lastCommand"] = data
             data = data or {}
-            handle_peer_command(data.get("command") or data)
+            handle_peer_command(data.get("command") or data, host)
 
         try:
             client.connect(

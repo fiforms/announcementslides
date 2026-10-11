@@ -39,6 +39,12 @@ from pathlib import Path
 from urllib.parse import quote
 
 SRT_SINK_FILE = Path("/data/status/srt-sink.json")
+# A Revelation master's `rist-screen` push (protocol 2.1), written by
+# slide-announcer-revelation-peer after it validates the command and
+# removed on `stop`. Unlike every other receiver mode this one has the
+# master as the RIST listener and this device as the caller — see
+# read_rist_push() / push_input_args().
+RIST_PUSH_FILE = Path("/data/status/rist-push.json")
 
 # Read directly by srt_stream_bridge.py (same process, same venv — no
 # more cross-process duplication the way the old standalone
@@ -237,6 +243,50 @@ def listener_input_args(config: dict) -> list[str]:
         "-encryption", str(config["rist_encryption_bits"]),
         "-i", url,
     ]
+
+
+def read_rist_push() -> dict | None:
+    """The master-initiated stream to connect to, or None. The daemon has
+    already validated it, but it is re-checked here since this decides what
+    ffmpeg is pointed at. Ignored when the admin has force-disabled the
+    receiver, or this ffmpeg lacks librist. The local Settings toggle does
+    not gate it: a push comes from a master the user paired on purpose, and
+    Settings > Advanced switches the whole peering feature off."""
+    try:
+        data = json.loads(RIST_PUSH_FILE.read_text())
+        host = ipaddress.IPv4Address(data["host"])
+        port = int(data["port"])
+        encryption = str(data["encryption"])
+        latency_ms = int(data["latencyMs"])
+        probe_ms = int(data["probeMs"])
+        stream_id, secret = str(data["streamId"]), str(data.get("secret") or "")
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+    if not (1024 <= port <= 65535 and 0 <= latency_ms <= 30000 and 1000 <= probe_ms <= 20000):
+        return None
+    if encryption not in ("none", "128", "256") or (encryption != "none" and not 1 <= len(secret) <= 127):
+        return None
+    if not (_read_raw().get("server_allows", True) is not False and rist_supported()):
+        return None
+    return {
+        "streamId": stream_id, "host": str(host), "port": port, "encryption": encryption,
+        "secret": secret, "latencyMs": latency_ms, "probeMs": probe_ms,
+    }
+
+
+def push_input_args(push: dict) -> list[str]:
+    """ffmpeg input arguments for calling a master's RIST listener.
+    `-analyzeduration` is the master's `probeMs`: it must exceed the
+    sender's keyframe interval or ffmpeg never finishes probing. The
+    passphrase is an option, not part of the URL, so it needs no escaping."""
+    args = [
+        "-rist_profile", "main",
+        "-buffer_size", str(push["latencyMs"]),
+        "-analyzeduration", str(push["probeMs"] * 1000),
+    ]
+    if push["encryption"] != "none":
+        args += ["-secret", push["secret"], "-encryption", push["encryption"]]
+    return args + ["-i", f"rist://{push['host']}:{push['port']}"]
 
 
 def update_settings(changes: dict) -> dict:

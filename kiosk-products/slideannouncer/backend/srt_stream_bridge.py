@@ -904,6 +904,7 @@ async def run_forever():
     pump_task = None
     stderr_task = None
     active_input_args = None
+    last_launch_at = 0.0
 
     async def _teardown():
         nonlocal proc, pump_task, stderr_task, active_input_args
@@ -920,15 +921,24 @@ async def run_forever():
     try:
         while True:
             config = srt_sink.read_config()
-            enabled = srt_sink.effective_enabled(config)
+            # A master's pushed stream (rist-screen) takes over from the
+            # configured listener while it lasts; its removal is "stop".
+            push = srt_sink.read_rist_push()
+            enabled = push is not None or srt_sink.effective_enabled(config)
             if enabled != was_enabled:
                 print(f"[srt-stream-bridge] effective_enabled={enabled}", flush=True)
                 was_enabled = enabled
             global _debug_enabled
             _debug_enabled = config["debug_overlay"]
-            input_args = srt_sink.listener_input_args(config) if enabled else None
+            if push is not None:
+                input_args = srt_sink.push_input_args(push)
+            else:
+                input_args = srt_sink.listener_input_args(config) if enabled else None
+            # streamId is part of the comparison so a new stream with
+            # otherwise identical settings still gets a fresh ffmpeg.
+            launch_key = (input_args, push["streamId"] if push else None)
 
-            if proc is not None and (not enabled or input_args != active_input_args):
+            if proc is not None and (not enabled or launch_key != active_input_args):
                 print("[srt-stream-bridge] config changed, restarting listener", flush=True)
                 await _teardown()
 
@@ -937,16 +947,25 @@ async def run_forever():
                 continue
 
             if proc is None:
+                # A caller whose master is unreachable (or gone without a
+                # stop) makes ffmpeg exit quickly; retry on a gentle
+                # cadence rather than in a tight loop.
+                wait = CONFIG_POLL_INTERVAL_SECONDS - (time.monotonic() - last_launch_at)
+                if wait > 0:
+                    await asyncio.sleep(wait)
+                    continue
+                last_launch_at = time.monotonic()
                 _state.reset()
                 cmd = _ffmpeg_cmd(input_args)
-                print(f"[srt-stream-bridge] starting {config['mode']} listener: {_redacted(cmd)}", flush=True)
+                role = f"RIST caller -> {push['host']}:{push['port']}" if push else f"{config['mode']} listener"
+                print(f"[srt-stream-bridge] starting {role}: {_redacted(cmd)}", flush=True)
                 proc = await asyncio.create_subprocess_exec(
                     *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
                 )
                 stderr_tail: deque = deque(maxlen=20)
                 stderr_task = asyncio.create_task(_drain_stderr(proc, stderr_tail))
                 pump_task = asyncio.create_task(_pump_stdout(proc, stderr_tail))
-                active_input_args = input_args
+                active_input_args = launch_key
 
             done, _ = await asyncio.wait({pump_task}, timeout=CONFIG_POLL_INTERVAL_SECONDS)
             if pump_task in done:
