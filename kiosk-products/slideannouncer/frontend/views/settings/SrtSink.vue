@@ -10,7 +10,7 @@ const { t } = useI18n()
 
 const localEnabled = ref(false)
 const serverAllows = ref(true)
-const mode = ref('srt') // 'srt' | 'rist_unicast' | 'rist_multicast' — see backend srt_sink.MODES
+const mode = ref('srt') // 'srt' | 'rist_unicast' | 'rist_caller' | 'rist_multicast' — see backend srt_sink.MODES
 const ristSupported = ref(true)
 const passphrase = ref('')
 const connectUrl = ref(null)
@@ -21,6 +21,9 @@ const ristEncryptionBits = ref(128)
 const multicastGroup = ref('')
 const multicastPort = ref(5000)
 const multicastPassphrase = ref('')
+const senderHost = ref('')
+const senderPort = ref(5000)
+const senderPassphrase = ref('')
 const qrLightboxDataUrl = ref(null)
 const regenerating = ref(false)
 const savingMode = ref(false)
@@ -33,6 +36,7 @@ const onWifi = ref(false)
 
 const isRist = computed(() => mode.value !== 'srt')
 const isMulticast = computed(() => mode.value === 'rist_multicast')
+const isCaller = computed(() => mode.value === 'rist_caller')
 
 const modeOptions = computed(() => [
   { value: 'srt', label: t('settings.srtSink.modeSrt') },
@@ -40,6 +44,7 @@ const modeOptions = computed(() => [
   // librist (backend srt_sink.rist_supported()).
   ...(ristSupported.value || isRist.value ? [
     { value: 'rist_unicast', label: t('settings.srtSink.modeRistUnicast') },
+    { value: 'rist_caller', label: t('settings.srtSink.modeRistCaller') },
     { value: 'rist_multicast', label: t('settings.srtSink.modeRistMulticast') },
   ] : []),
 ])
@@ -91,6 +96,9 @@ function applyStatus(data) {
   multicastGroup.value = data.multicast_group
   multicastPort.value = data.multicast_port
   multicastPassphrase.value = data.multicast_passphrase
+  senderHost.value = data.sender_host
+  senderPort.value = data.sender_port
+  senderPassphrase.value = data.sender_passphrase
 }
 
 // Generated client-side (no qrencode/system package needed) — the URL is
@@ -190,6 +198,26 @@ async function saveMulticast() {
   savingMulticast.value = false
 }
 
+// RIST Caller: this device connects out to a sender that is itself the RIST
+// listener (e.g. OBS at rist://@0.0.0.0:5000); host, port and passphrase
+// are the sender's, typed in and saved together.
+const senderDraft = ref({ host: '', port: 5000, passphrase: '' })
+const savingSender = ref(false)
+
+watch([senderHost, senderPort, senderPassphrase], ([host, port, pass]) => {
+  senderDraft.value = { host, port, passphrase: pass }
+}, { immediate: true })
+
+async function saveSender() {
+  savingSender.value = true
+  await saveSettings({
+    sender_host: senderDraft.value.host,
+    sender_port: Number(senderDraft.value.port),
+    sender_passphrase: senderDraft.value.passphrase,
+  })
+  savingSender.value = false
+}
+
 async function regenerate() {
   regenerating.value = true
   error.value = null
@@ -268,9 +296,11 @@ onMounted(() => {
             />
           </div>
 
+          <p class="hint mode-hint">{{ t(`settings.srtSink.modeHint.${mode}`) }}</p>
+
           <!-- SRT / RIST Unicast: this device listens; the passphrase is
                generated but editable. -->
-          <template v-if="!isMulticast">
+          <template v-if="!isMulticast && !isCaller">
             <span class="label">{{ t('settings.srtSink.passphrase') }}</span>
             <form v-if="editingPassphrase" class="row" @submit.prevent="savePassphrase">
               <input ref="passphraseInput" v-model="passphraseDraft" type="text" class="grow" autocomplete="off">
@@ -286,6 +316,27 @@ onMounted(() => {
             </div>
           </template>
         </div>
+
+        <!-- RIST Caller: connects out to the sender's listener; all three
+             values must match the sender's own settings. The stream starts
+             on its own once the sender begins transmitting. -->
+        <template v-if="isCaller">
+          <form class="multicast-form" @submit.prevent="saveSender">
+            <label class="field host">
+              <span class="label">{{ t('settings.srtSink.senderHost') }}</span>
+              <input v-model="senderDraft.host" type="text" placeholder="obs-pc.local" autocomplete="off" autocapitalize="off" spellcheck="false">
+            </label>
+            <label class="field port">
+              <span class="label">{{ t('settings.srtSink.port') }}</span>
+              <input v-model="senderDraft.port" type="text" inputmode="numeric" autocomplete="off">
+            </label>
+            <label class="field grow">
+              <span class="label">{{ t('settings.srtSink.passphrase') }}</span>
+              <input v-model="senderDraft.passphrase" type="text" :placeholder="t('settings.srtSink.multicastPassphraseHint')" autocomplete="off">
+            </label>
+            <button type="submit" class="tile action" :disabled="savingSender">{{ t('common.save') }}</button>
+          </form>
+        </template>
 
         <!-- RIST Multicast: joins the group the sender transmits to; all
              three values must match the sender's own settings. -->
@@ -387,6 +438,7 @@ onMounted(() => {
   min-width: 0;
 }
 .grow { flex: 1; min-width: 0; }
+.mode-hint { grid-column: 2; margin-top: -0.2rem; }
 code {
   padding: 0.4rem 0.7rem;
   background: var(--bg);
@@ -421,6 +473,7 @@ input[type="text"] {
 }
 .field input { width: 100%; }
 .field:first-child { flex: 0 0 9.5rem; }
+.field.host { flex: 0 0 14rem; }
 .field.port { flex: 0 0 5.5rem; }
 .wifi-warning {
   margin: 0.9rem 0 0;

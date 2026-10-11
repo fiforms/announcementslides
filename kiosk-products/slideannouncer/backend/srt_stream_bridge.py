@@ -96,6 +96,12 @@ CONFIG_POLL_INTERVAL_SECONDS = 2.0
 # frame. Only applies once output has started; an idle listener that has
 # never seen a caller still waits indefinitely.
 STREAM_IDLE_TIMEOUT_SECONDS = 10.0
+# Minimum gap between ffmpeg launches in rist_caller mode. A connected
+# caller just blocks while the sender is down (no exit, no polling cost),
+# so a relaunch only happens when ffmpeg actually exits — an unresolvable
+# hostname, or the idle timeout above ending a stream — and this keeps a
+# typo'd/unresolvable host from spawning ffmpeg every couple of seconds.
+CALLER_RETRY_INTERVAL_SECONDS = 5.0
 # Bounds memory for the rolling cache. serve_client() locates the real
 # keyframe within this window (see _parse_fragment_keyframe()) rather
 # than assuming one is there, so this only needs to be "usually enough
@@ -968,14 +974,23 @@ async def run_forever():
                 # A caller whose master is unreachable (or gone without a
                 # stop) makes ffmpeg exit quickly; retry on a gentle
                 # cadence rather than in a tight loop.
-                wait = CONFIG_POLL_INTERVAL_SECONDS - (time.monotonic() - last_launch_at)
+                retry = (
+                    CALLER_RETRY_INTERVAL_SECONDS
+                    if push is None and config["mode"] == "rist_caller" else CONFIG_POLL_INTERVAL_SECONDS
+                )
+                wait = retry - (time.monotonic() - last_launch_at)
                 if wait > 0:
                     await asyncio.sleep(wait)
                     continue
                 last_launch_at = time.monotonic()
                 _state.reset()
                 cmd = _ffmpeg_cmd(input_args)
-                role = f"RIST caller -> {push['host']}:{push['port']}" if push else f"{config['mode']} listener"
+                if push:
+                    role = f"RIST caller -> {push['host']}:{push['port']}"
+                elif config["mode"] == "rist_caller":
+                    role = f"RIST caller -> {config['sender_host']}:{config['sender_port']}"
+                else:
+                    role = f"{config['mode']} listener"
                 print(f"[srt-stream-bridge] starting {role}: {_redacted(cmd)}", flush=True)
                 proc = await asyncio.create_subprocess_exec(
                     *cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,

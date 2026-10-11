@@ -32,6 +32,7 @@ old external srt-sink-monitor.py daemon required).
 import functools
 import ipaddress
 import json
+import re
 import secrets
 import string
 import subprocess
@@ -91,6 +92,17 @@ MAX_PASSPHRASE_LENGTH = 79
 #                    call in to this device.
 # "rist_unicast"   — RIST (main profile) listener on RIST_PORT, encrypted
 #                    with the same passphrase as SRT mode.
+# "rist_caller"    — the reverse of rist_unicast: the sender (e.g. OBS
+#                    with its RIST output in listener mode, rist://@0.0.0.0:5000)
+#                    is the RIST listener and this device calls out to it,
+#                    which is how one sender serves several receivers
+#                    without any of them being reachable from the sender.
+#                    Host, port and passphrase are the sender's, so they're
+#                    entered by hand. There's no separate "is it up?" probe:
+#                    ffmpeg's RIST caller just sits (cheaply, keepalives
+#                    only) until the sender starts transmitting, and
+#                    srt_stream_bridge.py's idle timeout tears it down again
+#                    once the sender stops — see CALLER_PROBE_MS.
 # "rist_multicast" — joins a RIST multicast group the sender transmits to.
 #                    SRT itself has no multicast mode at all, which is why
 #                    multicast is RIST-only. Group/port/passphrase are
@@ -98,12 +110,22 @@ MAX_PASSPHRASE_LENGTH = 79
 #                    entered by hand and must match it exactly.
 # All three feed the same srt_stream_bridge.py remux pipeline — only
 # ffmpeg's input side differs (see listener_input_args()).
-MODES = ("srt", "rist_unicast", "rist_multicast")
+MODES = ("srt", "rist_unicast", "rist_caller", "rist_multicast")
 DEFAULT_MODE = "srt"
 # RIST main profile sends media on an even UDP port and its RTCP
 # (retransmit requests) on port+1, so ports are kept even.
 RIST_PORT = 5000
 DEFAULT_MULTICAST_PORT = 5000
+DEFAULT_SENDER_PORT = 5000
+# Same role as a Revelation master's `probeMs` (see push_input_args()):
+# ffmpeg's probe window has to outlast the sender's keyframe interval or
+# it never finishes probing a stream it joined mid-GOP. OBS defaults to
+# ~8s keyframes in this deployment (see srt_stream_bridge.py's
+# LATE_JOIN_KEYFRAME_TIMEOUT_SECONDS), so 10s.
+CALLER_PROBE_MS = 10000
+# A hostname (including mDNS `.local`) or an IPv4 address. Deliberately
+# strict: it ends up inside an ffmpeg URL.
+_HOSTNAME_RE = re.compile(r"^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$")
 # RIST's receive buffer: how long it holds packets to wait for
 # retransmits of lost ones — the RIST equivalent of the SRT latency
 # slider. librist's own default is 1000ms (sized for the internet); a LAN
@@ -129,6 +151,7 @@ DEFAULT_RIST_ENCRYPTION_BITS = 128
 #   comes with the server's latest revision.
 SERVER_EDITABLE_FIELDS = (
     "mode", "passphrase", "multicast_group", "multicast_port", "multicast_passphrase", "rist_encryption_bits",
+    "sender_host", "sender_port", "sender_passphrase",
 )
 
 
@@ -167,6 +190,9 @@ def read_config() -> dict:
         "multicast_group": data.get("multicast_group", ""),
         "multicast_port": _clamp(data.get("multicast_port"), 1024, 65534, DEFAULT_MULTICAST_PORT),
         "multicast_passphrase": data.get("multicast_passphrase", ""),
+        "sender_host": data.get("sender_host", ""),
+        "sender_port": _clamp(data.get("sender_port"), 1024, 65534, DEFAULT_SENDER_PORT),
+        "sender_passphrase": data.get("sender_passphrase", ""),
         "server_revision": _clamp(data.get("server_revision"), 0, 2**31, 0),
         "server_apply_error": data.get("server_apply_error"),
     }
@@ -191,14 +217,16 @@ def _clamp_latency_ms(value) -> int:
 def effective_enabled(config: dict | None = None) -> bool:
     """What srt_stream_bridge.py actually acts on — both the local toggle
     and the server's force-disable switch have to allow it, and the
-    selected mode has to be fully configured (a multicast group and the
-    sender's passphrase entered; RIST modes also need RIST support in
+    selected mode has to be fully configured (a multicast group or sender
+    host, and the sender's passphrase, entered; RIST modes also need RIST support in
     this device's ffmpeg)."""
     config = config or read_config()
     if not (config["local_enabled"] and config["server_allows"]):
         return False
     if config["mode"] == "rist_multicast":
         return bool(config["multicast_group"] and config["multicast_passphrase"]) and rist_supported()
+    if config["mode"] == "rist_caller":
+        return bool(config["sender_host"] and config["sender_passphrase"]) and rist_supported()
     if config["mode"] == "rist_unicast":
         return bool(config["passphrase"]) and rist_supported()
     return bool(config["passphrase"])
@@ -231,6 +259,17 @@ def listener_input_args(config: dict) -> list[str]:
         ]
     if mode == "rist_unicast":
         secret, url = config["passphrase"], f"rist://@0.0.0.0:{RIST_PORT}"
+    elif mode == "rist_caller":
+        # No "@": librist connects out to the sender's listener instead of
+        # binding a port here. The hostname is validated to a URL-safe set.
+        return [
+            "-rist_profile", "main",
+            "-buffer_size", str(config["rist_buffer_ms"]),
+            "-analyzeduration", str(CALLER_PROBE_MS * 1000),
+            "-secret", config["sender_passphrase"],
+            "-encryption", str(config["rist_encryption_bits"]),
+            "-i", f"rist://{config['sender_host']}:{config['sender_port']}",
+        ]
     else:
         # A multicast address after the "@" (listen) makes librist join
         # that group rather than bind a plain unicast port.
@@ -308,6 +347,12 @@ def update_settings(changes: dict) -> dict:
         config["multicast_group"] = _validate_multicast_group(changes["multicast_group"])
     if "multicast_port" in changes:
         config["multicast_port"] = _validate_rist_port(changes["multicast_port"])
+    if "sender_host" in changes:
+        config["sender_host"] = _validate_sender_host(changes["sender_host"])
+    if "sender_port" in changes:
+        config["sender_port"] = _validate_rist_port(changes["sender_port"])
+    if "sender_passphrase" in changes:
+        config["sender_passphrase"] = _validate_passphrase(changes["sender_passphrase"])
     if "rist_buffer_ms" in changes:
         config["rist_buffer_ms"] = _clamp(changes["rist_buffer_ms"], MIN_RIST_BUFFER_MS, MAX_RIST_BUFFER_MS, DEFAULT_RIST_BUFFER_MS)
     if "rist_encryption_bits" in changes:
@@ -386,6 +431,13 @@ def _validate_multicast_group(value) -> str:
     return str(address)
 
 
+def _validate_sender_host(value) -> str:
+    value = (value or "").strip()
+    if not _HOSTNAME_RE.fullmatch(value):
+        raise SrtSinkConfigError("Sender must be a hostname or IPv4 address (e.g. obs-pc.local or 192.168.1.20).")
+    return value
+
+
 def _validate_rist_port(value) -> int:
     try:
         port = int(value)
@@ -461,6 +513,9 @@ def sender_url(hostname: str, config: dict) -> str | None:
     mode = config["mode"]
     if mode == "srt":
         return connect_url(hostname, config["passphrase"], config["srt_latency_ms"]) if config["passphrase"] else None
+    if mode == "rist_caller":
+        # The sender is the listener here; there's nothing to paste into it.
+        return None
     if mode == "rist_unicast":
         host, port, secret = f"{hostname}.local", RIST_PORT, config["passphrase"]
     else:

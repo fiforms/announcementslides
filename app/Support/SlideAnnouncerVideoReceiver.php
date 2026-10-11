@@ -6,7 +6,8 @@ use App\Models\SlideAnnouncer;
 
 /**
  * Two-way sync of a Slide Announcer's LAN Video Receiver settings (mode,
- * passphrases, RIST multicast group/port, encryption), which can be edited
+ * passphrases, RIST multicast group/port or RIST caller sender host/port,
+ * encryption), which can be edited
  * both on the device (Settings > LAN Video Receiver) and on the Slide
  * Announcer web page. Device side: slideannouncer/local-app/backend/
  * srt_sink.py (SERVER_EDITABLE_FIELDS, apply_server_config(), report()).
@@ -24,11 +25,12 @@ use App\Models\SlideAnnouncer;
  */
 class SlideAnnouncerVideoReceiver
 {
-    public const MODES = ['srt', 'rist_unicast', 'rist_multicast'];
+    public const MODES = ['srt', 'rist_unicast', 'rist_caller', 'rist_multicast'];
 
     /** Settable from either side — the fields push() sends down. */
     public const EDITABLE = [
         'mode', 'passphrase', 'multicast_group', 'multicast_port', 'multicast_passphrase', 'rist_encryption_bits',
+        'sender_host', 'sender_port', 'sender_passphrase',
     ];
 
     /** Device-reported only (local on/off switch, tuning, capabilities). */
@@ -46,6 +48,12 @@ class SlideAnnouncerVideoReceiver
         // libsrt's passphrase rule (10-79 chars), printable ASCII, no spaces.
         $passphrase = ['regex:/^[\x21-\x7E]{10,79}$/'];
         $multicast = 'required_if:srt_sink_config.mode,rist_multicast';
+        $caller = 'required_if:srt_sink_config.mode,rist_caller';
+        $evenPort = function ($attribute, $value, $fail) {
+            if ($value !== null && (int) $value % 2 !== 0) {
+                $fail('Port must be even (RIST also uses the next port up).');
+            }
+        };
 
         return [
             'srt_sink_config' => 'sometimes|array',
@@ -56,12 +64,12 @@ class SlideAnnouncerVideoReceiver
                     $fail('Multicast IP must be in 224.0.1.0–239.255.255.255 (e.g. 239.1.2.3).');
                 }
             }],
-            'srt_sink_config.multicast_port' => [$multicast, 'nullable', 'integer', 'between:1024,65534', function ($attribute, $value, $fail) {
-                if ($value !== null && (int) $value % 2 !== 0) {
-                    $fail('Port must be even (RIST also uses the next port up).');
-                }
-            }],
+            'srt_sink_config.multicast_port' => [$multicast, 'nullable', 'integer', 'between:1024,65534', $evenPort],
             'srt_sink_config.multicast_passphrase' => [$multicast, 'nullable', 'string', ...$passphrase],
+            // A hostname (incl. mDNS .local) or IPv4 — same pattern as the device's srt_sink.py.
+            'srt_sink_config.sender_host' => [$caller, 'nullable', 'string', 'regex:/^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/'],
+            'srt_sink_config.sender_port' => [$caller, 'nullable', 'integer', 'between:1024,65534', $evenPort],
+            'srt_sink_config.sender_passphrase' => [$caller, 'nullable', 'string', ...$passphrase],
             'srt_sink_config.rist_encryption_bits' => 'nullable|in:128,256',
         ];
     }
@@ -85,7 +93,7 @@ class SlideAnnouncerVideoReceiver
         $next = $current;
         foreach (self::EDITABLE as $key) {
             if (array_key_exists($key, $edit)) {
-                $next[$key] = $key === 'multicast_port' || $key === 'rist_encryption_bits'
+                $next[$key] = in_array($key, ['multicast_port', 'sender_port', 'rist_encryption_bits'], true)
                     ? ($edit[$key] === null ? null : (int) $edit[$key])
                     : $edit[$key];
             }

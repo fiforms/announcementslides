@@ -178,4 +178,38 @@ class SlideAnnouncerVideoReceiverSyncTest extends TestCase
 
         $this->assertSame(0, $device->refresh()->srt_sink_config_revision);
     }
+
+    public function test_rist_caller_edit_is_validated_and_pushed(): void
+    {
+        $device = $this->makeDevice();
+
+        $this->webEdit($device, [
+            'mode' => 'rist_caller',
+            'sender_host' => 'bad host?',
+            'sender_port' => 5001,
+            'sender_passphrase' => 'short',
+        ])->assertSessionHasErrors([
+            'srt_sink_config.sender_host',
+            'srt_sink_config.sender_port',
+            'srt_sink_config.sender_passphrase',
+        ]);
+
+        // Host, port and passphrase are all required once the mode is chosen.
+        $this->webEdit($device, ['mode' => 'rist_caller'])->assertSessionHasErrors([
+            'srt_sink_config.sender_host',
+            'srt_sink_config.sender_passphrase',
+        ]);
+
+        $this->webEdit($device, [
+            'mode' => 'rist_caller',
+            'sender_host' => 'obs-pc.local',
+            'sender_port' => 5000,
+            'sender_passphrase' => 'SenderPass01',
+        ])->assertSessionHasNoErrors();
+
+        $this->asDevice($device)->getJson('/api/slide-announcers/shows')
+            ->assertJsonPath('srt_sink_config.mode', 'rist_caller')
+            ->assertJsonPath('srt_sink_config.sender_host', 'obs-pc.local')
+            ->assertJsonPath('srt_sink_config.sender_port', 5000);
+    }
 }

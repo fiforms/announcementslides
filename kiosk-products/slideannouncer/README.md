@@ -45,5 +45,14 @@ the active kiosk process, so no display takeover or kiosk restart is involved.
 The device addresses itself on the LAN by its mDNS hostname
 (`<hostname>.local`).
 
+Receiver modes (`srt_sink.MODES`): `srt` and `rist_unicast` listen on this
+device; `rist_multicast` joins a group; `rist_caller` is the reverse — the
+sender (e.g. OBS with a RIST output in listener mode, `rist://@0.0.0.0:5000`)
+listens and this device connects out to its configured host/port, so one
+sender can feed many devices. There is no separate probe for "is the sender
+up": ffmpeg's RIST caller blocks cheaply until media arrives, and the
+bridge's idle timeout ends the stream when it stops, relaunching ffmpeg
+(at most every `CALLER_RETRY_INTERVAL_SECONDS`) to wait for the next one.
+
 Its settings ride on the platform heartbeat as `srt_sink_*` extension keys
 (server side: `App\Support\SlideAnnouncer\VideoReceiverHeartbeatExtension`).

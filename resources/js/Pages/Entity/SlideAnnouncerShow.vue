@@ -38,6 +38,9 @@ const form = useForm({
     rx_multicast_group: receiver.multicast_group || '',
     rx_multicast_port: receiver.multicast_port ?? 5000,
     rx_multicast_passphrase: receiver.multicast_passphrase || '',
+    rx_sender_host: receiver.sender_host || '',
+    rx_sender_port: receiver.sender_port ?? 5000,
+    rx_sender_passphrase: receiver.sender_passphrase || '',
     rx_encryption_bits: receiver.rist_encryption_bits ?? 128,
     interval_seconds: interval_seconds ?? 10,
     settings_pin: settings_pin ?? '',
@@ -83,6 +86,9 @@ function submit() {
             multicast_group: data.rx_multicast_group || null,
             multicast_port: data.rx_multicast_port === '' ? null : Number(data.rx_multicast_port),
             multicast_passphrase: data.rx_multicast_passphrase || null,
+            sender_host: data.rx_sender_host || null,
+            sender_port: data.rx_sender_port === '' ? null : Number(data.rx_sender_port),
+            sender_passphrase: data.rx_sender_passphrase || null,
             rist_encryption_bits: Number(data.rx_encryption_bits),
         },
         settings: {
@@ -107,6 +113,7 @@ function formatDate(iso) {
 
 const isRist = computed(() => form.rx_mode !== 'srt');
 const isMulticast = computed(() => form.rx_mode === 'rist_multicast');
+const isCaller = computed(() => form.rx_mode === 'rist_caller');
 const ristSupported = computed(() => receiver.rist_supported !== false);
 
 // Same alphabet/length as the device's own generate_passphrase().
@@ -123,6 +130,8 @@ function generatePassphrase() {
 const connectUrl = computed(() => {
     const latencyMs = receiver.srt_latency_ms ?? 120;
     const bufferMs = receiver.rist_buffer_ms ?? 500;
+    // The sender is the listener in caller mode: nothing to configure it with.
+    if (isCaller.value) return null;
     if (form.rx_mode === 'srt') {
         if (!props.device.hostname || !form.rx_passphrase) return null;
         return `srt://${props.device.hostname}.local:${receiver.srt_port ?? 7002}?mode=caller&latency=${latencyMs * 1000}&passphrase=${encodeURIComponent(form.rx_passphrase)}`;
@@ -291,9 +300,11 @@ function copyConnectUrl() {
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.mode') }}</label>
                             <select v-model="form.rx_mode" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                                 <option value="srt">SRT</option>
-                                <option value="rist_unicast" :disabled="!ristSupported">RIST Unicast</option>
+                                <option value="rist_unicast" :disabled="!ristSupported">{{ $t('slide_announcers.mode_rist_unicast') }}</option>
+                                <option value="rist_caller" :disabled="!ristSupported">{{ $t('slide_announcers.mode_rist_caller') }}</option>
                                 <option value="rist_multicast" :disabled="!ristSupported">RIST Multicast</option>
                             </select>
+                            <p class="mt-1 text-xs text-gray-500">{{ $t(`slide_announcers.mode_hint.${form.rx_mode}`) }}</p>
                             <p v-if="!ristSupported" class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.rist_unsupported') }}</p>
                             <p v-if="form.errors['srt_sink_config.mode']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.mode'] }}</p>
                         </div>
@@ -308,7 +319,7 @@ function copyConnectUrl() {
                     </div>
 
                     <!-- SRT / RIST Unicast: the device listens, senders connect to it. -->
-                    <div v-if="!isMulticast">
+                    <div v-if="!isMulticast && !isCaller">
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.passphrase') }}</label>
                         <div class="flex gap-2">
                             <input v-model="form.rx_passphrase" type="text" autocomplete="off" spellcheck="false"
@@ -318,6 +329,28 @@ function copyConnectUrl() {
                         </div>
                         <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.passphrase_help') }}</p>
                         <p v-if="form.errors['srt_sink_config.passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.passphrase'] }}</p>
+                    </div>
+
+                    <!-- RIST Caller: the device connects out to a sender that is the RIST listener. -->
+                    <div v-else-if="isCaller" class="grid grid-cols-1 sm:grid-cols-[1fr_8rem] gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.sender_host') }}</label>
+                            <input v-model="form.rx_sender_host" type="text" placeholder="obs-pc.local" autocomplete="off" spellcheck="false"
+                                class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="form.errors['srt_sink_config.sender_host']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.sender_host'] }}</p>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.udp_port') }}</label>
+                            <input v-model="form.rx_sender_port" type="number" min="1024" max="65534" step="2"
+                                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="form.errors['srt_sink_config.sender_port']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.sender_port'] }}</p>
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.passphrase') }}</label>
+                            <input v-model="form.rx_sender_passphrase" type="text" autocomplete="off" spellcheck="false"
+                                :placeholder="$t('slide_announcers.passphrase_placeholder')" class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="form.errors['srt_sink_config.sender_passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.sender_passphrase'] }}</p>
+                        </div>
                     </div>
 
                     <!-- RIST Multicast: the device joins the group the sender transmits to. -->

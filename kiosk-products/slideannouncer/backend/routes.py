@@ -115,6 +115,9 @@ class SrtSinkSettingsRequest(BaseModel):
     multicast_group: str | None = None
     multicast_port: int | None = None
     multicast_passphrase: str | None = None
+    sender_host: str | None = None
+    sender_port: int | None = None
+    sender_passphrase: str | None = None
     rist_buffer_ms: int | None = None
     rist_encryption_bits: int | None = None
 
