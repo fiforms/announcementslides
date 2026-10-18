@@ -30,6 +30,7 @@ paired with; that's entirely the trust store's job.
 """
 import base64
 import hashlib
+import ipaddress
 import json
 import os
 import re
@@ -38,7 +39,7 @@ import socket
 import threading
 import time
 from pathlib import Path
-from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, unquote, urlencode, urlsplit, urlunsplit
 
 import httpx
 import socketio
@@ -369,11 +370,95 @@ def handle_rist_screen(payload: dict, master_host: str) -> None:
     write_rist_push({**params, "host": master_host})
 
 
-def handle_peer_command(command: dict, master_host: str | None = None) -> None:
+def is_private_or_local_host(hostname: str) -> bool:
+    """localhost, loopback, and RFC1918 (10/8, 172.16/12, 192.168/16) — the
+    only hosts a master's own page origin can plausibly be, and so the only
+    ones worth rewriting. Public/external hosts are left alone."""
+    host = (hostname or "").strip("[]").lower()
+    if host == "localhost":
+        return True
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    return ip.is_loopback or (ip.version == 4 and ip.is_private and not ip.is_link_local)
+
+
+def _rewrite_authority(url: str, host: str, port: int) -> str:
+    parts = urlsplit(url)
+    netloc_host = f"[{host}]" if ":" in host else host
+    userinfo = parts.netloc.rpartition("@")[0]
+    netloc = f"{userinfo + '@' if userinfo else ''}{netloc_host}:{port}"
+    return urlunsplit(parts._replace(netloc=netloc))
+
+
+def _should_rewrite(parts, endpoint: tuple[str, int], nat_compatible: bool) -> bool:
+    if not is_private_or_local_host(parts.hostname or ""):
+        return False
+    if nat_compatible:
+        return True
+    default_port = 443 if parts.scheme == "https" else 80
+    return parts.hostname != endpoint[0] or (parts.port or default_port) != endpoint[1]
+
+
+def rewrite_presentation_url(url, endpoint: tuple[str, int] | None, nat_compatible: bool = False) -> str | None:
+    """The master builds `url` from its own page origin (http://localhost:8000/
+    ...) and relies on each peer to swap in the master's reachable host:port.
+    Mirrors revelation-electron-wrapper's maybeRewritePeerPresentationUrl.
+
+    Returns None for a URL that must not be opened (missing, unparseable, or
+    not http/https). Otherwise the URL — rewritten only when its host is
+    private/local and differs from `endpoint` (always, if nat_compatible),
+    path and query untouched; a nested `src` query param gets the same
+    treatment. No known endpoint leaves it unchanged. `remoteMultiplexId`
+    is deliberately kept: it is what puts the page in follower mode."""
+    if not isinstance(url, str) or not url:
+        return None
+    try:
+        parts = urlsplit(url)
+        parts.port  # noqa: B018 - raises ValueError on a bad port
+    except ValueError:
+        return None
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        return None
+    if endpoint is None:
+        return url
+    host, port = endpoint
+    result = url
+    if _should_rewrite(parts, endpoint, nat_compatible):
+        result = _rewrite_authority(url, host, port)
+    # Nested src: edit the raw query in place so the rest stays byte-identical.
+    result_parts = urlsplit(result)
+    pieces = result_parts.query.split("&") if result_parts.query else []
+    changed = False
+    for i, piece in enumerate(pieces):
+        key, sep, value = piece.partition("=")
+        if key != "src" or not sep:
+            continue
+        nested = unquote(value)
+        try:
+            nested_parts = urlsplit(nested)
+            nested_parts.port  # noqa: B018
+        except ValueError:
+            continue
+        if nested_parts.scheme in ("http", "https") and nested_parts.hostname \
+                and _should_rewrite(nested_parts, endpoint, nat_compatible):
+            pieces[i] = f"src={quote(_rewrite_authority(nested, host, port), safe='')}"
+            changed = True
+    if changed:
+        result = urlunsplit(result_parts._replace(query="&".join(pieces)))
+    return result
+
+
+def handle_peer_command(command: dict, master_host: str | None = None,
+                        master_port: int | None = None, nat_compatible: bool = False) -> None:
     command_type = command.get("type")
     if command_type == "open-presentation":
-        url = (command.get("payload") or {}).get("url")
-        if url:
+        endpoint = (master_host, master_port) if master_host and master_port else None
+        url = rewrite_presentation_url((command.get("payload") or {}).get("url"), endpoint, nat_compatible)
+        if url is None:
+            log("open-presentation rejected: url missing or not http(s)")
+        else:
             url = apply_display_settings(url)
             log(f"open-presentation -> {url}")
             cdp_navigate(url)
@@ -468,7 +553,7 @@ def peer_worker(peer: dict, own_instance_id: str, discovery: _DiscoveryListener,
         def on_peer_command(data):
             connections[instance_id]["lastCommand"] = data
             data = data or {}
-            handle_peer_command(data.get("command") or data, host)
+            handle_peer_command(data.get("command") or data, host, port, bool(peer.get("natCompatible")))
 
         try:
             client.connect(
