@@ -23,15 +23,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'slide-announcer.auth' => \App\Http\Middleware\EnsureSlideAnnouncer::class,
         ]);
 
-        // Behind an nginx reverse proxy: trust its X-Forwarded-* headers so
-        // $request->ip() is the real client. Set TRUSTED_PROXIES to the proxy's
-        // IP(s)/CIDR(s), comma-separated, or '*' to trust any upstream.
-        $middleware->trustProxies(
-            at: array_filter(array_map('trim', explode(',', env('TRUSTED_PROXIES', '*')))),
-            headers: Request::HEADER_X_FORWARDED_FOR |
-                Request::HEADER_X_FORWARDED_HOST |
-                Request::HEADER_X_FORWARDED_PORT |
-                Request::HEADER_X_FORWARDED_PROTO,
+        // Behind an nginx reverse proxy; see TRUSTED_PROXIES in .env.
+        $middleware->replace(
+            \Illuminate\Http\Middleware\TrustProxies::class,
+            \App\Http\Middleware\TrustProxies::class,
         );
     })
     ->withExceptions(function (Exceptions $exceptions): void {
