@@ -3,6 +3,7 @@ the master builds URLs from its own origin (localhost:8000) and relies on the
 peer to point them at the master's real address."""
 import importlib
 import importlib.util
+import os
 import sys
 import types
 from importlib.machinery import SourceFileLoader
@@ -11,7 +12,10 @@ from urllib.parse import quote
 
 import pytest
 
-SCRIPT = Path(__file__).resolve().parents[1] / "image/system/scripts/slide-announcer-revelation-peer"
+# run-tests.sh stages this file under backend/products/<name>/, so locate the
+# product by PRODUCT_ROOT when set rather than relative to this file.
+PRODUCT_DIR = Path(os.environ.get("PRODUCT_ROOT") or Path(__file__).resolve().parents[1])
+SCRIPT = PRODUCT_DIR / "image/system/scripts/slide-announcer-revelation-peer"
 # The daemon imports OS-image-only packages at module level; none are needed
 # by the pure URL logic, so stub whichever are missing in a dev environment.
 for _name in ("httpx", "socketio", "websocket", "zeroconf", "cryptography.exceptions",

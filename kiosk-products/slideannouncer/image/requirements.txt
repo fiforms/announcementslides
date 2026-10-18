@@ -1,0 +1,4 @@
+# Product-specific Python deps, appended to local-app/backend/requirements.txt.
+# Revelation peering (backend/revelation.py): mDNS discovery and pairing crypto.
+zeroconf==0.132.*
+cryptography==43.0.*
