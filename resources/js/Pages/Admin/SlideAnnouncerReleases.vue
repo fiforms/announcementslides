@@ -20,7 +20,7 @@ const { isUploading, uploadError, overallProgress, upload } = useChunkedUpload({
 });
 
 const RELEASE_TYPES_BY_KIND = {
-    os: ['full', 'hotfix', 'disk_image'],
+    os: ['full', 'hotfix', 'disk_image', 'virt_image'],
     app: ['full'],
 };
 
@@ -29,7 +29,7 @@ function kindShort(k) {
 }
 
 function typeShort(type) {
-    return ['full', 'hotfix', 'disk_image'].includes(type) ? t(`slide_announcers.type_short_${type}`) : type;
+    return ['full', 'hotfix', 'disk_image', 'virt_image'].includes(type) ? t(`slide_announcers.type_short_${type}`) : type;
 }
 
 const CHANNEL_ORDER = ['developer', 'testing', 'stable'];
@@ -51,13 +51,13 @@ function formatDateTime(iso) {
 function parseReleaseFilename(filename) {
     // Versions are <platform X.Y.Z> or the pair <platform>_<product>.
     const v = '\\d+\\.\\d+\\.\\d+(?:_\\d+\\.\\d+\\.\\d+)?';
-    const match = new RegExp(`^slideannouncer-(${v})(?:\\.hotfix\\.from\\.(${v}))?\\.(?:raucb|tar\\.gz|img\\.xz)$`, 'i').exec(filename)
+    const match = new RegExp(`^slideannouncer-(${v})(?:\\.hotfix\\.from\\.(${v})|(-virt))?\\.(?:raucb|tar\\.gz|img\\.xz)$`, 'i').exec(filename)
         ?? new RegExp(`^slide-announcer-local-app-(${v})(?:-.+)?\\.tar\\.gz$`, 'i').exec(filename);
     if (!match) return null;
-    const [, version, base] = match;
+    const [, version, base, virt] = match;
     return {
         version,
-        release_type: base ? 'hotfix' : 'full',
+        release_type: base ? 'hotfix' : (virt ? 'virt_image' : 'full'),
         required_base_version: base ?? null,
     };
 }
@@ -97,7 +97,7 @@ const currentReleases = computed(() => releases.value.filter(r => r.channels.len
 const archivedReleases = computed(() => releases.value.filter(r => r.channels.length === 0));
 
 const acceptedExtension = computed(() => (
-    kind.value === 'os' && releaseType.value === 'disk_image' ? '.img.xz' :
+    kind.value === 'os' && ['disk_image', 'virt_image'].includes(releaseType.value) ? '.img.xz' :
     kind.value === 'os' ? '.raucb' : '.tar.gz'
 ));
 const canSubmit = computed(() => selectedFile.value && version.value.trim() && architecture.value.trim()
@@ -527,6 +527,9 @@ async function copyToClipboard(text, which) {
                             class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700 flex-shrink-0">
                             {{ $t('slide_announcers.download') }}
                         </a>
+                    </div>
+                    <div v-if="detailsRelease.release_type === 'virt_image'" class="mt-2 text-xs text-amber-700">
+                        <p>{{ $t('slide_announcers.virt_warning_admin') }}</p>
                     </div>
                     <div v-if="detailsRelease.release_type === 'disk_image'" class="mt-2 text-xs text-gray-500 space-y-1">
                         <i18n-t keypath="slide_announcers.etcher_help_admin" tag="p">

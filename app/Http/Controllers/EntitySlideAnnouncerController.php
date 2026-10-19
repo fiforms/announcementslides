@@ -48,24 +48,26 @@ class EntitySlideAnnouncerController extends Controller
                 'code' => $pairingCode->code,
                 'expires_at' => $pairingCode->expires_at->toIso8601String(),
             ] : null,
-            'diskImages' => $this->diskImages(),
+            'diskImages' => $this->diskImages('disk_image'),
+            'virtImages' => $this->diskImages('virt_image'),
             'languages' => Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']),
         ]);
     }
 
     /**
-     * Current os/disk_image releases tagged stable or testing, grouped by
+     * Current os releases of $releaseType (disk_image for SD cards, virt_image
+     * for VM testing) tagged stable or testing, grouped by
      * architecture, so an entity leader can grab an SD-card image to
      * provision a new device without needing admin access — the same
      * releases platform admins publish from Admin/SlideAnnouncerReleases,
      * just filtered to the two channels an entity actually points devices
      * at (developer is admin/tester-only, so it's excluded here).
      */
-    private function diskImages(): array
+    private function diskImages(string $releaseType): array
     {
         return SlideAnnouncerRelease::query()
             ->where('kind', 'os')
-            ->where('release_type', 'disk_image')
+            ->where('release_type', $releaseType)
             ->with('channels')
             ->get()
             ->filter(fn (SlideAnnouncerRelease $release) => $release->channels

@@ -9,6 +9,7 @@ const props = defineProps({
     devices: { type: Array, default: () => [] },
     pairingCode: { type: Object, default: null },
     diskImages: { type: Array, default: () => [] },
+    virtImages: { type: Array, default: () => [] },
 });
 
 const { t, locale } = useI18n();
@@ -104,6 +105,46 @@ function formatBytes(bytes) {
                     </table>
                 </div>
                 <p v-else class="text-sm text-gray-500">{{ $t('slide_announcers.no_images') }}</p>
+            </div>
+
+            <div v-if="virtImages.length" class="rounded-xl border border-amber-300 bg-amber-50 p-6 shadow-sm space-y-3">
+                <h2 class="text-sm font-semibold text-amber-900 uppercase tracking-wide">
+                    <span class="mr-2 rounded bg-amber-200 px-2 py-0.5 text-xs font-bold text-amber-900">{{ $t('slide_announcers.virt_badge') }}</span>
+                    {{ $t('slide_announcers.virt_title') }}
+                </h2>
+                <p class="text-sm font-medium text-amber-900">{{ $t('slide_announcers.virt_warning') }}</p>
+                <i18n-t keypath="slide_announcers.virt_help" tag="p" class="text-sm text-amber-900">
+                    <template #instructions>
+                        <a href="https://github.com/fiforms/slideannouncer/blob/main/image-builder/README.md#virt-uefivm-test-image--buildsh---virt"
+                            target="_blank" rel="noopener noreferrer"
+                            class="underline font-medium">{{ $t('slide_announcers.virt_instructions_link') }}</a>
+                    </template>
+                </i18n-t>
+                <div class="overflow-hidden rounded-lg border border-amber-200 bg-white">
+                    <table class="min-w-full divide-y divide-gray-200 text-sm">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-2 text-left font-medium text-gray-500">{{ $t('slide_announcers.architecture') }}</th>
+                                <th class="px-4 py-2 text-left font-medium text-gray-500">{{ $t('slide_announcers.col_stable') }}</th>
+                                <th class="px-4 py-2 text-left font-medium text-gray-500">{{ $t('slide_announcers.col_testing') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            <tr v-for="row in virtImages" :key="row.architecture">
+                                <td class="px-4 py-2 font-mono text-gray-900">{{ row.architecture }}</td>
+                                <td v-for="channel in ['stable', 'testing']" :key="channel" class="px-4 py-2">
+                                    <template v-if="row[channel]">
+                                        <a :href="row[channel].url" download class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                            v{{ row[channel].version }} (VM)
+                                        </a>
+                                        <span class="text-gray-500"> &middot; {{ formatBytes(row[channel].file_size) }}</span>
+                                    </template>
+                                    <span v-else class="text-gray-400">—</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <div v-if="devices.length" class="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">

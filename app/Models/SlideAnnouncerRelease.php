@@ -14,8 +14,10 @@ class SlideAnnouncerRelease extends Model
     // .tar.gz); 'hotfix' (os only, .raucb) requires required_base_version
     // and only applies on top of that exact version; 'disk_image' (os
     // only, .img.xz) is a flashable disk image for re-imaging an SD card,
-    // never an OTA candidate.
-    const RELEASE_TYPES = ['full', 'hotfix', 'disk_image'];
+    // never an OTA candidate. 'virt_image' (os only, .img.xz) is the UEFI
+    // disk image `build.sh --virt` makes for testing in an arm64 VM — also
+    // never an OTA candidate, and never for an SD card.
+    const RELEASE_TYPES = ['full', 'hotfix', 'disk_image', 'virt_image'];
 
     /**
      * A release/device version: <platform X.Y.Z> optionally paired with the
@@ -116,7 +118,7 @@ class SlideAnnouncerRelease extends Model
      * Parses a filename like "slideannouncer-1.2.0.raucb", a pair-versioned
      * "slideannouncer-0.4.0_0.1.1.raucb", or
      * "slideannouncer-1.2.1.hotfix.from.1.2.0.raucb" (versions may be pairs
-     * in both places), or a local-app build archive
+     * in both places), a VM test image "slideannouncer-0.4.0_0.1.1-virt.img.xz", or a local-app build archive
      * "slide-announcer-local-app-0.4.0_0.1.1-<hash>….tar.gz" (as
      * local-app/package.sh names it), into version/
      * release_type/required_base_version. Returns null for anything else
@@ -129,7 +131,7 @@ class SlideAnnouncerRelease extends Model
     {
         $v = self::VERSION_PATTERN;
         $pattern = "/^slideannouncer-(?<version>{$v})"
-            . "(?:\\.hotfix\\.from\\.(?<base>{$v}))?"
+            . "(?:\\.hotfix\\.from\\.(?<base>{$v})|(?<virt>-virt))?"
             . '\.(?:raucb|tar\.gz|img\.xz)$/i';
         $appArchive = "/^slide-announcer-local-app-(?<version>{$v})(?:-.+)?\\.tar\\.gz$/i";
 
@@ -141,7 +143,7 @@ class SlideAnnouncerRelease extends Model
 
         return [
             'version' => $matches['version'],
-            'release_type' => $base !== '' ? 'hotfix' : 'full',
+            'release_type' => $base !== '' ? 'hotfix' : (($matches['virt'] ?? '') !== '' ? 'virt_image' : 'full'),
             'required_base_version' => $base !== '' ? $base : null,
         ];
     }

@@ -117,7 +117,7 @@ class SlideAnnouncerReleaseController extends Controller
 
         // disk_image is an os-only flashable archive, never an app variant;
         // hotfix requires a base version, full/disk_image must not have one.
-        if ($data['release_type'] === 'disk_image' && $data['kind'] !== 'os') {
+        if (in_array($data['release_type'], ['disk_image', 'virt_image'], true) && $data['kind'] !== 'os') {
             return response()->json(['message' => 'Disk images are only valid for the os kind.'], 422);
         }
         if ($data['release_type'] !== 'hotfix' && ! empty($data['required_base_version'])) {
@@ -144,6 +144,7 @@ class SlideAnnouncerReleaseController extends Controller
         $suffix = match ($data['release_type']) {
             'hotfix' => "-hotfix-from-{$data['required_base_version']}",
             'disk_image' => '-disk-image',
+            'virt_image' => '-virt-image',
             default => '',
         };
         $finalPath = "slide-announcer/releases/{$data['kind']}/{$data['architecture']}/{$data['version']}{$suffix}.{$extension}";
@@ -206,13 +207,14 @@ class SlideAnnouncerReleaseController extends Controller
 
     /**
      * (os,full) and (os,hotfix) are RAUC bundles; (os,disk_image) is a
-     * flashable .img.xz disk image; (app,full) is the local-app .tar.gz
-     * archive. Only these four combinations are valid — enforced by
+     * flashable .img.xz disk image and so is (os,virt_image), a UEFI image for
+     * VMs; (app,full) is the local-app .tar.gz
+     * archive. Only these five combinations are valid — enforced by
      * finalize()'s disk_image kind check above.
      */
     private function expectedExtension(string $kind, string $releaseType): string
     {
-        return $kind === 'os' && $releaseType === 'disk_image' ? 'img.xz' : ($kind === 'os' ? 'raucb' : 'tar.gz');
+        return $kind === 'os' && in_array($releaseType, ['disk_image', 'virt_image'], true) ? 'img.xz' : ($kind === 'os' ? 'raucb' : 'tar.gz');
     }
 
     /**

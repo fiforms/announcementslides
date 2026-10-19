@@ -58,6 +58,7 @@ class SlideAnnouncerReleaseVersionTest extends TestCase
             'pair to pair'      => ['slideannouncer-0.4.1_0.1.1.hotfix.from.0.4.1_0.1.0.raucb', ['version' => '0.4.1_0.1.1', 'release_type' => 'hotfix', 'required_base_version' => '0.4.1_0.1.0']],
             'app archive'       => ['slide-announcer-local-app-0.4.0_0.1.1-8066cfc-slideannouncer-e4b6392.tar.gz', ['version' => '0.4.0_0.1.1', 'release_type' => 'full', 'required_base_version' => null]],
             'legacy app archive' => ['slide-announcer-local-app-0.4.0-8066cfc-slideannouncer-b0.1.0-f0.1.0-8f51f4b.tar.gz', ['version' => '0.4.0', 'release_type' => 'full', 'required_base_version' => null]],
+            'vm test image'     => ['slideannouncer-0.4.2_0.1.9-virt.img.xz', ['version' => '0.4.2_0.1.9', 'release_type' => 'virt_image', 'required_base_version' => null]],
             'unrelated'         => ['notes.txt', null],
             'plus is not a separator' => ['slideannouncer-0.4.0+0.1.1.raucb', null],
         ];
