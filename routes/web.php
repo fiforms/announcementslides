@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\EntityConsoleController;
+use App\Http\Controllers\Admin\PromoShowController as AdminPromoShowController;
 use App\Http\Controllers\Admin\SlideAnnouncerConsoleController;
 use App\Http\Controllers\Admin\SlideAnnouncerReleaseController;
 use App\Http\Controllers\Admin\SlideController as AdminSlideController;
@@ -189,6 +190,12 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
 
     Route::post('/invitations', [AdminUserController::class, 'storeInvitation'])->name('invitations.store');
     Route::delete('/invitations/{invitation}', [AdminUserController::class, 'destroyInvitation'])->name('invitations.destroy');
+
+    // ── Promo shows (globally-distributed one-off shows) ──────────────────
+    Route::get('/promo-shows', [AdminPromoShowController::class, 'index'])->name('promo-shows.index');
+    Route::patch('/promo-shows/{promo}', [AdminPromoShowController::class, 'update'])->name('promo-shows.update');
+    Route::delete('/promo-shows/{promo}/slides/{slide}', [AdminPromoShowController::class, 'detachSlide'])->name('promo-shows.slides.detach');
+    Route::delete('/promo-shows/{promo}', [AdminPromoShowController::class, 'destroy'])->name('promo-shows.destroy');
 
     // ── Entity console (admin oversight of entity-scoped slides) ──────────
     Route::get('/entities', [EntityConsoleController::class, 'index'])->name('entities.index');

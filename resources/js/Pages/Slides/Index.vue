@@ -18,6 +18,7 @@ const props = defineProps({
     selectedLanguage: { type: String, default: null },
     entityId: { type: Number, default: null },
     showId: { type: Number, default: null },
+    promoId: { type: Number, default: null },
     frame: { type: Object, default: null },
     availableShows: { type: Array, default: () => [] },
     initialSlide: { type: Object, default: null },
@@ -27,6 +28,12 @@ const props = defineProps({
 // at display time instead of using the stored (English) name.
 const showLabel = (show) => show.system ? t(`shows.${show.system}`) : show.name;
 
+// Global View also lists every live promo (a globally-distributed one-off
+// show), which is addressed by ?promo= rather than a show id since every
+// site holds its own copy of it.
+const showKey = (show) => show.promo ? `promo-${show.promo}` : `show-${show.id}`;
+const selectedShowKey = computed(() => props.promoId ? `promo-${props.promoId}` : `show-${props.showId}`);
+
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
 
 // Reload the dashboard preserving the current entity / language / show state,
@@ -35,18 +42,21 @@ function reloadWith(overrides = {}) {
     const params = {
         language: currentLanguageCode.value,
         ...(props.entityId ? { entity_id: props.entityId } : {}),
-        ...(props.showId ? { show_id: props.showId } : {}),
+        ...(props.promoId ? { promo: props.promoId } : props.showId ? { show_id: props.showId } : {}),
         ...overrides,
     };
-    router.get(route('slides.index'), params, { preserveScroll: true });
+    // An override of null drops that param (e.g. leaving a promo for a show).
+    const query = Object.fromEntries(Object.entries(params).filter(([, v]) => v != null));
+    router.get(route('slides.index'), query, { preserveScroll: true });
 }
 
 function changeLanguage(code) {
     reloadWith({ language: code });
 }
 
-function changeShow(showId) {
-    reloadWith({ show_id: showId });
+function changeShow(key) {
+    const show = props.availableShows.find(s => showKey(s) === key);
+    reloadWith(show.promo ? { promo: show.promo, show_id: null } : { show_id: show.id, promo: null });
 }
 
 const selectedIds = ref(new Set());
@@ -84,6 +94,7 @@ function downloadAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showId) params.append('show_id', props.showId);
+    if (props.promoId) params.append('promo', props.promoId);
     if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
@@ -101,6 +112,7 @@ function downloadPowerPointAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showId) params.append('show_id', props.showId);
+    if (props.promoId) params.append('promo', props.promoId);
     if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
 }
@@ -134,6 +146,7 @@ function downloadRevelationAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showId) params.append('show_id', props.showId);
+    if (props.promoId) params.append('promo', props.promoId);
     if (props.entityId) params.append('entity_id', props.entityId);
     startRevelationDownload(route('slides.download-revelation') + `?${params.toString()}`);
 }
@@ -232,9 +245,9 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
                     </option>
                 </select>
 
-                <select v-if="availableShows.length > 1" :value="showId" @change="changeShow($event.target.value)"
+                <select v-if="availableShows.length > 1" :value="selectedShowKey" @change="changeShow($event.target.value)"
                     class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right">
-                    <option v-for="show in availableShows" :key="show.id" :value="show.id">{{ showLabel(show) }}</option>
+                    <option v-for="show in availableShows" :key="showKey(show)" :value="showKey(show)">{{ showLabel(show) }}</option>
                 </select>
 
                 <div class="flex flex-wrap gap-2">

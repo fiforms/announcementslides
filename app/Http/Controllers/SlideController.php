@@ -56,10 +56,11 @@ class SlideController extends Controller
         // request plays that entity's Main show by default (or another of
         // its shows via ?show_id=, to preview it) and a request with no
         // entity plays the Global Board by default (or a globally-pushed
-        // one-off show via ?show_id=). Nearby-shared slides get into a show
-        // via auto-add or a leader manually dragging them in — no separate
-        // live union needed.
+        // one-off "promo" show via ?promo=). Nearby-shared slides get into a
+        // show via auto-add or a leader manually dragging them in — no
+        // separate live union needed.
         $availableShows = [];
+        $promo = null;
 
         if ($entityId) {
             $entity = Entity::findOrFail($entityId);
@@ -70,16 +71,22 @@ class SlideController extends Controller
             $availableShows = $entityShows->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'system' => $s->is_main ? 'main' : null])->all();
         } else {
             $globalBoard = Show::globalBoard();
-            $showId = $request->query('show_id') ? (int) $request->query('show_id') : $globalBoard->id;
 
             // One-off distributed shows (e.g. a special promo video) don't have
-            // a single show row — each entity got its own copy — so pick one
-            // representative copy per template purely so an anonymous/global
-            // viewer can preview the same content.
+            // a single show row — each entity got its own copy — so they're
+            // addressed by template instead (a stable, hot-linkable ?promo=).
+            // A link to a promo that has since expired and been swept just
+            // falls back to the Global Board.
+            $promo = $request->query('promo')
+                ? GlobalShowTemplate::find((int) $request->query('promo'))
+                : null;
+            $showId = $promo ? null : ($request->query('show_id') ? (int) $request->query('show_id') : $globalBoard->id);
+
             $availableShows = collect([['id' => $globalBoard->id, 'name' => 'Announcements', 'system' => 'global']])
                 ->concat(
-                    GlobalShowTemplate::has('shows')->get()->map(fn ($t) => [
-                        'id' => $t->shows()->first()->id,
+                    GlobalShowTemplate::live()->orderBy('name')->get()->map(fn ($t) => [
+                        'id' => null,
+                        'promo' => $t->id,
                         'name' => $t->name,
                         'system' => null,
                     ])
@@ -90,7 +97,9 @@ class SlideController extends Controller
         // display filter (untagged slides always show).
         // Slides with no image and no overlay are invisible placeholders kept
         // in the show for editing; they aren't listed or played here.
-        $slidesQuery = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->orderedInShow($showId)->current()
+        $slidesQuery = ($promo ? $promo->slidesQuery() : Slide::orderedInShow($showId))
+            ->with(['primaryMedia', 'overlayMedia', 'media'])
+            ->current()
             ->withContent()
             ->language($languageId);
         $slides = $slidesQuery->get()->map(fn ($s) => $this->slideResource($s));
@@ -124,6 +133,7 @@ class SlideController extends Controller
             'selectedLanguage' => $languageCode,
             'entityId' => $entityId,
             'showId' => $showId,
+            'promoId' => $promo?->id,
             'frame' => $frame,
             'availableShows' => $availableShows,
             'initialSlide' => $initialSlide,
@@ -475,6 +485,11 @@ class SlideController extends Controller
         if ($languageCode) {
             $language = Language::where('abbreviation', $languageCode)->first();
             $languageId = $language?->id;
+        }
+
+        if ($promoId = $request->query('promo')) {
+            return GlobalShowTemplate::findOrFail((int) $promoId)->slidesQuery()
+                ->with('primaryMedia')->current()->language($languageId)->get();
         }
 
         if ($showId) {
