@@ -30,6 +30,7 @@ const MEDIA_TYPE_LABELS = {
 };
 
 function mediaLabel(media) {
+    if (media.media_type === 'slide' && media.mime_type?.startsWith('video/')) return 'Video';
     return MEDIA_TYPE_LABELS[media.media_type] ?? media.media_type;
 }
 
