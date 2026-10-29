@@ -8,6 +8,8 @@ import { checkSlideReadability } from '@/Composables/useQrScan.js';
 // is opened and again whenever its image or overlay change.
 const props = defineProps({
     media: { type: Array, default: () => [] },
+    // The slide's link as currently typed, to check against the codes.
+    link: { type: String, default: '' },
 });
 
 const checking = ref(false);
@@ -18,6 +20,12 @@ const signature = computed(() => JSON.stringify(
         .filter(m => ['slide', 'slide-overlay'].includes(m.media_type))
         .map(m => [m.id, m.media_type, m.file_url, m.file_size, m.active_variant]),
 ));
+
+const normalize = url => (url ?? '').trim().replace(/\/+$/, '');
+const knownCodes = computed(() => [...new Set([...(result.value?.texts ?? []), ...(result.value?.expected ?? [])])]);
+const linkMismatch = computed(() => normalize(props.link) !== ''
+    && knownCodes.value.length > 0
+    && !knownCodes.value.some(code => normalize(code) === normalize(props.link)));
 
 let run = 0;
 async function check() {
@@ -46,6 +54,10 @@ watch(signature, check);
             Check its size, contrast and the picture behind it.
         </p>
         <p v-else-if="!result.codes.length" class="mt-1 text-xs text-gray-500">No QR Code Detected</p>
+        <p v-if="linkMismatch" class="mt-2 text-sm font-semibold text-red-600">
+            Error: this link doesn't match the QR code on the slide
+            (<span class="break-all">{{ knownCodes.join(', ') }}</span>). Use the "Use QR Link" button, or change the QR code.
+        </p>
         <div v-if="result.issues.length" class="mt-2">
             <ValidationWarnings :issues="result.issues" title="QR code may be hard to scan" />
         </div>

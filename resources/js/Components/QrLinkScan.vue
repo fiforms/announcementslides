@@ -32,7 +32,7 @@ async function scan() {
     <div class="text-right">
         <button type="button" @click="scan" :disabled="scanning"
             class="text-xs font-medium text-indigo-600 hover:text-indigo-800 disabled:text-gray-400">
-            {{ scanning ? 'Scanning…' : 'Scan for QR code' }}
+            {{ scanning ? 'Scanning…' : 'Use QR Link' }}
         </button>
         <div v-if="error" class="mt-1 text-xs text-red-600">{{ error }}</div>
         <div v-else-if="urls && !urls.length" class="mt-1 text-xs text-gray-500">

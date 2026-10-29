@@ -759,7 +759,7 @@ function persistLeaderOrder() {
                                 <input v-model="editForm.link" type="url" placeholder="https://…"
                                     class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                                 <p v-if="editForm.errors.link" class="mt-1 text-xs text-red-600">{{ editForm.errors.link }}</p>
-                                <QrReadability :media="editingSlide.media ?? []" />
+                                <QrReadability :media="editingSlide.media ?? []" :link="editForm.link ?? ''" />
                             </div>
 
                             <div v-if="editingSlide.mime_type?.startsWith('video/')">
