@@ -51,6 +51,7 @@ const addToShow     = ref('main'); // 'main' | 'separate' | 'none'
 const targetShowId  = ref('');
 const newShowName   = ref('');
 const token         = ref('');
+const promoToken    = ref('');
 
 const busy = computed(() => isUploading.value || resize.isResizing.value);
 // An image, or at least a title: a slide may have no image (overlay/widgets
@@ -135,6 +136,7 @@ async function submit() {
             }
         } else {
             payload.new_show_name = newShowName.value;
+            if (!props.entityId && promoToken.value.trim()) payload.promo_token = promoToken.value.trim().toLowerCase();
         }
     }
 
@@ -152,6 +154,7 @@ async function submit() {
                 resize.reset();
                 title.value         = '';
                 token.value         = '';
+                promoToken.value    = '';
                 notes.value         = '';
                 textDescription.value = '';
                 link.value          = '';
@@ -324,6 +327,12 @@ async function submit() {
                         </select>
                         <input v-if="!targetShowId" v-model="newShowName" type="text" :placeholder="$t('show_manage.new_show_name_placeholder')"
                             class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    </div>
+                    <div v-if="addToShow === 'separate' && !targetShowId && !entityId" class="mt-2 flex items-center gap-1 text-sm text-gray-500">
+                        <span>/?promo=</span>
+                        <input v-model="promoToken" type="text" maxlength="32" autocapitalize="none" autocomplete="off" spellcheck="false"
+                            class="w-40 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            :placeholder="$t('upload.promo_token_placeholder')" />
                     </div>
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input v-model="addToShow" type="radio" value="none"

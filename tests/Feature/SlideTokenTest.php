@@ -125,4 +125,95 @@ class SlideTokenTest extends TestCase
         $this->finalize(User::factory()->create(), ['token' => 'camp26'])->assertForbidden();
         $this->assertSame(0, Slide::count());
     }
+
+    public function test_shows_and_promos_get_unique_immutable_tokens(): void
+    {
+        $entity = Entity::create(['name' => 'Local']);
+        $show = \App\Models\Show::mainFor($entity);
+        $promo = \App\Models\GlobalShowTemplate::create(['name' => 'Camp']);
+
+        foreach ([$show, $promo, \App\Models\Show::globalBoard()] as $model) {
+            $this->assertMatchesRegularExpression('/^[bcdfghjkmnpqrstvwxz2567]{6}$/', $model->token);
+        }
+
+        $original = $show->token;
+        $show->update(['token' => 'camp26', 'name' => 'Renamed']);
+        $this->assertSame($original, $show->fresh()->token);
+        $this->assertNotSame($show->token, $promo->token);
+    }
+
+    public function test_show_param_only_selects_a_show_of_the_requested_entity(): void
+    {
+        $a = Entity::create(['name' => 'A']);
+        $b = Entity::create(['name' => 'B']);
+        $showA = \App\Models\Show::mainFor($a);
+        $showB = \App\Models\Show::mainFor($b);
+        $this->actingAs(User::factory()->create(['role' => 'admin']));
+
+        $this->get(route('slides.index', ['entity_id' => $a->id, 'show' => $showB->token]))
+            ->assertInertia(fn (Assert $page) => $page->where('showToken', $showA->token));
+        $this->get(route('slides.index', ['entity_id' => $a->id, 'show' => $showA->token]))
+            ->assertInertia(fn (Assert $page) => $page->where('showToken', $showA->token));
+        // Without an entity only global shows resolve; an entity's show token falls back to the Global Board.
+        $this->get(route('slides.index', ['show' => $showA->token]))
+            ->assertInertia(fn (Assert $page) => $page->where('showToken', \App\Models\Show::globalBoard()->token));
+        // Numeric ids are no longer accepted.
+        $this->get(route('slides.index', ['entity_id' => $a->id, 'show_id' => $showB->id]))
+            ->assertInertia(fn (Assert $page) => $page->where('showToken', $showA->token));
+    }
+
+    public function test_a_downloads_unknown_show_or_promo_token_404s(): void
+    {
+        $this->get(route('slides.download-zip', ['show' => 'nope']))->assertNotFound();
+        $this->get(route('slides.download-zip', ['promo' => 'nope']))->assertNotFound();
+    }
+
+    public function test_a_contributor_can_name_a_new_promo_and_it_must_be_unique(): void
+    {
+        $user = User::factory()->create(['role' => 'contributor']);
+        \App\Models\GlobalShowTemplate::create(['name' => 'Old', 'token' => 'easter26']);
+
+        $this->finalize($user, ['add_to_show' => 'separate', 'new_show_name' => 'Camp', 'promo_token' => 'easter26'])->assertStatus(422);
+        $this->finalize($user, ['add_to_show' => 'main', 'promo_token' => 'camp26'])->assertStatus(422);
+        $this->finalize($user, ['add_to_show' => 'separate', 'new_show_name' => 'Camp', 'promo_token' => 'camp26'])->assertOk();
+
+        $this->assertSame('Camp', \App\Models\GlobalShowTemplate::where('token', 'camp26')->value('name'));
+    }
+
+    public function test_an_entitys_shows_are_private_to_its_members_and_admins(): void
+    {
+        $entity = Entity::create(['name' => 'Local']);
+        $show = \App\Models\Show::mainFor($entity);
+        $member = User::factory()->create();
+        $member->entities()->attach($entity->id, ['role' => 'viewer']);
+        $admin = User::factory()->create(['role' => 'admin']);
+        $outsider = User::factory()->create();
+        $query = ['entity_id' => $entity->id, 'show' => $show->token];
+
+        // Guests are sent to log in, signed-in non-members are refused.
+        $this->get(route('slides.index', $query))->assertRedirect(route('login'));
+        $this->get(route('slides.archive', ['entity_id' => $entity->id]))->assertRedirect(route('login'));
+        $this->get(route('slides.download-zip', $query))->assertRedirect(route('login'));
+        $this->actingAs($outsider)->get(route('slides.index', $query))->assertForbidden();
+        $this->actingAs($outsider)->get(route('slides.download-pptx', $query))->assertForbidden();
+
+        $this->actingAs($member)->get(route('slides.index', $query))->assertOk();
+        $this->actingAs($admin)->get(route('slides.index', $query))->assertOk();
+    }
+
+    public function test_global_views_stay_public_and_local_slide_downloads_need_membership(): void
+    {
+        $this->get(route('slides.index'))->assertOk();
+
+        $entity = Entity::create(['name' => 'Local']);
+        $slide = $this->slide(['entity_id' => $entity->id]);
+        $member = User::factory()->create();
+        $member->entities()->attach($entity->id, ['role' => 'viewer']);
+
+        $this->get(route('slides.download', $slide->token))->assertNotFound();
+        $this->actingAs(User::factory()->create())->get(route('slides.download', $slide->token))->assertNotFound();
+        // Past the visibility check (a slide with no media then 404s for lack of a file).
+        $this->actingAs($member)->get(route('slides.download', $slide->token))->assertNotFound();
+        $this->assertTrue(Slide::released()->visibleToUser($member)->whereKey($slide->id)->exists());
+    }
 }

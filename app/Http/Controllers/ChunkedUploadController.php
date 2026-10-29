@@ -11,6 +11,7 @@ use App\Models\Show;
 use App\Models\Slide;
 use App\Services\ImageValidationService;
 use App\Support\ImageResize;
+use App\Support\PublicToken;
 use App\Support\SlideToken;
 use App\Support\SortZones;
 use Illuminate\Http\Request;
@@ -136,6 +137,19 @@ class ChunkedUploadController extends Controller
             // Checked by hand: this app only renders JSON errors for api/*, so a
             // failed validate() here would redirect instead of reaching the form.
             $check = Validator::make(['token' => $token], ['token' => SlideToken::rules()]);
+            if ($check->fails()) {
+                return response()->json(['message' => $check->errors()->first('token'), 'errors' => $check->errors()], 422);
+            }
+        }
+
+        // Likewise a new one-off promo show's link name (?promo=camp26).
+        $promoToken = filled($request->promo_token) ? $request->promo_token : null;
+        if ($promoToken !== null) {
+            abort_unless($user->isContributor() && ! $request->entity_id, 403);
+            if ($request->add_to_show !== 'separate' || $request->global_template_id) {
+                return response()->json(['message' => 'A promo link name can only be set when creating a new one-off show.'], 422);
+            }
+            $check = Validator::make(['token' => $promoToken], ['token' => PublicToken::rules(GlobalShowTemplate::class)]);
             if ($check->fails()) {
                 return response()->json(['message' => $check->errors()->first('token'), 'errors' => $check->errors()], 422);
             }
@@ -346,6 +360,7 @@ class ChunkedUploadController extends Controller
             $template = $request->global_template_id
                 ? GlobalShowTemplate::findOrFail($request->global_template_id)
                 : GlobalShowTemplate::create([
+                    'token' => filled($request->promo_token) ? $request->promo_token : null,
                     'name' => $request->new_show_name,
                     'created_by' => $request->user()->id,
                 ]);

@@ -36,7 +36,7 @@ class PromoShowController extends Controller
                     'sites_count' => $t->shows_count,
                     'creator'     => $t->creator?->only('id', 'name'),
                     'created_at'  => $t->created_at->toIso8601String(),
-                    'public_url'  => route('slides.index', ['promo' => $t->id]),
+                    'public_url'  => route('slides.index', ['promo' => $t->token]),
                     'slides'      => $t->slidesQuery()->with('primaryMedia')->get()->map(fn (Slide $s) => [
                         'id'            => $s->id,
                         'title'         => $s->title,
@@ -47,7 +47,7 @@ class PromoShowController extends Controller
                         'publish_at'    => $s->publish_at?->toIso8601String(),
                         'expires_at'    => $s->expires_at?->toIso8601String(),
                         'is_current'    => in_array($s->id, $currentIds),
-                        'public_url'    => route('slides.show', ['slide' => $s->token, 'promo' => $t->id]),
+                        'public_url'    => route('slides.show', ['slide' => $s->token, 'promo' => $t->token]),
                     ]),
                 ];
             });

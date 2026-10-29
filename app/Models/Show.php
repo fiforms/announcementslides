@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use App\Models\Concerns\HasPublicToken;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 
@@ -31,10 +32,10 @@ use Illuminate\Support\Collection;
  */
 class Show extends Model
 {
-    use SoftDeletes;
+    use HasPublicToken, SoftDeletes;
 
     protected $fillable = [
-        'entity_id', 'global_template_id', 'name', 'is_main', 'language_id',
+        'token', 'entity_id', 'global_template_id', 'name', 'is_main', 'language_id',
         'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'created_by',
     ];
 

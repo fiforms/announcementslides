@@ -10,11 +10,11 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Entity;
 use App\Models\User;
 use App\Services\Widgets\OverlayWidgets;
-use App\Support\SlideToken;
+use App\Models\Concerns\HasPublicToken;
 
 class Slide extends Model
 {
-    use SoftDeletes;
+    use HasPublicToken, SoftDeletes;
 
     protected $fillable = [
         'token', 'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
@@ -31,23 +31,6 @@ class Slide extends Model
             'share_nearby' => 'boolean',
             'immutable' => 'boolean',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        // Every slide gets its public token at creation (a custom one, if the
-        // creator was allowed to choose it, is already set and was validated
-        // for uniqueness) — and it never changes afterwards, since it is the
-        // slide's shareable link.
-        static::creating(function (Slide $slide) {
-            $slide->token = filled($slide->token) ? $slide->token : SlideToken::generate();
-        });
-
-        static::updating(function (Slide $slide) {
-            if ($slide->isDirty('token')) {
-                $slide->token = $slide->getOriginal('token');
-            }
-        });
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────

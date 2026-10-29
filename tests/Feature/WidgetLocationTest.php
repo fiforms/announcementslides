@@ -77,7 +77,10 @@ class WidgetLocationTest extends TestCase
         WidgetLocation::saveDefault(self::CHARLOTTE);
         $church = $this->church();
 
-        $this->get('/?entity_id=' . $church->id)->assertInertia(fn (AssertableInertia $page) => $page
+        $member = \App\Models\User::factory()->create();
+        $member->entities()->attach($church->id, ['role' => 'viewer']);
+
+        $this->actingAs($member)->get('/?entity_id=' . $church->id)->assertInertia(fn (AssertableInertia $page) => $page
             ->where('widgetLocation.name', 'Wilmington, NC')
             ->where('widgetLocation.source', 'entity'));
 

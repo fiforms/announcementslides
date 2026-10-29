@@ -186,6 +186,7 @@
         "upload_first_link": "Sube tu primera diapositiva"
     },
     "upload": {
+        "promo_token_placeholder": "nombre de enlace (opcional)",
         "token_label": "Nombre de enlace personalizado",
         "token_hint": "Opcional. Letras, números y guiones, p. ej. camp26. Déjelo en blanco para uno aleatorio. No se puede cambiar después de subir.",
         "no_image_hint": "¿Sin imagen? Póngale un título. Puede agregar texto, un código QR o widgets como superposición, o una imagen más tarde.",

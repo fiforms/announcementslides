@@ -17,8 +17,8 @@ const props = defineProps({
     languages: { type: Array, default: () => [] },
     selectedLanguage: { type: String, default: null },
     entityId: { type: Number, default: null },
-    showId: { type: Number, default: null },
-    promoId: { type: Number, default: null },
+    showToken: { type: String, default: null },
+    promoToken: { type: String, default: null },
     frame: { type: Object, default: null },
     availableShows: { type: Array, default: () => [] },
     initialSlide: { type: Object, default: null },
@@ -29,10 +29,10 @@ const props = defineProps({
 const showLabel = (show) => show.system ? t(`shows.${show.system}`) : show.name;
 
 // Global View also lists every live promo (a globally-distributed one-off
-// show), which is addressed by ?promo= rather than a show id since every
-// site holds its own copy of it.
-const showKey = (show) => show.promo ? `promo-${show.promo}` : `show-${show.id}`;
-const selectedShowKey = computed(() => props.promoId ? `promo-${props.promoId}` : `show-${props.showId}`);
+// show), which is addressed by ?promo= rather than ?show= since every
+// site holds its own copy of it. Both use public tokens, never database ids.
+const showKey = (show) => show.promo ? `promo-${show.promo}` : `show-${show.token}`;
+const selectedShowKey = computed(() => props.promoToken ? `promo-${props.promoToken}` : `show-${props.showToken}`);
 
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
 
@@ -42,7 +42,7 @@ function reloadWith(overrides = {}) {
     const params = {
         language: currentLanguageCode.value,
         ...(props.entityId ? { entity_id: props.entityId } : {}),
-        ...(props.promoId ? { promo: props.promoId } : props.showId ? { show_id: props.showId } : {}),
+        ...(props.promoToken ? { promo: props.promoToken } : props.showToken ? { show: props.showToken } : {}),
         ...overrides,
     };
     // An override of null drops that param (e.g. leaving a promo for a show).
@@ -56,7 +56,7 @@ function changeLanguage(code) {
 
 function changeShow(key) {
     const show = props.availableShows.find(s => showKey(s) === key);
-    reloadWith(show.promo ? { promo: show.promo, show_id: null } : { show_id: show.id, promo: null });
+    reloadWith(show.promo ? { promo: show.promo, show: null } : { show: show.token, promo: null });
 }
 
 const selectedIds = ref(new Set());
@@ -79,10 +79,13 @@ function clearSelection() {
     selectedIds.value = new Set();
 }
 
+// Downloads name slides by their public token, never the database id.
+const selectedTokens = () => props.slides.filter(s => selectedIds.value.has(s.id)).map(s => s.token).join(',');
+
 const hasSelection = computed(() => selectedIds.value.size > 0);
 
 function downloadSelected() {
-    const ids = [...selectedIds.value].join(',');
+    const ids = selectedTokens();
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
     params.append('language', currentLanguageCode.value);
@@ -93,14 +96,14 @@ function downloadSelected() {
 function downloadAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
-    if (props.showId) params.append('show_id', props.showId);
-    if (props.promoId) params.append('promo', props.promoId);
+    if (props.showToken) params.append('show', props.showToken);
+    if (props.promoToken) params.append('promo', props.promoToken);
     if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-zip') + (params.toString() ? `?${params.toString()}` : '');
 }
 
 function downloadPowerPointSelected() {
-    const ids = [...selectedIds.value].join(',');
+    const ids = selectedTokens();
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
     params.append('language', currentLanguageCode.value);
@@ -111,8 +114,8 @@ function downloadPowerPointSelected() {
 function downloadPowerPointAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
-    if (props.showId) params.append('show_id', props.showId);
-    if (props.promoId) params.append('promo', props.promoId);
+    if (props.showToken) params.append('show', props.showToken);
+    if (props.promoToken) params.append('promo', props.promoToken);
     if (props.entityId) params.append('entity_id', props.entityId);
     window.location.href = route('slides.download-pptx') + (params.toString() ? `?${params.toString()}` : '');
 }
@@ -134,7 +137,7 @@ function startRevelationDownload(url) {
 }
 
 function downloadRevelationSelected() {
-    const ids = [...selectedIds.value].join(',');
+    const ids = selectedTokens();
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
     params.append('language', currentLanguageCode.value);
@@ -145,8 +148,8 @@ function downloadRevelationSelected() {
 function downloadRevelationAll() {
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
-    if (props.showId) params.append('show_id', props.showId);
-    if (props.promoId) params.append('promo', props.promoId);
+    if (props.showToken) params.append('show', props.showToken);
+    if (props.promoToken) params.append('promo', props.promoToken);
     if (props.entityId) params.append('entity_id', props.entityId);
     startRevelationDownload(route('slides.download-revelation') + `?${params.toString()}`);
 }

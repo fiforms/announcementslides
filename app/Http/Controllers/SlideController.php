@@ -14,6 +14,7 @@ use App\Services\RevelationSnapshotBuilder;
 use App\Services\VideoFrameExtractor;
 use App\Support\NearbyEntities;
 use App\Support\WidgetLocation;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -36,6 +37,7 @@ class SlideController extends Controller
         $languageCode = $request->query('language');
         $languageId = null;
         $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
+        $this->authorizeEntityView($request, $entityId);
 
         // If no language specified, try to detect from Accept-Language header (browser default)
         if (!$languageCode) {
@@ -65,10 +67,9 @@ class SlideController extends Controller
         if ($entityId) {
             $entity = Entity::findOrFail($entityId);
             $entityShows = Show::where('entity_id', $entityId)->orderByDesc('is_main')->orderBy('name')->get();
-            $showId = $request->query('show_id')
-                ? (int) $request->query('show_id')
-                : $entity->mainShow()->id;
-            $availableShows = $entityShows->map(fn ($s) => ['id' => $s->id, 'name' => $s->name, 'system' => $s->is_main ? 'main' : null])->all();
+            $selectedShow = $this->requestedShow($request, $entityId) ?? $entity->mainShow();
+            $showId = $selectedShow->id;
+            $availableShows = $entityShows->map(fn ($s) => ['id' => $s->id, 'token' => $s->token, 'name' => $s->name, 'system' => $s->is_main ? 'main' : null])->all();
         } else {
             $globalBoard = Show::globalBoard();
 
@@ -77,16 +78,16 @@ class SlideController extends Controller
             // addressed by template instead (a stable, hot-linkable ?promo=).
             // A link to a promo that has since expired and been swept just
             // falls back to the Global Board.
-            $promo = $request->query('promo')
-                ? GlobalShowTemplate::find((int) $request->query('promo'))
-                : null;
-            $showId = $promo ? null : ($request->query('show_id') ? (int) $request->query('show_id') : $globalBoard->id);
+            $promo = $this->requestedPromo($request);
+            $selectedShow = $promo ? null : ($this->requestedShow($request, null) ?? $globalBoard);
+            $showId = $selectedShow?->id;
 
-            $availableShows = collect([['id' => $globalBoard->id, 'name' => 'Announcements', 'system' => 'global']])
+            $availableShows = collect([['id' => $globalBoard->id, 'token' => $globalBoard->token, 'name' => 'Announcements', 'system' => 'global']])
                 ->concat(
                     GlobalShowTemplate::live()->orderBy('name')->get()->map(fn ($t) => [
                         'id' => null,
-                        'promo' => $t->id,
+                        'token' => null,
+                        'promo' => $t->token,
                         'name' => $t->name,
                         'system' => null,
                     ])
@@ -133,8 +134,8 @@ class SlideController extends Controller
             'languages' => $languages,
             'selectedLanguage' => $languageCode,
             'entityId' => $entityId,
-            'showId' => $showId,
-            'promoId' => $promo?->id,
+            'showToken' => $selectedShow?->token,
+            'promoToken' => $promo?->token,
             'frame' => $frame,
             'availableShows' => $availableShows,
             'initialSlide' => $initialSlide,
@@ -146,6 +147,7 @@ class SlideController extends Controller
         $languageCode = $request->query('language');
         $languageId = null;
         $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
+        $this->authorizeEntityView($request, $entityId);
 
         // If no language specified, try to detect from Accept-Language header (browser default)
         if (!$languageCode) {
@@ -219,9 +221,9 @@ class SlideController extends Controller
      * into the primary image. Slides with no overlay (or a video/failed
      * flatten) download the primary file as-is.
      */
-    public function download(Slide $slide, OverlayCompositor $compositor)
+    public function download(Request $request, Slide $slide, OverlayCompositor $compositor)
     {
-        abort_unless(Slide::released()->whereKey($slide->id)->exists(), 404);
+        abort_unless($this->canDownload($request, Slide::released(), $slide), 404);
 
         $media = $slide->primaryMedia;
         abort_unless($media, 404);
@@ -242,10 +244,10 @@ class SlideController extends Controller
      * per-attachment download buttons. Gated the same way any other
      * public-facing slide content is: the slide must be current.
      */
-    public function downloadMedia(Slide $slide, SlideMedia $media)
+    public function downloadMedia(Request $request, Slide $slide, SlideMedia $media)
     {
         abort_unless($media->slide_id === $slide->id, 404);
-        abort_unless(Slide::current()->whereKey($slide->id)->exists(), 404);
+        abort_unless($this->canDownload($request, Slide::current(), $slide), 404);
 
         // The bare base image of an overlaid slide is the 'Background' (the
         // composited slide is the plain download); other types name themselves.
@@ -359,7 +361,8 @@ class SlideController extends Controller
             abort(404);
         }
 
-        $show  = $request->query('show_id') ? Show::find((int) $request->query('show_id')) : null;
+        // resolveDownloadSlides() above has already gated ?entity_id=.
+        $show  = $this->requestedShow($request, $request->query('entity_id') ? (int) $request->query('entity_id') : null);
         $title = $show?->name ?: 'Announcement Slides';
 
         // Where widgets with no location of their own should point: the
@@ -481,13 +484,15 @@ class SlideController extends Controller
     }
 
     /**
-     * A show's exact slide set/order (?show_id=, the primary download path),
-     * or the legacy ad-hoc-selection path (?ids=, used from the global
-     * Slides/Index.vue browsing page, which has no single show concept).
+     * A show's exact slide set/order (?show=<token>, or ?promo=<token>, the
+     * primary download path), or the legacy ad-hoc-selection path (?ids= slide
+     * tokens, used from the global Slides/Index.vue browsing page, which has no
+     * single show concept).
      */
     private function resolveDownloadSlides(Request $request)
     {
-        $showId = $request->query('show_id');
+        $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
+        $this->authorizeEntityView($request, $entityId);
         $languageCode = $request->query('language');
         $languageId = null;
 
@@ -496,15 +501,17 @@ class SlideController extends Controller
             $languageId = $language?->id;
         }
 
-        if ($promoId = $request->query('promo')) {
-            return GlobalShowTemplate::findOrFail((int) $promoId)->slidesQuery()
+        if ($request->query('promo')) {
+            return ($this->requestedPromo($request) ?? abort(404))->slidesQuery()
                 ->with('primaryMedia')->current()->language($languageId)->get();
         }
 
-        if ($showId) {
+        if ($request->query('show')) {
+            $show = $this->requestedShow($request, $entityId) ?? abort(404);
+
             // Same language rule as the dashboard listing, so a download
             // contains exactly the slides the UI shows.
-            return Slide::with('primaryMedia')->orderedInShow((int) $showId)->current()->language($languageId)->get();
+            return Slide::with('primaryMedia')->orderedInShow($show->id)->current()->language($languageId)->get();
         }
 
         $ids = $request->query('ids');
@@ -516,10 +523,62 @@ class SlideController extends Controller
             ->orderByDesc('created_at');
 
         if ($ids) {
-            $query->whereIn('id', explode(',', $ids));
+            $query->whereIn('token', array_filter(explode(',', $ids)));
         }
 
         return $query->get();
+    }
+
+    /** Whether $slide is in $query and the viewer may see it (site admins see any entity's). */
+    private function canDownload(Request $request, $query, Slide $slide): bool
+    {
+        $user = $request->user();
+        if (! $user?->isAdmin()) {
+            $query->visibleToUser($user);
+        }
+
+        return $query->whereKey($slide->id)->exists();
+    }
+
+    /**
+     * An entity's shows (and the local slides in them) are private to that
+     * church's members and site admins: guests are sent to log in, anyone
+     * else gets a 403. Global content (no entity) stays public.
+     */
+    private function authorizeEntityView(Request $request, ?int $entityId): void
+    {
+        if ($entityId === null) {
+            return;
+        }
+
+        $user = $request->user();
+        if (! $user) {
+            throw new AuthenticationException();
+        }
+
+        abort_unless($user->isAdmin() || in_array($entityId, $user->memberEntityIds(), true), 403);
+    }
+
+    /**
+     * The show named by ?show=<token>, only if it belongs to the requested
+     * entity (or is a global show when there is none) — a token for some other
+     * church's show never plays under this page. Null when absent or no match.
+     */
+    private function requestedShow(Request $request, ?int $entityId): ?Show
+    {
+        $token = $request->query('show');
+
+        return is_string($token) && $token !== ''
+            ? Show::where('token', $token)->where('entity_id', $entityId)->first()
+            : null;
+    }
+
+    /** The promo named by ?promo=<token>, or null (a swept/unknown promo falls back to the Global Board). */
+    private function requestedPromo(Request $request): ?GlobalShowTemplate
+    {
+        $token = $request->query('promo');
+
+        return is_string($token) && $token !== '' ? GlobalShowTemplate::where('token', $token)->first() : null;
     }
 
     private function slideResource(Slide $slide): array

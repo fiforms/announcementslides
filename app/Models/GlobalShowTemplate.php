@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasPublicToken;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,7 +20,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class GlobalShowTemplate extends Model
 {
-    protected $fillable = ['name', 'created_by'];
+    use HasPublicToken;
+
+    protected $fillable = ['token', 'name', 'created_by'];
 
     public function shows(): HasMany
     {

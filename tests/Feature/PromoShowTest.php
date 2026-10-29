@@ -44,13 +44,13 @@ class PromoShowTest extends TestCase
         SlideMedia::create(['slide_id' => $local->id, 'media_type' => 'slide', 'filename' => 'local.jpg', 'original_filename' => 'local.jpg', 'file_size' => 10, 'disk_path' => 'slides/local.jpg', 'mime_type' => 'image/jpeg']);
         $copies[0]->slides()->attach($local->id, ['sort_order' => 5]);
 
-        $this->get(route('slides.index', ['promo' => $template->id]))
+        $this->get(route('slides.index', ['promo' => $template->token]))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('promoId', $template->id)
-                ->where('showId', null)
+                ->where('promoToken', $template->token)
+                ->where('showToken', null)
                 ->has('slides', 1)
                 ->where('slides.0.id', $slide->id)
-                ->where('availableShows.1.promo', $template->id)
+                ->where('availableShows.1.promo', $template->token)
                 ->where('availableShows.1.name', 'Camp Meeting'));
     }
 
@@ -59,13 +59,13 @@ class PromoShowTest extends TestCase
         [$template, $slide, $copies] = $this->promo();
         $copies[0]->forceDelete();
 
-        $this->get(route('slides.index', ['promo' => $template->id]))
+        $this->get(route('slides.index', ['promo' => $template->token]))
             ->assertInertia(fn (Assert $page) => $page->where('slides.0.id', $slide->id));
 
         $template->delete();
 
-        $this->get(route('slides.index', ['promo' => $template->id]))
-            ->assertInertia(fn (Assert $page) => $page->where('promoId', null)->where('showId', Show::globalBoard()->id));
+        $this->get(route('slides.index', ['promo' => $template->token]))
+            ->assertInertia(fn (Assert $page) => $page->where('promoToken', null)->where('showToken', Show::globalBoard()->token));
     }
 
     public function test_expired_promo_is_not_offered_in_dropdown(): void

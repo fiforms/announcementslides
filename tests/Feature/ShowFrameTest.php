@@ -367,10 +367,11 @@ class ShowFrameTest extends TestCase
             ->where('frame.overlay_widgets.0.widget', 'clock')
             ->where('frame.overlay_widgets.0.data_url', fn ($u) => str_contains($u, '/widget-data/')));
 
-        // A user from another church, a guest, and the global dashboard get none.
-        $this->actingAs(User::factory()->create())->get($url)->assertInertia(fn ($page) => $page->where('frame', null));
+        // A user from another church and a guest can't open the church's page at all
+        // (see SlideTokenTest); the global dashboard has no frame.
+        $this->actingAs(User::factory()->create())->get($url)->assertForbidden();
         $this->app['auth']->forgetGuards();
-        $this->get($url)->assertInertia(fn ($page) => $page->where('frame', null));
+        $this->get($url)->assertRedirect(route('login'));
         $this->actingAs($this->leader)->get(route('slides.index'))->assertInertia(fn ($page) => $page->where('frame', null));
     }
 
@@ -388,7 +389,7 @@ class ShowFrameTest extends TestCase
         $this->actingAs($this->leader)->get(route('slides.index', ['entity_id' => $this->entity->id]))
             ->assertInertia(fn ($page) => $page->has('slides', 1));
         // Naming this show while acting for another entity doesn't hand out its frame.
-        $this->actingAs($outsider)->get(route('slides.index', ['entity_id' => $other->id, 'show_id' => $this->show->id]))
+        $this->actingAs($outsider)->get(route('slides.index', ['entity_id' => $other->id, 'show' => $this->show->token]))
             ->assertInertia(fn ($page) => $page->where('frame', null));
     }
 }

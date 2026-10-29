@@ -95,7 +95,7 @@ class PowerPointExportTest extends TestCase
     /** @return string[] raw bytes of each image embedded in the exported deck */
     private function exportedImages(Slide $slide): array
     {
-        $response = $this->get(route('slides.download-pptx', ['ids' => $slide->id]));
+        $response = $this->get(route('slides.download-pptx', ['ids' => $slide->token]));
         $response->assertOk();
 
         $zip = new ZipArchive();
