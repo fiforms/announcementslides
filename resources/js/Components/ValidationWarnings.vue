@@ -2,6 +2,7 @@
 defineProps({
     issues: { type: Array, default: () => [] },
     compact: { type: Boolean, default: false },
+    title: { type: String, default: 'Image quality issues detected' },
 });
 </script>
 
@@ -27,7 +28,7 @@ defineProps({
                         clip-rule="evenodd" />
                 </svg>
                 <div class="flex-1">
-                    <h4 class="text-sm font-semibold text-yellow-800">Image quality issues detected</h4>
+                    <h4 class="text-sm font-semibold text-yellow-800">{{ title }}</h4>
                     <ul class="mt-2 space-y-1">
                         <li v-for="(issue, idx) in issues" :key="idx" class="text-xs text-yellow-700">
                             • {{ issue }}

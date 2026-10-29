@@ -1,4 +1,5 @@
 import wasmUrl from 'zxing-wasm/reader/zxing_reader.wasm?url';
+import { analyzeQrReadability } from '@/Composables/qrReadability.js';
 
 let readerPromise = null;
 
@@ -91,4 +92,85 @@ export async function scanSlideMedia(media) {
     ]);
 
     return { inImage, inOverlay, all: [...new Set([...inImage, ...inOverlay])] };
+}
+
+// The decoder as the readability checks drive it (see qrReadability.js).
+async function readQr(image) {
+    const { readBarcodes } = await loadReader();
+    return readBarcodes(image, { formats: ['QRCode'], maxNumberOfSymbols: 10, tryHarder: true });
+}
+
+/**
+ * Readability warnings for the QR codes in an image file (see
+ * analyzeQrReadability). Never throws — failures just mean no warnings.
+ */
+export async function checkQrReadability(file) {
+    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') return { codes: [], issues: [] };
+
+    try {
+        return await analyzeQrReadability(await imageData(file), readQr);
+    } catch {
+        return { codes: [], issues: [] };
+    }
+}
+
+const SLIDE_CANVAS = { w: 1920, h: 1080 };
+
+function loadImage(blob) {
+    const url = URL.createObjectURL(blob);
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image failed to load')); };
+        img.src = url;
+    });
+}
+
+// Draws an image into the canvas the way the displays do: scaled to fit
+// ("object-contain") and centered. SVGs without an intrinsic size are
+// taken to be canvas-sized.
+function drawContained(ctx, img) {
+    const w = img.naturalWidth || SLIDE_CANVAS.w;
+    const h = img.naturalHeight || SLIDE_CANVAS.h;
+    const scale = Math.min(SLIDE_CANVAS.w / w, SLIDE_CANVAS.h / h);
+    ctx.drawImage(img, (SLIDE_CANVAS.w - w * scale) / 2, (SLIDE_CANVAS.h - h * scale) / 2, w * scale, h * scale);
+}
+
+const fetchBlob = url => fetch(url, { cache: 'no-cache' }).then(r => {
+    if (!r.ok) throw new Error(`could not fetch ${url}`);
+    return r.blob();
+});
+
+/**
+ * QR readability of a slide as shown: its image with the overlay burned in,
+ * on the 1080p black canvas the displays use — so a code that only goes
+ * wrong against the picture behind it (or whose overlay hides part of one)
+ * is judged as the audience sees it. Live widgets aren't included. Returns
+ * null for a slide that isn't an image (video) or has nothing to render;
+ * rejects if a file can't be fetched or drawn.
+ */
+export async function checkSlideReadability(media) {
+    const slides = media.filter(m => m.media_type === 'slide');
+    if (slides.some(m => !m.mime_type?.startsWith('image/'))) return null;
+    const slide = slides[0];
+    const overlay = media.find(m => m.media_type === 'slide-overlay');
+    if (!slide && !overlay) return null;
+
+    const [slideImg, overlayImg] = await Promise.all([
+        slide ? fetchBlob(slide.file_url).then(loadImage) : null,
+        overlay ? fetchBlob(overlay.file_url).then(async b => loadImage(
+            overlay.mime_type?.includes('svg') ? new Blob([await b.text()], { type: 'image/svg+xml' }) : b,
+        )) : null,
+    ]);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = SLIDE_CANVAS.w;
+    canvas.height = SLIDE_CANVAS.h;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    if (slideImg) drawContained(ctx, slideImg);
+    if (overlayImg) drawContained(ctx, overlayImg);
+
+    return analyzeQrReadability(ctx.getImageData(0, 0, canvas.width, canvas.height), readQr);
 }

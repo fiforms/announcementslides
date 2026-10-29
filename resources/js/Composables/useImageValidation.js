@@ -1,4 +1,4 @@
-import { scanQrCodes } from '@/Composables/useQrScan.js';
+import { scanQrCodes, checkQrReadability } from '@/Composables/useQrScan.js';
 
 export function useImageValidation() {
     const MIN_RESOLUTION_MP = 2;
@@ -89,6 +89,7 @@ export function useImageValidation() {
         if (qrCodes.length > 1) {
             issues.push(`${qrCodes.length} QR codes found — a slide should carry only one`);
         }
+        if (qrCodes.length) issues.push(...(await checkQrReadability(file)).issues);
 
         return { issues, width, height, qrCodes };
     }
