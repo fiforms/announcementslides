@@ -71,7 +71,7 @@ export function overlayQrTargets(svgText) {
         const doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
         const json = doc.getElementById('as-overlay-source')?.textContent;
         const elements = json ? JSON.parse(json).elements ?? [] : [];
-        return elements.filter(el => el.type === 'qr' && typeof el.data === 'string' && el.data).map(el => el.data);
+        return elements.filter(el => el.type === 'qr' && !el.hidden && typeof el.data === 'string' && el.data).map(el => el.data);
     } catch {
         return [];
     }
@@ -105,12 +105,12 @@ async function readQr(image) {
  * analyzeQrReadability). Never throws — failures just mean no warnings.
  */
 export async function checkQrReadability(file) {
-    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') return { codes: [], issues: [] };
+    if (!file.type.startsWith('image/') || file.type === 'image/svg+xml') return { codes: [], issues: [], texts: [] };
 
     try {
         return await analyzeQrReadability(await imageData(file), readQr);
     } catch {
-        return { codes: [], issues: [] };
+        return { codes: [], issues: [], texts: [] };
     }
 }
 
@@ -156,11 +156,17 @@ export async function checkSlideReadability(media) {
     const overlay = media.find(m => m.media_type === 'slide-overlay');
     if (!slide && !overlay) return null;
 
+    // The QR targets the overlay editor put in the overlay, to tell "no code
+    // here" from "a code is here that the check can't read".
+    let expected = [];
     const [slideImg, overlayImg] = await Promise.all([
         slide ? fetchBlob(slide.file_url).then(loadImage) : null,
-        overlay ? fetchBlob(overlay.file_url).then(async b => loadImage(
-            overlay.mime_type?.includes('svg') ? new Blob([await b.text()], { type: 'image/svg+xml' }) : b,
-        )) : null,
+        overlay ? fetchBlob(overlay.file_url).then(async b => {
+            if (!overlay.mime_type?.includes('svg')) return loadImage(b);
+            const text = await b.text();
+            expected = overlayQrTargets(text);
+            return loadImage(new Blob([text], { type: 'image/svg+xml' }));
+        }) : null,
     ]);
 
     const canvas = document.createElement('canvas');
@@ -172,5 +178,6 @@ export async function checkSlideReadability(media) {
     if (slideImg) drawContained(ctx, slideImg);
     if (overlayImg) drawContained(ctx, overlayImg);
 
-    return analyzeQrReadability(ctx.getImageData(0, 0, canvas.width, canvas.height), readQr);
+    const result = await analyzeQrReadability(ctx.getImageData(0, 0, canvas.width, canvas.height), readQr);
+    return { ...result, expected, unreadable: expected.filter(target => !result.texts.includes(target)) };
 }

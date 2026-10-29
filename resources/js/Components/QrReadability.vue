@@ -39,10 +39,18 @@ watch(signature, check);
 
 <template>
     <div v-if="checking" class="mt-1 text-xs text-gray-500">Checking QR code readability…</div>
-    <div v-else-if="result?.issues.length" class="mt-2">
-        <ValidationWarnings :issues="result.issues" title="QR code may be hard to scan" />
-    </div>
-    <div v-else-if="result?.codes.length" class="mt-1 text-xs text-green-700">
-        QR code looks readable on the slide (including its overlay).
-    </div>
+    <template v-else-if="result">
+        <p v-if="result.unreadable.length" class="mt-2 text-sm font-bold text-red-600">
+            Error: the overlay contains {{ result.unreadable.length === 1 ? 'a QR code' : `${result.unreadable.length} QR codes` }}
+            that can't be read on the slide as shown (<span class="break-all">{{ result.unreadable.join(', ') }}</span>).
+            Check its size, contrast and the picture behind it.
+        </p>
+        <p v-else-if="!result.codes.length" class="mt-1 text-xs text-gray-500">No QR Code Detected</p>
+        <div v-if="result.issues.length" class="mt-2">
+            <ValidationWarnings :issues="result.issues" title="QR code may be hard to scan" />
+        </div>
+        <p v-else-if="result.codes.length && !result.unreadable.length" class="mt-1 text-xs text-green-700">
+            QR code looks readable on the slide (including its overlay).
+        </p>
+    </template>
 </template>

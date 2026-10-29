@@ -178,13 +178,13 @@ function quietZoneFraction(image, box, ring, split, inverted) {
  * `read(image)` must return zxing-style results (`text`, `isValid`,
  * `position`, `isInverted`, `version`).
  *
- * Returns { codes: [{ text, widthPct, modules, tooSmall, ... }], issues: [] }
+ * Returns { codes: [{ text, widthPct, modules, tooSmall, ... }], issues: [], texts: [] }
  * where issues are human-readable warnings; `codes` is empty when none read.
  */
 export async function analyzeQrReadability(source, read) {
     const image = downscale(source, MAX_WIDTH);
     const found = decoded(await read(image));
-    if (!found.length) return { codes: [], issues: [] };
+    if (!found.length) return { codes: [], issues: [], texts: [] };
 
     const many = found.length > 1;
     const codes = [];
@@ -248,5 +248,5 @@ export async function analyzeQrReadability(source, read) {
         codes.push(report);
     }
 
-    return { codes, issues };
+    return { codes, issues, texts: found.map(f => f.text) };
 }
