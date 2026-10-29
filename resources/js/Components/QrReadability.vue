@@ -27,6 +27,14 @@ const linkMismatch = computed(() => normalize(props.link) !== ''
     && knownCodes.value.length > 0
     && !knownCodes.value.some(code => normalize(code) === normalize(props.link)));
 
+const issues = computed(() => {
+    const count = result.value?.texts.length ?? 0;
+    return [
+        ...(count > 1 ? [`${count} QR codes detected on this slide — multiple QR codes may be confusing to scan`] : []),
+        ...(result.value?.issues ?? []),
+    ];
+});
+
 let run = 0;
 async function check() {
     const mine = ++run;
@@ -58,8 +66,8 @@ watch(signature, check);
             Error: this link doesn't match the QR code on the slide
             (<span class="break-all">{{ knownCodes.join(', ') }}</span>). Use the "Use QR Link" button, or change the QR code.
         </p>
-        <div v-if="result.issues.length" class="mt-2">
-            <ValidationWarnings :issues="result.issues" title="QR code may be hard to scan" />
+        <div v-if="issues.length" class="mt-2">
+            <ValidationWarnings :issues="issues" title="QR code may be hard to scan" />
         </div>
         <p v-else-if="result.codes.length && !result.unreadable.length" class="mt-1 text-xs text-green-700">
             QR code looks readable on the slide (including its overlay).
