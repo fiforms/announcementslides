@@ -84,6 +84,8 @@
         "subscribe": "Subscribe",
         "unsubscribe": "Unsubscribe",
         "already_subscribed": "Subscribed",
+        "not_accepting_subscribers": "Not accepting subscribers",
+        "subscription_closed": "No longer available",
         "no_subscriptions": "You are not connected to any entities yet.",
         "role_viewer": "Viewer",
         "role_admin": "Admin",
@@ -207,6 +209,8 @@
     "entity_slides": {
         "page_title": "{name} — Slides",
         "upload_btn": "Create or Upload",
+        "allow_subscription": "Allow subscription",
+        "allow_subscription_hint": "When off, other people can no longer subscribe to this church's slide feed, and current subscribers lose access. Only leaders and Play Link (kiosk) screens can see it.",
         "entity_scoped_notice": "Slides uploaded here are visible only to members of {name}.",
         "col_slide": "Slide",
         "col_dates": "Dates",

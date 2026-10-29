@@ -18,7 +18,7 @@ class EntityController extends Controller
             ->when($term->isNotEmpty(), fn ($q) => $q->search((string) $term))
             ->orderBy('name')
             ->limit(20)
-            ->get(['id', 'name', 'city', 'state', 'entity_type']);
+            ->get(['id', 'name', 'city', 'state', 'entity_type', 'allow_subscription']);
 
         return response()->json($entities);
     }
@@ -26,6 +26,8 @@ class EntityController extends Controller
     public function subscribe(Request $request, Entity $entity): RedirectResponse
     {
         $user = $request->user();
+
+        abort_unless($entity->allow_subscription, 403, 'This church does not accept subscribers.');
 
         // Self-service subscriptions are always 'viewer'; admins are assigned via CLI/admin UI.
         $user->entities()->syncWithoutDetaching([

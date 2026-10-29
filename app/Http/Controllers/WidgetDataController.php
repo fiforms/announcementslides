@@ -191,7 +191,7 @@ class WidgetDataController extends Controller
         }
 
         return $user && ($slide->uploaded_by === $user->id
-            || ($slide->entity_id && in_array($slide->entity_id, $user->memberEntityIds())));
+            || ($slide->entity_id && in_array($slide->entity_id, $user->viewableEntityIds())));
     }
 
     /**
@@ -203,7 +203,7 @@ class WidgetDataController extends Controller
     {
         $entityId = $media->show?->entity_id;
 
-        return $entityId && $user && ($user->isAdmin() || in_array($entityId, $user->memberEntityIds()));
+        return $entityId && $user && ($user->isAdmin() || in_array($entityId, $user->viewableEntityIds()));
     }
 
     private function callerKey(Request $request): string

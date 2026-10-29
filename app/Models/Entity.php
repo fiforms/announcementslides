@@ -21,12 +21,14 @@ class Entity extends Model
         'website',
         'is_custom',
         'deactivated',
+        'allow_subscription',
         'created_by',
     ];
 
     protected $casts = [
         'is_custom'   => 'boolean',
         'deactivated' => 'boolean',
+        'allow_subscription' => 'boolean',
         'latitude'    => 'decimal:7',
         'longitude'   => 'decimal:7',
     ];

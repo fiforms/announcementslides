@@ -84,6 +84,8 @@
         "subscribe": "Suscribirse",
         "unsubscribe": "Cancelar suscripción",
         "already_subscribed": "Suscrito",
+        "not_accepting_subscribers": "No acepta suscriptores",
+        "subscription_closed": "Ya no disponible",
         "no_subscriptions": "Aún no estás conectado a ninguna entidad.",
         "role_viewer": "Espectador",
         "role_admin": "Administrador",
@@ -207,6 +209,8 @@
     "entity_slides": {
         "page_title": "{name} — Diapositivas",
         "upload_btn": "Crear o subir",
+        "allow_subscription": "Permitir suscripción",
+        "allow_subscription_hint": "Si está desactivado, otras personas ya no pueden suscribirse a las diapositivas de esta iglesia y los suscriptores actuales pierden el acceso. Solo los líderes y las pantallas con Enlace de Reproducción (quiosco) pueden verlas.",
         "entity_scoped_notice": "Las diapositivas subidas aquí son visibles solo para los miembros de {name}.",
         "col_slide": "Diapositiva",
         "col_dates": "Fechas",

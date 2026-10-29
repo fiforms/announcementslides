@@ -46,6 +46,7 @@ function onSearchInput() {
 }
 
 function subscribe(entity) {
+    if (!entity.allow_subscription) return;
     router.post(route('entities.subscribe', entity.id), {}, { preserveScroll: true });
     searchQuery.value = '';
     searchResults.value = [];
@@ -91,6 +92,9 @@ function entityLabel(entity) {
                     <span class="text-sm font-medium text-gray-900">{{ sub.name }}</span>
                     <span v-if="sub.city || sub.state" class="ml-2 text-sm text-gray-500">
                         {{ [sub.city, sub.state].filter(Boolean).join(', ') }}
+                    </span>
+                    <span v-if="sub.role === 'viewer' && sub.allow_subscription === false" class="ml-2 text-xs text-amber-700">
+                        {{ $t('profile.subscription_closed') }}
                     </span>
                     <span
                         class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
@@ -157,6 +161,9 @@ function entityLabel(entity) {
                         class="ml-2 text-xs text-green-600 font-medium"
                     >
                         {{ $t('profile.already_subscribed') }}
+                    </span>
+                    <span v-else-if="!entity.allow_subscription" class="ml-2 text-xs text-gray-400">
+                        {{ $t('profile.not_accepting_subscribers') }}
                     </span>
                     <PrimaryButton
                         v-else

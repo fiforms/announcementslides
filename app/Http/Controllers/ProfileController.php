@@ -28,7 +28,7 @@ class ProfileController extends Controller
             'slideDelaySeconds' => $user->slideDelaySeconds(),
             'subscriptions' => $user->entities()
                 ->orderBy('name')
-                ->get(['entities.id', 'entities.name', 'entities.city', 'entities.state', 'entities.entity_type'])
+                ->get(['entities.id', 'entities.name', 'entities.city', 'entities.state', 'entities.entity_type', 'entities.allow_subscription'])
                 ->map(fn ($e) => [
                     'id'          => $e->id,
                     'name'        => $e->name,
@@ -36,6 +36,7 @@ class ProfileController extends Controller
                     'state'       => $e->state,
                     'entity_type' => $e->entity_type,
                     'role'        => $e->pivot->role,
+                    'allow_subscription' => (bool) $e->allow_subscription,
                 ]),
         ]);
     }

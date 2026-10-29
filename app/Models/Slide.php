@@ -175,7 +175,7 @@ class Slide extends Model
     public function scopeVisibleToUser(Builder $query, ?User $user): Builder
     {
         if ($user) {
-            $entityIds = $user->memberEntityIds();
+            $entityIds = $user->viewableEntityIds();
             return $query->where(fn ($q) => $q->whereNull('entity_id')->orWhereIn('entity_id', $entityIds));
         }
         return $query->whereNull('entity_id');

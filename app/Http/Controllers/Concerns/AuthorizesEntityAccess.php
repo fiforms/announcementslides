@@ -22,11 +22,11 @@ trait AuthorizesEntityAccess
         $entityId = (int) $request->query('entity_id');
 
         if (!$entityId) {
-            $entityId = $user->memberEntityIds()[0] ?? 0;
+            $entityId = $user->viewableEntityIds()[0] ?? 0;
         }
 
         abort_unless(
-            $entityId && in_array($entityId, $user->memberEntityIds()),
+            $entityId && in_array($entityId, $user->viewableEntityIds()),
             403
         );
 

@@ -31,11 +31,22 @@ class EntitySlideController extends Controller
         $shows = Show::where('entity_id', $entity->id)->where('is_main', false)->get(['id', 'name']);
 
         return Inertia::render('Entity/Slides', [
-            'entity' => ['id' => $entity->id, 'name' => $entity->name],
+            'entity' => ['id' => $entity->id, 'name' => $entity->name, 'allow_subscription' => $entity->allow_subscription],
             'slides' => $slides,
             'languages' => $languages,
             'shows' => $shows,
         ]);
+    }
+
+    /** Whether other people may subscribe to this entity's slide feed (leaders and site admins decide). */
+    public function updateSettings(Request $request, Entity $entity)
+    {
+        $user = $request->user();
+        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
+
+        $entity->update($request->validate(['allow_subscription' => 'required|boolean']));
+
+        return back()->with('success', 'Settings saved.');
     }
 
     public function edit(Request $request, Entity $entity, Slide $slide): Response

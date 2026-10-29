@@ -216,4 +216,41 @@ class SlideTokenTest extends TestCase
         $this->actingAs($member)->get(route('slides.download', $slide->token))->assertNotFound();
         $this->assertTrue(Slide::released()->visibleToUser($member)->whereKey($slide->id)->exists());
     }
+
+    public function test_an_entity_can_close_subscriptions_leaving_only_leaders_and_kiosk_links(): void
+    {
+        $entity = Entity::create(['name' => 'Closed']);
+        $this->assertTrue($entity->fresh()->allow_subscription);
+
+        $leader = User::factory()->create();
+        $leader->entities()->attach($entity->id, ['role' => 'admin']);
+        $follower = User::factory()->create();
+        $follower->entities()->attach($entity->id, ['role' => 'viewer']);
+        $newcomer = User::factory()->create();
+        $local = $this->slide(['entity_id' => $entity->id]);
+        $query = ['entity_id' => $entity->id];
+
+        // Open: followers see the feed and anyone can subscribe.
+        $this->actingAs($follower)->get(route('slides.index', $query))->assertOk();
+        $this->actingAs($newcomer)->post(route('entities.subscribe', $entity))->assertRedirect();
+        $this->assertTrue($newcomer->entities()->whereKey($entity->id)->exists());
+        $newcomer->entities()->detach($entity->id);
+
+        // The leader closes it.
+        $this->actingAs($follower)->patch(route('entity.slides.settings', $entity), ['allow_subscription' => false])->assertForbidden();
+        $this->actingAs($leader)->patch(route('entity.slides.settings', $entity), ['allow_subscription' => false])->assertRedirect();
+        $this->assertFalse($entity->fresh()->allow_subscription);
+
+        $this->actingAs($follower)->get(route('slides.index', $query))->assertForbidden();
+        $this->actingAs($follower)->get(route('slides.show', $local->token))
+            ->assertInertia(fn (Assert $page) => $page->where('initialSlide', null));
+        $this->actingAs($newcomer)->post(route('entities.subscribe', $entity))->assertForbidden();
+        $this->assertFalse($newcomer->entities()->whereKey($entity->id)->exists());
+        $this->assertSame([], $follower->viewableEntityIds());
+
+        // Leaders keep access, and re-opening restores followers.
+        $this->actingAs($leader)->get(route('slides.index', $query))->assertOk();
+        $this->actingAs($leader)->patch(route('entity.slides.settings', $entity), ['allow_subscription' => true]);
+        $this->actingAs($follower)->get(route('slides.index', $query))->assertOk();
+    }
 }

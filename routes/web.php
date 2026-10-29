@@ -128,6 +128,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     // ── Entity leader: entity-scoped slide management ──────────────────────
     Route::prefix('entity/{entity}/slides')->name('entity.slides.')->group(function () {
         Route::get('/', [EntitySlideController::class, 'index'])->name('index');
+        Route::patch('/settings', [EntitySlideController::class, 'updateSettings'])->name('settings');
         Route::get('/{slide}/edit', [EntitySlideController::class, 'edit'])->name('edit');
         Route::patch('/{slide}', [EntitySlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [EntitySlideController::class, 'archive'])->name('archive');

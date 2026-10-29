@@ -73,6 +73,24 @@ class User extends Authenticatable
         return $this->entities()->pluck('entities.id')->toArray();
     }
 
+    /**
+     * The entities whose slide feed this user may see: ones they lead, plus
+     * ones they follow that still allow subscriptions. (An entity that has
+     * switched subscriptions off keeps its leaders and kiosk links only —
+     * existing followers stay on record but lose access.)
+     */
+    public function viewableEntities()
+    {
+        return $this->entities()->where(
+            fn ($q) => $q->where('user_entities.role', 'admin')->orWhere('entities.allow_subscription', true)
+        );
+    }
+
+    public function viewableEntityIds(): array
+    {
+        return $this->viewableEntities()->pluck('entities.id')->toArray();
+    }
+
     public function settings()
     {
         return $this->hasMany(UserSetting::class);

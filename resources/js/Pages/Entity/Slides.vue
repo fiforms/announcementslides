@@ -18,6 +18,10 @@ const user = page.props.auth.user;
 
 const showUploadPanel = ref(false);
 
+function toggleSubscription(allow) {
+    router.patch(route('entity.slides.settings', props.entity.id), { allow_subscription: allow }, { preserveScroll: true });
+}
+
 function canEdit(slide) {
     return user.role === 'admin' || slide.uploader?.id === user.id;
 }
@@ -65,6 +69,16 @@ function statusBadge(status) {
                 <i18n-t keypath="entity_slides.entity_scoped_notice" scope="global">
                     <template #name><strong>{{ entity.name }}</strong></template>
                 </i18n-t>
+            </div>
+
+            <div class="rounded-lg border border-gray-200 bg-white px-4 py-3">
+                <label class="flex items-start gap-2">
+                    <input type="checkbox" :checked="entity.allow_subscription"
+                        class="mt-0.5 rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
+                        @change="toggleSubscription($event.target.checked)" />
+                    <span class="text-sm font-medium text-gray-700">{{ $t('entity_slides.allow_subscription') }}</span>
+                </label>
+                <p class="mt-1 text-xs text-gray-500">{{ $t('entity_slides.allow_subscription_hint') }}</p>
             </div>
 
             <UploadPanel

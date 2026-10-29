@@ -112,7 +112,7 @@ class SlideController extends Controller
         $user = $request->user();
         $frameShow = $entityId ? Show::find($showId) : null;
         $frame = $frameShow && $frameShow->entity_id === $entityId
-            && $user && ($user->isAdmin() || in_array($entityId, $user->memberEntityIds()))
+            && $user && ($user->isAdmin() || in_array($entityId, $user->viewableEntityIds()))
             ? app(ShowFrame::class)->forPlayer($frameShow)
             : null;
 
@@ -556,7 +556,7 @@ class SlideController extends Controller
             throw new AuthenticationException();
         }
 
-        abort_unless($user->isAdmin() || in_array($entityId, $user->memberEntityIds(), true), 403);
+        abort_unless($user->isAdmin() || in_array($entityId, $user->viewableEntityIds(), true), 403);
     }
 
     /**
