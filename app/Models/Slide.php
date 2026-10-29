@@ -10,13 +10,14 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Entity;
 use App\Models\User;
 use App\Services\Widgets\OverlayWidgets;
+use App\Support\SlideToken;
 
 class Slide extends Model
 {
     use SoftDeletes;
 
     protected $fillable = [
-        'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
+        'token', 'title', 'notes', 'text_description', 'link', 'video_playback_mode', 'publish_at', 'expires_at',
         'status', 'uploaded_by', 'reviewed_by', 'reviewed_at', 'entity_id', 'language_id',
         'share_nearby', 'immutable', 'fanout_sort_order', 'overlay_thumbnail_path',
     ];
@@ -30,6 +31,23 @@ class Slide extends Model
             'share_nearby' => 'boolean',
             'immutable' => 'boolean',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        // Every slide gets its public token at creation (a custom one, if the
+        // creator was allowed to choose it, is already set and was validated
+        // for uniqueness) — and it never changes afterwards, since it is the
+        // slide's shareable link.
+        static::creating(function (Slide $slide) {
+            $slide->token = filled($slide->token) ? $slide->token : SlideToken::generate();
+        });
+
+        static::updating(function (Slide $slide) {
+            if ($slide->isDirty('token')) {
+                $slide->token = $slide->getOriginal('token');
+            }
+        });
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────
@@ -129,6 +147,17 @@ class Slide extends Model
             && $this->entity_id === null
             && $this->status === 'published'
             && ($this->expires_at === null || $this->expires_at->isFuture());
+    }
+
+    /**
+     * Published and past any scheduled publish time — expiry is ignored, so
+     * archived slides stay reachable by their link. Drafts, pending
+     * submissions, rejected slides and not-yet-live ones are not released.
+     */
+    public function scopeReleased(Builder $query): Builder
+    {
+        return $query->where('status', 'published')
+            ->where(fn ($q) => $q->whereNull('publish_at')->orWhere('publish_at', '<=', now()));
     }
 
     public function scopeArchived(Builder $query): Builder

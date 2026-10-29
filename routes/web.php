@@ -30,12 +30,12 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [SlideController::class, 'index'])->name('slides.index');
 Route::get('/archive', [SlideController::class, 'archive'])->name('slides.archive');
-Route::get('/slides/{slide}/download', [SlideController::class, 'download'])->name('slides.download');
-Route::get('/slides/{slide}/media/{media}/download', [SlideController::class, 'downloadMedia'])->name('slides.media.download');
+Route::get('/slides/{slide:token}/download', [SlideController::class, 'download'])->name('slides.download');
+Route::get('/slides/{slide:token}/media/{media}/download', [SlideController::class, 'downloadMedia'])->name('slides.media.download');
 Route::get('/slides/download-zip', [SlideController::class, 'downloadZip'])->name('slides.download-zip');
 Route::get('/slides/download-pptx', [SlideController::class, 'downloadPowerPoint'])->name('slides.download-pptx');
 Route::get('/slides/download-revelation', [SlideController::class, 'downloadRevelation'])->name('slides.download-revelation');
-Route::get('/slides/{slide}', [SlideController::class, 'index'])->name('slides.show');
+Route::get('/slides/{slide:token}', [SlideController::class, 'index'])->name('slides.show');
 
 // Overlay widgets: bundle files (only those in the installed manifest), and
 // server-fetched data for a saved placement — never a caller-supplied URL.

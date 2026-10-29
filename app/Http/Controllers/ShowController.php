@@ -412,6 +412,7 @@ class ShowController extends Controller
     {
         return [
             'id' => $slide->id,
+            'token' => $slide->token,
             'title' => $slide->title,
             'notes' => $slide->notes,
             'text_description' => $slide->text_description,

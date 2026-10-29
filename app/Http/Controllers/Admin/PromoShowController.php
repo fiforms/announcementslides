@@ -47,7 +47,7 @@ class PromoShowController extends Controller
                         'publish_at'    => $s->publish_at?->toIso8601String(),
                         'expires_at'    => $s->expires_at?->toIso8601String(),
                         'is_current'    => in_array($s->id, $currentIds),
-                        'public_url'    => route('slides.show', ['slide' => $s->id, 'promo' => $t->id]),
+                        'public_url'    => route('slides.show', ['slide' => $s->token, 'promo' => $t->id]),
                     ]),
                 ];
             });

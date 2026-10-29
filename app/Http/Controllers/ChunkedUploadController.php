@@ -11,9 +11,11 @@ use App\Models\Show;
 use App\Models\Slide;
 use App\Services\ImageValidationService;
 use App\Support\ImageResize;
+use App\Support\SlideToken;
 use App\Support\SortZones;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -122,6 +124,22 @@ class ChunkedUploadController extends Controller
 
         $uploads  = $request->input('uploads', []);
         $user     = $request->user();
+
+        // Only conference-level uploaders (contributors and admins, never an
+        // entity leader) may pick a slide's link name, and it names one slide.
+        $token = filled($request->token) ? $request->token : null;
+        if ($token !== null) {
+            abort_unless($user->isContributor() && ! $request->entity_id, 403);
+            if (count($uploads) > 1) {
+                return response()->json(['message' => 'A custom link name can only be used when uploading a single slide.'], 422);
+            }
+            // Checked by hand: this app only renders JSON errors for api/*, so a
+            // failed validate() here would redirect instead of reaching the form.
+            $check = Validator::make(['token' => $token], ['token' => SlideToken::rules()]);
+            if ($check->fails()) {
+                return response()->json(['message' => $check->errors()->first('token'), 'errors' => $check->errors()], 422);
+            }
+        }
         $entityId = null;
         $status   = 'published';
 
@@ -207,6 +225,7 @@ class ChunkedUploadController extends Controller
         // With no uploads, one slide with no image.
         foreach ($validated ?: [[null, null, null]] as [$upload, $validation, $originalValidation]) {
             $slide = Slide::create([
+                'token'             => $token,
                 'title'             => filled($request->title)
                     ? $request->title
                     : trim(preg_replace('/[-_]+/', ' ', pathinfo($upload['original_filename'], PATHINFO_FILENAME))),

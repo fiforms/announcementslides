@@ -44,10 +44,10 @@ const downloads = computed(() => {
     const hasOverlay = media.some(m => m.media_type === 'slide-overlay');
 
     return media.flatMap(m => {
-        const item = { media: m, label: mediaLabel(m), href: route('slides.media.download', [props.slide.id, m.id]) };
+        const item = { media: m, label: mediaLabel(m), href: route('slides.media.download', [props.slide.token, m.id]) };
         if (hasOverlay && m.media_type === 'slide') {
             return [
-                { ...item, href: route('slides.download', props.slide.id) },
+                { ...item, href: route('slides.download', props.slide.token) },
                 { ...item, label: 'Background', special: true },
             ];
         }

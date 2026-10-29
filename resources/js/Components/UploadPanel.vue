@@ -50,6 +50,7 @@ const shareNearby   = ref(false);
 const addToShow     = ref('main'); // 'main' | 'separate' | 'none'
 const targetShowId  = ref('');
 const newShowName   = ref('');
+const token         = ref('');
 
 const busy = computed(() => isUploading.value || resize.isResizing.value);
 // An image, or at least a title: a slide may have no image (overlay/widgets
@@ -108,6 +109,12 @@ async function submit() {
         payload.status = status.value;
     }
 
+    // A chosen link name only applies to one conference-level (global) slide;
+    // the server enforces who may set it.
+    if (!props.entityId && token.value.trim() && selectedFiles.value.length <= 1) {
+        payload.token = token.value.trim().toLowerCase();
+    }
+
     if (props.entityId) {
         payload.entity_id = props.entityId;
         payload.share_nearby = shareNearby.value;
@@ -144,6 +151,7 @@ async function submit() {
                 fileValidations.value = [];
                 resize.reset();
                 title.value         = '';
+                token.value         = '';
                 notes.value         = '';
                 textDescription.value = '';
                 link.value          = '';
@@ -230,6 +238,17 @@ async function submit() {
                         class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
                         :placeholder="$t('show_manage.title_placeholder')" />
                     <p v-if="!selectedFiles.length" class="mt-1 text-xs text-gray-500">{{ $t('upload.no_image_hint') }}</p>
+                </div>
+
+                <div v-if="!entityId && selectedFiles.length <= 1" class="sm:col-span-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('upload.token_label') }} <span class="text-gray-400 font-normal">{{ $t('upload.notes_optional') }}</span></label>
+                    <div class="flex items-center gap-1 text-sm text-gray-500">
+                        <span>/slides/</span>
+                        <input v-model="token" type="text" maxlength="32" autocapitalize="none" autocomplete="off" spellcheck="false"
+                            class="w-48 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            placeholder="camp26" />
+                    </div>
+                    <p class="mt-1 text-xs text-gray-500">{{ $t('upload.token_hint') }}</p>
                 </div>
 
                 <div class="sm:col-span-2">

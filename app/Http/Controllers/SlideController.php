@@ -120,9 +120,10 @@ class SlideController extends Controller
         // Deep link to a single slide (e.g. /slides/{slide}): render the same
         // dashboard, plus that slide's data so the frontend can open its
         // lightbox on load. Only if it's actually visible to this viewer —
-        // it may belong to a different show/entity than the one loaded above.
+        // it may belong to a different show/entity than the one loaded above,
+        // and drafts/pending/unreleased slides never open from a link.
         $initialSlide = null;
-        if ($slide && Slide::visibleToUser($request->user())->whereKey($slide->id)->exists()) {
+        if ($slide && Slide::released()->visibleToUser($request->user())->whereKey($slide->id)->exists()) {
             $slide->load(['primaryMedia', 'overlayMedia', 'media']);
             $initialSlide = $this->slideResource($slide);
         }
@@ -220,10 +221,7 @@ class SlideController extends Controller
      */
     public function download(Slide $slide, OverlayCompositor $compositor)
     {
-        abort_unless(
-            $slide->status === 'published',
-            404
-        );
+        abort_unless(Slide::released()->whereKey($slide->id)->exists(), 404);
 
         $media = $slide->primaryMedia;
         abort_unless($media, 404);
@@ -528,6 +526,7 @@ class SlideController extends Controller
     {
         return [
             'id'                => $slide->id,
+            'token'             => $slide->token,
             'title'             => $slide->title,
             'notes'             => $slide->notes,
             'text_description'  => $slide->text_description,

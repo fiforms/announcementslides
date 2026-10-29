@@ -186,6 +186,8 @@
         "upload_first_link": "Upload your first slide"
     },
     "upload": {
+        "token_label": "Custom link name",
+        "token_hint": "Optional. Letters, numbers and hyphens, e.g. camp26. Leave blank for a random one. It can't be changed after upload.",
         "no_image_hint": "No image? Give it a title. You can add text, a QR code or widgets as an overlay, or an image later.",
         "share_needs_image": "Sharing with nearby churches needs an image.",
         "btn_create": "Create slide",

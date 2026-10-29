@@ -65,7 +65,7 @@ class SlideMediaLightboxTest extends TestCase
         \Illuminate\Support\Facades\Storage::fake('public');
         \Illuminate\Support\Facades\Storage::disk('public')->put($media->disk_path, 'fake-bytes');
 
-        $this->get(route('slides.media.download', [$slide->id, $media->id]))
+        $this->get(route('slides.media.download', [$slide->token, $media->id]))
             ->assertOk();
     }
 
@@ -76,7 +76,7 @@ class SlideMediaLightboxTest extends TestCase
         $slideB = $this->makeSlideWithMedia(null, $user->id);
         $mediaFromB = $slideB->media()->where('media_type', 'slide-overlay')->first();
 
-        $this->get(route('slides.media.download', [$slideA->id, $mediaFromB->id]))
+        $this->get(route('slides.media.download', [$slideA->token, $mediaFromB->id]))
             ->assertNotFound();
     }
 
@@ -87,7 +87,7 @@ class SlideMediaLightboxTest extends TestCase
         $slide->update(['status' => 'draft']);
         $media = $slide->media()->where('media_type', 'slide')->first();
 
-        $this->get(route('slides.media.download', [$slide->id, $media->id]))
+        $this->get(route('slides.media.download', [$slide->token, $media->id]))
             ->assertNotFound();
     }
 }

@@ -189,10 +189,10 @@ const lightboxStartExpanded = ref(false);
 function openLightbox(slide) {
     lightboxStartExpanded.value = false;
     openLightboxRaw(slide);
-    const slideUrl = route('slides.show', slide.id, false);
+    const slideUrl = route('slides.show', slide.token, false);
     if (window.location.pathname !== slideUrl) {
         backgroundUrl ??= window.location.pathname + window.location.search;
-        window.history.pushState({ slideId: slide.id }, '', route('slides.show', slide.id));
+        window.history.pushState({ slideId: slide.id }, '', route('slides.show', slide.token));
     }
 }
 
@@ -201,15 +201,15 @@ function closeLightbox() {
     // Match on the path rather than a pushed-state marker, so this also
     // covers landing directly on a slide's canonical URL (initialSlide),
     // whose history entry is Inertia's and carries no slideId.
-    if (/^\/slides\/\d+$/.test(window.location.pathname)) {
+    if (/^\/slides\/[a-z0-9-]+$/.test(window.location.pathname)) {
         window.history.pushState({}, '', backgroundUrl ?? (route('slides.index') + window.location.search));
         backgroundUrl = null;
     }
 }
 
 function onPopState() {
-    const match = window.location.pathname.match(/^\/slides\/(\d+)$/);
-    const slide = match ? props.slides.find(s => s.id === Number(match[1])) : null;
+    const match = window.location.pathname.match(/^\/slides\/([a-z0-9-]+)$/);
+    const slide = match ? props.slides.find(s => s.token === match[1]) : null;
     if (slide) {
         lightboxStartExpanded.value = false;
         openLightboxRaw(slide);
