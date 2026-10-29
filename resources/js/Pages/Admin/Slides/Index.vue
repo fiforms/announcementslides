@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { useForm, router, Link } from '@inertiajs/vue3';
+import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
 import DropZone from '@/Components/DropZone.vue';
@@ -32,6 +33,8 @@ const { validate: validateImage } = useImageValidation();
 const { isUploading, uploadError, fileProgress, overallProgress, upload } = useChunkedUpload();
 const resize = useUploadResize();
 const busy = computed(() => isUploading.value || resize.isResizing.value);
+
+const { t } = useI18n();
 
 const showUploadPanel = ref(false);
 const selectedFiles   = ref([]);
@@ -128,6 +131,26 @@ async function submitUpload() {
 }
 
 // ── Slide actions ─────────────────────────────────────────────────────────────
+
+// "Copy sharing link": the slide's public /slides/<token> URL.
+const copiedSlideId = ref(null);
+
+async function copyLink(slide) {
+    try {
+        await navigator.clipboard.writeText(slide.canonical_url);
+        copiedSlideId.value = slide.id;
+        setTimeout(() => { if (copiedSlideId.value === slide.id) copiedSlideId.value = null; }, 1500);
+    } catch {
+        window.prompt(t('admin.copy_link'), slide.canonical_url);
+    }
+}
+
+// Double-clicking a row opens the editor (but not when the double-click lands on one of its own buttons/links).
+function editSlide(slide, event) {
+    if (event.target.closest('a, button, input, select, textarea')) return;
+    window.getSelection()?.removeAllRanges();
+    router.visit(route('admin.slides.edit', slide.id));
+}
 
 function approve(slide) {
     router.post(route('admin.slides.approve', slide.id));
@@ -408,7 +431,8 @@ function statusBadge(status) {
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-gray-100">
-                    <tr v-for="slide in activeSlides" :key="slide.id" class="hover:bg-gray-50 transition-colors">
+                    <tr v-for="slide in activeSlides" :key="slide.id" class="hover:bg-gray-50 transition-colors cursor-pointer"
+                        @dblclick="editSlide(slide, $event)">
                         <td class="px-4 py-3">
                             <div class="flex items-center gap-3">
                                 <div class="h-12 w-20 flex-shrink-0 rounded overflow-hidden bg-slate-100">
@@ -459,6 +483,18 @@ function statusBadge(status) {
                                         {{ $t('admin.reject') }}
                                     </button>
                                 </template>
+                                <button type="button" @click="copyLink(slide)"
+                                    :title="copiedSlideId === slide.id ? $t('admin.link_copied') : $t('admin.copy_link')"
+                                    :aria-label="$t('admin.copy_link')"
+                                    class="rounded-md border border-gray-300 p-1.5 text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors">
+                                    <svg v-if="copiedSlideId === slide.id" class="h-4 w-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                    </svg>
+                                    <svg v-else class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                            d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                                    </svg>
+                                </button>
                                 <Link :href="route('admin.slides.edit', slide.id)"
                                     class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                     {{ $t('admin.edit') }}

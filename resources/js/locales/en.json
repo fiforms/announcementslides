@@ -94,6 +94,8 @@
         "global": "Announcements"
     },
     "slides": {
+        "share": "Copy Sharing Link",
+        "link_copied": "Link copied!",
         "announcement_slides_title": "Current Announcement Slides",
         "slides_available": "slide|slides available",
         "clear": "Clear",
@@ -275,6 +277,8 @@
         "manage": "Manage →",
         "all_slides": "All slides →",
         "approve": "Approve",
+        "copy_link": "Copy Sharing Link",
+        "link_copied": "Link copied!",
         "reject": "Reject",
         "edit": "Edit",
         "edit_slide_title": "Edit Slide",

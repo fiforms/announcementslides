@@ -165,14 +165,28 @@ async function copy(text, field) {
                     @click.stop>
                     <div class="flex flex-shrink-0 items-start justify-between gap-3">
                         <p class="line-clamp-2 text-lg font-medium">{{ slide.title }}</p>
-                        <button v-if="canUnarchive" @click="$emit('unarchive', slide)"
-                            class="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors">
-                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M4 8l6-6 6 6M10 2v16m-8 4h16" />
-                            </svg>
-                            Un-archive
-                        </button>
+                        <div class="flex flex-shrink-0 items-center gap-2">
+                            <button v-if="canUnarchive" @click="$emit('unarchive', slide)"
+                                class="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors">
+                                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M4 8l6-6 6 6M10 2v16m-8 4h16" />
+                                </svg>
+                                Un-archive
+                            </button>
+                            <button @click="copy(route('slides.show', slide.token), 'share')"
+                                :title="copiedField === 'share' ? $t('slides.link_copied') : $t('slides.share')"
+                                :aria-label="$t('slides.share')"
+                                class="rounded p-1.5 text-white/60 hover:bg-white/10 hover:text-white transition-colors">
+                                <svg v-if="copiedField === 'share'" class="h-5 w-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                                </svg>
+                                <svg v-else class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                            </button>
+                        </div>
                     </div>
 
                     <div v-if="slide.text_description" class="flex min-h-0 items-start gap-2 overflow-y-auto">

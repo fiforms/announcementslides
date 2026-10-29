@@ -94,6 +94,8 @@
         "global": "Anuncios"
     },
     "slides": {
+        "share": "Copiar enlace para compartir",
+        "link_copied": "¡Enlace copiado!",
         "announcement_slides_title": "Diapositivas de anuncios actuales",
         "slides_available": "diapositiva|diapositivas disponibles",
         "clear": "Limpiar",
@@ -275,6 +277,8 @@
         "manage": "Administrar →",
         "all_slides": "Todas las diapositivas →",
         "approve": "Aprobar",
+        "copy_link": "Copiar enlace para compartir",
+        "link_copied": "¡Enlace copiado!",
         "reject": "Rechazar",
         "edit": "Editar",
         "edit_slide_title": "Editar diapositiva",
