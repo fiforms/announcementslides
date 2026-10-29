@@ -93,7 +93,8 @@ class RevelationSnapshotBuilder
             $position++;
 
             if ($hasBase) {
-                $baseName = self::entryName($position, $total, $media->downloadName());
+                $media->setRelation('slide', $slide);
+                $baseName = self::entryName($position, $total, $media->titledDownloadName($hasOverlay ? 'Background' : ''));
                 $files[$baseName] = $disk->path($media->disk_path);
             }
             if (! $hasOverlay) {
@@ -101,8 +102,8 @@ class RevelationSnapshotBuilder
                 continue;
             }
 
-            $ext         = pathinfo($overlay->disk_path, PATHINFO_EXTENSION) ?: 'svg';
-            $overlayName = self::entryName($position, $total, "overlay.{$ext}");
+            $overlay->setRelation('slide', $slide);
+            $overlayName = self::entryName($position, $total, $overlay->titledDownloadName('Overlay'));
             $files[$overlayName] = $disk->path($overlay->disk_path);
 
             $section = $hasBase

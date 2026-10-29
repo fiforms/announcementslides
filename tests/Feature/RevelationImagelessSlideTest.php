@@ -78,7 +78,7 @@ class RevelationImagelessSlideTest extends TestCase
         $this->assertCount(2, array_filter($names, fn ($n) => str_starts_with($n, '00') && ! str_ends_with($n, '.md')));
         // Slide 2 is its overlay alone (no background image) plus the widget block.
         [, $second] = explode("\n\n---\n\n", $markdown);
-        $this->assertStringContainsString('![fill](002_overlay.svg)', $second);
+        $this->assertStringContainsString('![fill](<002_b - Overlay.svg>)', $second);
         $this->assertStringNotContainsString('fill:background', $second);
         $this->assertStringContainsString(':widget:', $second);
         $this->assertStringContainsString('name: clock', $second);

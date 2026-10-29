@@ -230,12 +230,12 @@ class SlideController extends Controller
 
         $composite = $this->flattenSlide($slide, $media, $compositor);
         if ($composite) {
-            return response()->download($composite, $this->jpgName($media->downloadName()), [
+            return response()->download($composite, $this->jpgName($media->titledDownloadName()), [
                 'Content-Type' => 'image/jpeg',
             ])->deleteFileAfterSend(true);
         }
 
-        return Storage::disk('public')->download($media->disk_path, $media->downloadName());
+        return Storage::disk('public')->download($media->disk_path, $media->titledDownloadName());
     }
 
     /**
@@ -249,7 +249,18 @@ class SlideController extends Controller
         abort_unless($media->slide_id === $slide->id, 404);
         abort_unless(Slide::current()->whereKey($slide->id)->exists(), 404);
 
-        return Storage::disk('public')->download($media->disk_path, $media->downloadName());
+        // The bare base image of an overlaid slide is the 'Background' (the
+        // composited slide is the plain download); other types name themselves.
+        $suffix = match ($media->media_type) {
+            'slide'            => $slide->overlayMedia ? 'Background' : '',
+            'slide-overlay'    => 'Overlay',
+            'color-flyer'      => 'Color Flyer',
+            'easy-print-flyer' => 'Easy-Print Flyer',
+            'social-media-image' => 'Social Media Image',
+            default            => '',
+        };
+
+        return Storage::disk('public')->download($media->disk_path, $media->titledDownloadName($suffix));
     }
 
     public function downloadZip(Request $request, OverlayCompositor $compositor)
@@ -280,7 +291,7 @@ class SlideController extends Controller
             if (! file_exists($fullPath)) {
                 continue;
             }
-            $name = $media->downloadName();
+            $name = $media->titledDownloadName();
 
             // Burn the overlay into the image so the zip holds the slide as
             // viewers see it (falling back to the bare file).

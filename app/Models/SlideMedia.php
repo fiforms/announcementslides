@@ -145,6 +145,33 @@ class SlideMedia extends Model
         return pathinfo($name, PATHINFO_FILENAME) . '.jpg';
     }
 
+    /**
+     * The filename to offer on a slide's download: the slide's title, stripped
+     * of special characters and trimmed to a sensible length, plus $suffix
+     * (e.g. 'Background') and the real file's extension. Falls back to the
+     * uploaded filename when the slide has no usable title.
+     */
+    public function titledDownloadName(string $suffix = ''): string
+    {
+        $fallback = $this->downloadName();
+        $base = preg_replace('/[^\p{L}\p{N}]+/u', ' ', (string) $this->slide?->title);
+        $base = trim($base);
+        if (mb_strlen($base) > 60) {
+            // Cut at the last whole word that fits (or hard-cut a single huge word).
+            $cut  = mb_substr($base, 0, 60);
+            $base = trim(mb_strlen($base) > 60 && $base[strlen($cut)] !== ' ' && str_contains($cut, ' ')
+                ? mb_substr($cut, 0, mb_strrpos($cut, ' '))
+                : $cut);
+        }
+        if ($base === '') {
+            return $fallback;
+        }
+
+        $ext = strtolower(pathinfo($fallback, PATHINFO_EXTENSION));
+
+        return $base . ($suffix !== '' ? " - {$suffix}" : '') . ($ext !== '' ? ".{$ext}" : '');
+    }
+
     /** 'upscale' or 'downscale' for the stored resized version, if any. */
     public function resizedKind(): ?string
     {
