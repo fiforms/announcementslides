@@ -79,6 +79,12 @@ class User extends Authenticatable
      * switched subscriptions off keeps its leaders and kiosk links only —
      * existing followers stay on record but lose access.)
      */
+    /** Entities this user leads (entity-admin role): the only ones whose archive they may see. */
+    public function leaderEntityIds(): array
+    {
+        return $this->adminEntities()->pluck('entities.id')->toArray();
+    }
+
     public function viewableEntities()
     {
         return $this->entities()->where(

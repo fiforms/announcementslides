@@ -203,7 +203,7 @@ class WidgetDataController extends Controller
     {
         $entityId = $media->show?->entity_id;
 
-        return $entityId && $user && ($user->isAdmin() || in_array($entityId, $user->viewableEntityIds()));
+        return $entityId && $user && in_array($entityId, $user->viewableEntityIds());
     }
 
     private function callerKey(Request $request): string

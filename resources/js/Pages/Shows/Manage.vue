@@ -674,7 +674,7 @@ function persistLeaderOrder() {
                 </div>
             </div>
 
-            <div class="text-center">
+            <div v-if="isAdmin" class="text-center">
                 <Link :href="route('slides.archive', { entity_id: entity.id })"
                     class="text-sm font-medium text-gray-500 hover:text-gray-700">
                     {{ $t('show_manage.all_archived') }}

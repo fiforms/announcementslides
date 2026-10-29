@@ -112,7 +112,7 @@ class SlideController extends Controller
         $user = $request->user();
         $frameShow = $entityId ? Show::find($showId) : null;
         $frame = $frameShow && $frameShow->entity_id === $entityId
-            && $user && ($user->isAdmin() || in_array($entityId, $user->viewableEntityIds()))
+            && $user && in_array($entityId, $user->viewableEntityIds())
             ? app(ShowFrame::class)->forPlayer($frameShow)
             : null;
 
@@ -124,7 +124,7 @@ class SlideController extends Controller
         // it may belong to a different show/entity than the one loaded above,
         // and drafts/pending/unreleased slides never open from a link.
         $initialSlide = null;
-        if ($slide && Slide::released()->visibleToUser($request->user())->whereKey($slide->id)->exists()) {
+        if ($slide && Slide::released()->visibleToUser($request->user())->hidingArchivedLocalFrom($request->user())->whereKey($slide->id)->exists()) {
             $slide->load(['primaryMedia', 'overlayMedia', 'media']);
             $initialSlide = $this->slideResource($slide);
         }
@@ -147,7 +147,16 @@ class SlideController extends Controller
         $languageCode = $request->query('language');
         $languageId = null;
         $entityId = $request->query('entity_id') ? (int) $request->query('entity_id') : null;
-        $this->authorizeEntityView($request, $entityId);
+        $user = $request->user();
+
+        // Archives exist per church and are for its leaders only — not
+        // followers, and not site admins unless they lead it too. There is no
+        // global archive page.
+        abort_if($entityId === null, 404);
+        if (! $user) {
+            throw new AuthenticationException();
+        }
+        abort_unless(in_array($entityId, $user->leaderEntityIds(), true), 403);
 
         // If no language specified, try to detect from Accept-Language header (browser default)
         if (!$languageCode) {
@@ -166,11 +175,7 @@ class SlideController extends Controller
 
         $query = Slide::with(['primaryMedia', 'overlayMedia', 'media'])->archived()->language($languageId);
 
-        if ($entityId) {
-            $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
-        } else {
-            $query->visibleToUser($request->user());
-        }
+        $query->where(fn ($q) => $q->whereNull('entity_id')->orWhere('entity_id', $entityId));
 
         $query->orderByDesc('expires_at');
 
@@ -183,16 +188,13 @@ class SlideController extends Controller
 
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
 
-        $user = $request->user();
-        $isAdmin = $entityId && $user && ($user->isAdmin() || $user->isEntityAdmin($entityId));
-
         return Inertia::render('Slides/Archive', [
             'slides' => $slides,
             'languages' => $languages,
             'search' => $search,
             'selectedLanguage' => $languageCode,
             'entityId' => $entityId,
-            'isAdmin' => $isAdmin,
+            'isAdmin' => true,
         ]);
     }
 
@@ -534,16 +536,18 @@ class SlideController extends Controller
     {
         $user = $request->user();
         if (! $user?->isAdmin()) {
-            $query->visibleToUser($user);
+            $query->visibleToUser($user)->hidingArchivedLocalFrom($user);
         }
 
         return $query->whereKey($slide->id)->exists();
     }
 
     /**
-     * An entity's shows (and the local slides in them) are private to that
-     * church's members and site admins: guests are sent to log in, anyone
-     * else gets a 403. Global content (no entity) stays public.
+     * An entity's shows (and the local slides in them) are private to the
+     * people who lead or follow that church — site admins included, who
+     * subscribe like anyone else (their oversight tools are the admin console).
+     * Guests are sent to log in, anyone else gets a 403 (before the entity is
+     * even looked up, so ids can't be probed). Global content stays public.
      */
     private function authorizeEntityView(Request $request, ?int $entityId): void
     {
@@ -556,7 +560,7 @@ class SlideController extends Controller
             throw new AuthenticationException();
         }
 
-        abort_unless($user->isAdmin() || in_array($entityId, $user->viewableEntityIds(), true), 403);
+        abort_unless(in_array($entityId, $user->viewableEntityIds(), true), 403);
     }
 
     /**

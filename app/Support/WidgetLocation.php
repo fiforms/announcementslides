@@ -49,7 +49,12 @@ class WidgetLocation
         $id = $request->query('entity_id')
             ?? ($routeEntity instanceof Entity ? $routeEntity->id : $routeEntity);
 
-        return self::for($id ? Entity::find((int) $id) : null);
+        // A church's location only follows the URL for people who may view that
+        // church — otherwise ?entity_id=N on any page would reveal it.
+        $user = $request->user();
+        $viewable = $id && $user && in_array((int) $id, $user->viewableEntityIds(), true);
+
+        return self::for($viewable ? Entity::find((int) $id) : null);
     }
 
     /** @return array{name: string, latitude: float, longitude: float}|null */

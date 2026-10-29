@@ -84,6 +84,10 @@ class WidgetLocationTest extends TestCase
             ->where('widgetLocation.name', 'Wilmington, NC')
             ->where('widgetLocation.source', 'entity'));
 
+        // ?entity_id= doesn't reveal a church's location to people who can't view it.
+        $this->actingAs(\App\Models\User::factory()->create())->get('/qr-code?entity_id=' . $church->id)
+            ->assertInertia(fn (AssertableInertia $page) => $page->where('widgetLocation.source', 'default'));
+
         $this->get('/')->assertInertia(fn (AssertableInertia $page) => $page
             ->where('widgetLocation.name', 'Charlotte, NC')
             ->where('widgetLocation.source', 'default'));

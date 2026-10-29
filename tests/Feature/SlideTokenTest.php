@@ -148,7 +148,9 @@ class SlideTokenTest extends TestCase
         $b = Entity::create(['name' => 'B']);
         $showA = \App\Models\Show::mainFor($a);
         $showB = \App\Models\Show::mainFor($b);
-        $this->actingAs(User::factory()->create(['role' => 'admin']));
+        $user = User::factory()->create();
+        $user->entities()->attach([$a->id => ['role' => 'viewer'], $b->id => ['role' => 'viewer']]);
+        $this->actingAs($user);
 
         $this->get(route('slides.index', ['entity_id' => $a->id, 'show' => $showB->token]))
             ->assertInertia(fn (Assert $page) => $page->where('showToken', $showA->token));
@@ -180,7 +182,7 @@ class SlideTokenTest extends TestCase
         $this->assertSame('Camp', \App\Models\GlobalShowTemplate::where('token', 'camp26')->value('name'));
     }
 
-    public function test_an_entitys_shows_are_private_to_its_members_and_admins(): void
+    public function test_an_entitys_shows_are_private_to_its_followers_and_leaders_even_for_site_admins(): void
     {
         $entity = Entity::create(['name' => 'Local']);
         $show = \App\Models\Show::mainFor($entity);
@@ -198,6 +200,10 @@ class SlideTokenTest extends TestCase
         $this->actingAs($outsider)->get(route('slides.download-pptx', $query))->assertForbidden();
 
         $this->actingAs($member)->get(route('slides.index', $query))->assertOk();
+        // Site admins subscribe like anyone else; unknown entity ids look the same as private ones.
+        $this->actingAs($admin)->get(route('slides.index', $query))->assertForbidden();
+        $this->actingAs($admin)->get(route('slides.index', ['entity_id' => 99999]))->assertForbidden();
+        $admin->entities()->attach($entity->id, ['role' => 'viewer']);
         $this->actingAs($admin)->get(route('slides.index', $query))->assertOk();
     }
 
@@ -252,5 +258,36 @@ class SlideTokenTest extends TestCase
         $this->actingAs($leader)->get(route('slides.index', $query))->assertOk();
         $this->actingAs($leader)->patch(route('entity.slides.settings', $entity), ['allow_subscription' => true]);
         $this->actingAs($follower)->get(route('slides.index', $query))->assertOk();
+    }
+
+    public function test_an_entitys_archive_is_for_its_leaders_only(): void
+    {
+        $entity = Entity::create(['name' => 'Church']);
+        $leader = User::factory()->create();
+        $leader->entities()->attach($entity->id, ['role' => 'admin']);
+        $follower = User::factory()->create();
+        $follower->entities()->attach($entity->id, ['role' => 'viewer']);
+        $siteAdmin = User::factory()->create(['role' => 'admin']);
+
+        $expired = $this->slide(['entity_id' => $entity->id, 'expires_at' => now()->subDay(), 'title' => 'Old local']);
+        $this->slide(['expires_at' => now()->subDay(), 'title' => 'Old global']);
+        $query = ['entity_id' => $entity->id];
+
+        $this->get(route('slides.archive', $query))->assertRedirect(route('login'));
+        $this->actingAs($follower)->get(route('slides.archive', $query))->assertForbidden();
+        $this->actingAs($siteAdmin)->get(route('slides.archive', $query))->assertForbidden();
+        $this->actingAs($leader)->get(route('slides.archive', $query))->assertOk()
+            ->assertInertia(fn (Assert $page) => $page->has('slides.data', 2));
+
+        // There is no global archive page.
+        $this->get(route('slides.archive'))->assertNotFound();
+        $this->actingAs($leader)->get(route('slides.archive'))->assertNotFound();
+
+        // ...and an archived local slide's own link/download is leaders-only too.
+        $this->actingAs($follower)->get(route('slides.show', $expired->token))
+            ->assertInertia(fn (Assert $page) => $page->where('initialSlide', null));
+        $this->actingAs($leader)->get(route('slides.show', $expired->token))
+            ->assertInertia(fn (Assert $page) => $page->where('initialSlide.token', $expired->token));
+        $this->actingAs($follower)->get(route('slides.download', $expired->token))->assertNotFound();
     }
 }

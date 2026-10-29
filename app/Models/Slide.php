@@ -181,6 +181,20 @@ class Slide extends Model
         return $query->whereNull('entity_id');
     }
 
+    /**
+     * A church's archived (expired) local slides are for its leaders only:
+     * followers keep seeing its live slides, and global slides are unaffected.
+     */
+    public function scopeHidingArchivedLocalFrom(Builder $query, ?User $user): Builder
+    {
+        $leaderIds = $user ? $user->leaderEntityIds() : [];
+
+        return $query->where(fn ($q) => $q->whereNull('slides.entity_id')
+            ->orWhereNull('slides.expires_at')
+            ->orWhere('slides.expires_at', '>', now())
+            ->orWhereIn('slides.entity_id', $leaderIds));
+    }
+
     public function scopeShareNearby(Builder $query): Builder
     {
         return $query->where('share_nearby', true);
