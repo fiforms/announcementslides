@@ -36,7 +36,9 @@ function mediaLabel(media) {
 
 // One download button per attachment. When the slide has an overlay, its
 // 'Slide' button is the composited result and the bare base image moves to
-// a separate 'Background' button (the overlay keeps its own button).
+// a separate 'Background' button (the overlay keeps its own button). Those two
+// are flagged `special`: they're raw parts that are easy to send out by mistake
+// (the background alone can carry stale content), so they sit behind a menu.
 const downloads = computed(() => {
     const media = props.slide?.media ?? [];
     const hasOverlay = media.some(m => m.media_type === 'slide-overlay');
@@ -46,12 +48,39 @@ const downloads = computed(() => {
         if (hasOverlay && m.media_type === 'slide') {
             return [
                 { ...item, href: route('slides.download', props.slide.id) },
-                { ...item, label: 'Background' },
+                { ...item, label: 'Background', special: true },
             ];
         }
-        return [item];
+        return [{ ...item, special: m.media_type === 'slide-overlay' }];
     });
 });
+
+const mainDownloads = computed(() => downloads.value.filter(d => !d.special));
+const specialDownloads = computed(() => downloads.value.filter(d => d.special));
+// The finished slide (composited when there's an overlay): the only thing the right-click menu offers.
+const slideDownload = computed(() => mainDownloads.value.find(d => d.media.media_type === 'slide') ?? null);
+
+// Leave room for the capped (30dvh) info panel, the gap and the padding so the buttons never leave the viewport.
+const previewMaxH = computed(() => props.slide && isExpanded.value
+    ? 'max-h-[min(85vh,calc(70dvh-3rem))]'
+    : 'max-h-[min(65vh,calc(70dvh-3rem))]');
+
+const specialOpen = ref(false);
+const contextMenu = ref(null);
+
+watch(() => props.slide?.id, () => {
+    specialOpen.value = false;
+    contextMenu.value = null;
+});
+
+function openContextMenu(event) {
+    if (!slideDownload.value) return;
+    event.preventDefault();
+    contextMenu.value = {
+        x: Math.min(event.clientX, window.innerWidth - 180),
+        y: Math.min(event.clientY, window.innerHeight - 50),
+    };
+}
 
 function isPdf(media) {
     return media.mime_type === 'application/pdf';
@@ -81,7 +110,7 @@ async function copy(text, field) {
             leave-to-class="opacity-0"
         >
             <div v-if="slide"
-                class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 overflow-y-auto bg-black/85 p-4"
+                class="fixed inset-0 z-50 flex flex-col items-center justify-center gap-4 overflow-hidden bg-black/85 p-4"
                 @click.self="$emit('close')">
 
                 <!-- Expand/shrink button (z-10: the relative preview below
@@ -110,31 +139,32 @@ async function copy(text, field) {
 
                 <!-- Preview (base + overlay, composited exactly like the slideshow) -->
                 <div class="relative w-full flex-shrink"
-                    :class="isExpanded ? 'max-h-[85vh] max-w-[95vw]' : 'max-h-[65vh] max-w-4xl'"
-                    @click.self="$emit('close')">
+                    :class="isExpanded ? 'max-w-[95vw]' : 'max-w-4xl'"
+                    @click.self="$emit('close')"
+                    @contextmenu="openContextMenu">
                     <video v-if="slide.mime_type?.startsWith('video/')"
                         :src="slide.file_url"
-                        controls autoplay loop
+                        controls controlslist="nodownload" autoplay loop
                         class="w-full rounded-lg object-contain shadow-2xl"
-                        :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
+                        :class="previewMaxH" />
                     <img v-else-if="slide.file_url || slide.thumbnail_url" :src="slide.file_url || slide.thumbnail_url"
-                        :alt="slide.title"
+                        :alt="slide.title" draggable="false"
                         class="w-full rounded-lg object-contain shadow-2xl"
-                        :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
+                        :class="previewMaxH" />
                     <!-- A slide with no image: a black 16:9 stage for its overlay and widgets. -->
                     <div v-else class="aspect-video w-full rounded-lg bg-black shadow-2xl"
-                        :class="isExpanded ? 'max-h-[85vh]' : 'max-h-[65vh]'" />
-                    <img v-if="slide.overlay_url" :src="slide.overlay_url" :alt="`${slide.title} overlay`"
+                        :class="previewMaxH" />
+                    <img v-if="slide.overlay_url" :src="slide.overlay_url" :alt="`${slide.title} overlay`" draggable="false"
                         class="pointer-events-none absolute inset-0 h-full w-full object-contain" />
                     <WidgetLayer v-if="slide.overlay_widgets?.length" :key="slide.id" :widgets="slide.overlay_widgets" />
                 </div>
 
                 <!-- Description / link / attached files -->
-                <div class="w-full rounded-xl border border-white/10 bg-black/60 p-4 text-white shadow-2xl backdrop-blur-md space-y-3"
+                <div class="flex max-h-[30dvh] w-full flex-col gap-3 rounded-xl border border-white/10 bg-black/60 p-4 text-white shadow-2xl backdrop-blur-md"
                     :class="isExpanded ? 'max-w-[95vw]' : 'max-w-4xl'"
                     @click.stop>
-                    <div class="flex items-start justify-between gap-3">
-                        <p class="text-lg font-medium">{{ slide.title }}</p>
+                    <div class="flex flex-shrink-0 items-start justify-between gap-3">
+                        <p class="line-clamp-2 text-lg font-medium">{{ slide.title }}</p>
                         <button v-if="canUnarchive" @click="$emit('unarchive', slide)"
                             class="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-500 transition-colors">
                             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -145,7 +175,7 @@ async function copy(text, field) {
                         </button>
                     </div>
 
-                    <div v-if="slide.text_description" class="flex items-start gap-2">
+                    <div v-if="slide.text_description" class="flex min-h-0 items-start gap-2 overflow-y-auto">
                         <p class="flex-1 text-sm text-white/80 whitespace-pre-line">{{ slide.text_description }}</p>
                         <button @click="copy(slide.text_description, 'description')" title="Copy description"
                             class="flex-shrink-0 rounded p-1 text-white/60 hover:bg-white/10 hover:text-white">
@@ -159,7 +189,7 @@ async function copy(text, field) {
                         </button>
                     </div>
 
-                    <div v-if="slide.link" class="flex items-center gap-2">
+                    <div v-if="slide.link" class="flex flex-shrink-0 items-center gap-2">
                         <a :href="slide.link" target="_blank" rel="noopener"
                             class="flex-1 truncate text-sm text-indigo-300 hover:text-indigo-200 underline">{{ slide.link }}</a>
                         <button @click="copy(slide.link, 'link')" title="Copy link"
@@ -174,8 +204,8 @@ async function copy(text, field) {
                         </button>
                     </div>
 
-                    <div v-if="downloads.length" class="flex flex-wrap gap-2 pt-1">
-                        <a v-for="d in downloads" :key="d.label + d.media.id"
+                    <div v-if="downloads.length" class="relative flex flex-shrink-0 flex-wrap gap-2 pt-1">
+                        <a v-for="d in mainDownloads" :key="d.label + d.media.id"
                             :href="d.href"
                             class="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-medium text-white hover:bg-white/20 transition-colors">
                             <svg v-if="isPdf(d.media)" class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -192,8 +222,41 @@ async function copy(text, field) {
                                     d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
                         </a>
+
+                        <!-- Raw parts (background / overlay) live behind one extra click -->
+                        <div v-if="specialDownloads.length" class="relative">
+                            <button type="button" @click="specialOpen = !specialOpen"
+                                class="flex items-center gap-1.5 rounded-lg border border-white/20 px-3 py-1.5 text-xs font-medium text-white/80 hover:bg-white/10 transition-colors"
+                                :aria-expanded="specialOpen">
+                                Special Assets
+                                <svg class="h-3.5 w-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                                </svg>
+                            </button>
+                            <div v-if="specialOpen" class="fixed inset-0 z-10" @click="specialOpen = false" />
+                            <div v-if="specialOpen"
+                                class="absolute bottom-full left-0 z-20 mb-1 min-w-40 rounded-lg border border-white/10 bg-neutral-900 p-1 shadow-2xl">
+                                <a v-for="d in specialDownloads" :key="d.label + d.media.id"
+                                    :href="d.href" @click="specialOpen = false"
+                                    class="block whitespace-nowrap rounded px-3 py-1.5 text-xs text-white hover:bg-white/10">
+                                    Download {{ d.label }}
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- Right-click replaces the browser menu so "Save image as" can't grab the raw background -->
+                <template v-if="contextMenu && slideDownload">
+                    <div class="fixed inset-0 z-[60]" @click="contextMenu = null" @contextmenu.prevent="contextMenu = null" />
+                    <div class="fixed z-[61] rounded-lg border border-white/10 bg-neutral-900 p-1 shadow-2xl"
+                        :style="{ left: contextMenu.x + 'px', top: contextMenu.y + 'px' }">
+                        <a :href="slideDownload.href" @click="contextMenu = null"
+                            class="block whitespace-nowrap rounded px-3 py-1.5 text-sm text-white hover:bg-white/10">
+                            Download {{ slideDownload.label }}
+                        </a>
+                    </div>
+                </template>
             </div>
         </Transition>
     </Teleport>
