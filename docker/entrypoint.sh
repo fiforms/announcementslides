@@ -9,14 +9,18 @@ if [ "$1" != "supervisord" ]; then
     exec su-exec www-data "$@"
 fi
 
+# No APP_KEY supplied: generate one on first start and keep it in the storage
+# volume, so a default install needs no secrets and a backup of the volume
+# carries the key with it. Set APP_KEY explicitly to manage it yourself.
+KEY_FILE=storage/app/.app_key
 if [ -z "$APP_KEY" ]; then
-    cat >&2 <<'MSG'
-ERROR: APP_KEY is not set.
-Generate one and pass it as an environment variable:
-    docker run --rm ghcr.io/fiforms/announcementslides php artisan key:generate --show
-Keep it safe: it is needed to restore a backup on another server.
-MSG
-    exit 1
+    if [ ! -s "$KEY_FILE" ]; then
+        mkdir -p "$(dirname "$KEY_FILE")"
+        (umask 077; php artisan key:generate --show > "$KEY_FILE")
+        echo "Generated a new APP_KEY and stored it in $KEY_FILE" >&2
+    fi
+    APP_KEY="$(cat "$KEY_FILE")"
+    export APP_KEY
 fi
 
 mkdir -p storage/app/public storage/app/private storage/framework/cache/data \
