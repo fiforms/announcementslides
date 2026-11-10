@@ -20,6 +20,10 @@ A web-based announcement slide distribution system designed for Seventh-day Adve
 - SQLite (default) or a supported relational database
 - `ffmpeg` (for video slide thumbnails) — see [INSTALLING.md](INSTALLING.md) for production setup, including the queue worker required for thumbnails to actually generate
 
+## Docker
+
+A ready-to-run image is built by GitHub Actions and published to GHCR. See [docker/README.md](docker/README.md) for a Compose setup with MySQL.
+
 ## Installation
 
 ```bash
