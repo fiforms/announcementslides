@@ -1,5 +1,7 @@
 # Installing / Deploying
 
+> **Docker:** a prebuilt image (nginx, php-fpm, queue worker, scheduler and ffmpeg included) is published to `ghcr.io/fiforms/announcementslides`. If you use it, skip everything below and follow [docker/README.md](docker/README.md).
+
 This covers the parts of a production deployment that go beyond the local
 dev setup in [README.md](README.md#installation): the queue worker and
 `ffmpeg`, both required for slide thumbnails to actually generate.

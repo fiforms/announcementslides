@@ -1,0 +1,25 @@
+.git
+.github
+.claude
+.env
+.env.*
+.phpunit.result.cache
+/.phpunit.cache
+node_modules
+vendor
+public/build
+public/hot
+public/storage
+public/upscaler-models
+storage/logs/*
+storage/framework/*/*
+storage/app/*
+bootstrap/cache/*.php
+database/*.sqlite
+tests
+# Device firmware / kiosk sources are not part of the web app image.
+slideannouncer
+kiosk-products
+docker/compose.yaml
+docker/.env*
+Dockerfile
