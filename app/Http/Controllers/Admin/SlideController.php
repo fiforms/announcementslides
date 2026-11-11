@@ -64,7 +64,10 @@ class SlideController extends Controller
 
         foreach ($request->file('files') as $file) {
             $uuid       = Str::uuid();
-            $ext        = $file->getClientOriginalExtension();
+            // Stored extension comes from the content-sniffed mime type, never
+            // the client's filename (see ChunkedUploadController::chunk()).
+            $ext        = config('slides.mime_extensions.' . $file->getMimeType());
+            abort_unless($ext, 422, 'Unsupported file type.');
             $filename   = "{$uuid}.{$ext}";
             $diskPath   = "slides/{$filename}";
 
