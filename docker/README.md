@@ -94,8 +94,7 @@ https URL, and set `TRUSTED_PROXIES` to the proxy's IP/CIDR (both in the setting
 ## Building locally
 
 ```bash
-git submodule update --init resources/widgets
-docker build -t announcementslides:local .
+npm run build:docker        # inits the widgets submodule, then docker build -t announcementslides:local .
 cd docker && APP_IMAGE=announcementslides:local docker compose up -d
 ```
 
