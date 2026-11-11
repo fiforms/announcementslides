@@ -7,7 +7,7 @@ import { createApp, h } from 'vue';
 import { ZiggyVue } from '../../vendor/tightenco/ziggy';
 import i18n from './i18n';
 
-const fallbackName = import.meta.env.VITE_APP_NAME || 'Announcement Slides';
+const fallbackName = import.meta.env.VITE_APP_NAME || 'AnnouncementSlides';
 
 // Site name for the interface language: an APP_NAME_<locale> override from
 // the server if one exists, else APP_NAME (see config/app.php).

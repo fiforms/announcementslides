@@ -22,6 +22,9 @@ services:
       - path: .env
         required: false
     environment:
+      # Site name shown in the header, page titles and emails (a settings page may
+      # replace this later). Per-language names: APP_NAME_es=... in .env.
+      APP_NAME: ${APP_NAME:-AnnouncementSlides}
       APP_URL: ${APP_URL:-http://localhost:8080}
       GOOGLE_REDIRECT_URI: ${APP_URL:-http://localhost:8080}/auth/google/callback
       DB_CONNECTION: mysql

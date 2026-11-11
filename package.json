@@ -5,6 +5,7 @@
     "type": "module",
     "scripts": {
         "build": "vite build",
+        "build:docker": "git submodule update --init resources/widgets && docker build -t announcementslides:local .",
         "dev": "vite",
         "test:slideannouncer": "PRODUCT_ROOT=$PWD/kiosk-products/slideannouncer slideannouncer/local-app/run-tests.sh -q",
         "hotfix:new:product": "kiosk-products/slideannouncer/hotfixes/new.sh",
