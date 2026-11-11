@@ -209,6 +209,7 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     // ── Entity console (admin oversight of entity-scoped slides) ──────────
     Route::get('/entities', [EntityConsoleController::class, 'index'])->name('entities.index');
     Route::get('/entities/{entity}/slides', [EntityConsoleController::class, 'slides'])->name('entities.slides');
+    Route::get('/entities/{entity}', [EntityConsoleController::class, 'show'])->name('entities.show');
 
     // ── Directory import (churches + pastors from files) ───────────────────
     Route::get('/directory-import', [DirectoryImportController::class, 'index'])->name('directory-import.index');
