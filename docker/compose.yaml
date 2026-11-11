@@ -30,6 +30,13 @@ services:
       DB_DATABASE: ${DB_DATABASE:-announcementslides}
       DB_USERNAME: ${DB_USERNAME:-announcementslides}
       DB_PASSWORD: ${DB_PASSWORD:-announcementslides}
+      # First-run wizard (/setup, only while there are no users). Empty = open:
+      # whoever opens the page first creates the admin, fine for a local test.
+      # Set a value (and keep it secret) for anything reachable from outside.
+      SETUP_TOKEN: ${SETUP_TOKEN:-}
+      # Show the email/password login form (the wizard's admin has a password).
+      # Set false once Google sign-in is configured and you want it Google-only.
+      PASSWORD_LOGIN: ${PASSWORD_LOGIN:-true}
     volumes:
       - storage:/var/www/html/storage
     depends_on:

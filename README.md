@@ -80,6 +80,10 @@ npm run build
 
 ### Create the first user
 
+On a fresh install, just open the site: with no users yet it redirects to a
+setup wizard (`/setup`) that creates the first admin and can install the bundled
+widgets. The wizard disappears once any user exists. Or from the command line:
+
 ```bash
 php artisan user:create
 php artisan user:setrole

@@ -28,6 +28,13 @@ use Illuminate\Support\Facades\Route;
 
 // ── Public ────────────────────────────────────────────────────────────────────
 
+// First-run wizard: exists only while there are no users (then 404s).
+Route::middleware(\App\Http\Middleware\EnsureSetupIsOpen::class)->group(function () {
+    Route::get('/setup', [\App\Http\Controllers\SetupController::class, 'show'])->name('setup.show');
+    Route::post('/setup', [\App\Http\Controllers\SetupController::class, 'store'])
+        ->middleware('throttle:10,1')->name('setup.store');
+});
+
 Route::get('/', [SlideController::class, 'index'])->name('slides.index');
 Route::get('/archive', [SlideController::class, 'archive'])->name('slides.archive');
 Route::get('/slides/{slide:token}/download', [SlideController::class, 'download'])->name('slides.download');

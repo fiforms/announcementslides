@@ -10,7 +10,7 @@ import { computed } from 'vue';
 import { useI18n } from 'vue-i18n';
 
 const { t } = useI18n();
-const isDev = computed(() => usePage().props.isDev);
+const passwordLogin = computed(() => usePage().props.passwordLogin);
 
 defineProps({
     canResetPassword: {
@@ -42,7 +42,7 @@ const submit = () => {
             {{ status }}
         </div>
 
-        <form v-if="isDev" @submit.prevent="submit">
+        <form v-if="passwordLogin" @submit.prevent="submit">
             <div>
                 <InputLabel for="email" :value="$t('auth.email')" />
 
@@ -100,8 +100,8 @@ const submit = () => {
             </div>
         </form>
 
-        <div :class="isDev ? 'mt-4' : ''">
-            <div v-if="isDev" class="relative">
+        <div :class="passwordLogin ? 'mt-4' : ''">
+            <div v-if="passwordLogin" class="relative">
                 <div class="absolute inset-0 flex items-center">
                     <div class="w-full border-t border-gray-300" />
                 </div>

@@ -37,6 +37,7 @@ class HandleInertiaRequests extends Middleware
             'appName' => config('app.name'),
             'appNameLocalized' => config('app.name_localized'),
             'isDev'   => app()->environment('local'),
+            'passwordLogin' => (bool) config('auth.password_login'),
             'auth' => [
                 'user'             => $request->user()?->only('id', 'name', 'email', 'role', 'avatar_url'),
                 'admin_entities'   => $request->user()?->adminEntities()->get(['entities.id', 'entities.name']) ?? [],

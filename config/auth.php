@@ -114,4 +114,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Show the email/password login form
+    |--------------------------------------------------------------------------
+    |
+    | Google sign-in is the production default, so the password form is hidden
+    | outside the local environment. This only controls the form: POST /login
+    | works either way. Set PASSWORD_LOGIN=true to show it (a test instance, or
+    | the admin created by the first-run setup wizard, which has a password).
+    |
+    */
+
+    'password_login' => (bool) env('PASSWORD_LOGIN', env('APP_ENV') === 'local'),
+
 ];
