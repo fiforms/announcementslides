@@ -310,6 +310,35 @@ already soft-deletes.
     authenticated entity leader/admin session on the website, re-pairing to
     a different site always requires a logged-in human's consent; a device
     can't silently retarget itself.
+  - **Trust assumption: the `device_uuid` lookup is global (decided,
+    intentional).** On re-pair, `SlideAnnouncerPairingController` looks the
+    `device_uuid` up across *all* entities, not just the entity that issued
+    the pairing code. If it matches, the device is reassigned to the code's
+    entity and all its existing tokens are deleted. This is what lets a
+    physical device move between sites. The consequence is that anyone who
+    (a) can generate a pairing code for an entity they lead and (b) knows
+    another entity's `device_uuid` can move that device to their entity,
+    which cuts the original site off (its tokens stop working until it is
+    re-paired). We accept this because:
+    - the `device_uuid` is a random identifier, unique per device, and is
+      only shown in the web UI to leaders of the entity the device
+      currently belongs to (and site admins). Learning another site's
+      requires physical access to the device's boot partition or an
+      insider at that site;
+    - the attacker gains no access to the other site's data, only the
+      device itself, and the loss is visible (the device shows as
+      unpaired/revoked at its old site) and recoverable by re-pairing it;
+    - the model is "possession of the device implies the right to re-home
+      it". The device-side `device_uuid_check` (see *Device identity &
+      anti-clone protection*) is verified **on the device only**; the server
+      never validates it, so it does not protect against this.
+
+    If the deployment ever needs stronger guarantees, the options are to
+    scope the lookup to the code's entity (and treat a match elsewhere as a
+    new device, or refuse), or to require proof of possession (e.g. a
+    signature over the pairing code made with the device's identity key).
+    Either is a server change plus a device change, so it's deferred until
+    there's a reason.
 
 ### Sync endpoint
 `GET /api/slide-announcers/slides` (`auth:sanctum` + `slide-announcer.auth`).
