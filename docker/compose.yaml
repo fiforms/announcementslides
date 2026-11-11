@@ -1,42 +1,96 @@
-# AnnouncementSlides: app + MySQL. No secrets needed to try it:
+# AnnouncementSlides — Docker Compose stack (web app + MySQL).
+# This is the ONLY file you need.
 #
-#   docker compose up -d                       # works with no .env at all
+#   1. Set APP_URL in the "YOUR SETTINGS" block below.
+#   2. docker compose up -d
+#   3. Open that address in a browser: a setup wizard creates your administrator
+#      account and installs the bundled widgets. That's it.
 #
-# Configuration: copy .env.example to .env (in this directory) and set whatever
-# you need. Every variable in it is passed straight into the app container, so
-# any Laravel setting (MAIL_*, GOOGLE_*, AWS_*, FILESYSTEM_DISK, ...) can be set
-# there without editing this file.
+# Upgrade later with:  docker compose pull && docker compose up -d
+# See https://github.com/fiforms/announcementslides#docker for details
+# (backups, reverse proxy / HTTPS, Google sign-in).
 #
-# To use an existing MySQL server instead of the bundled one, set DB_HOST (and
-# the other DB_* values) in .env and start only the app: docker compose up -d app
+# Services:
+#   app   web server + queue worker + scheduler (migrations run on start)
+#   db    MySQL 8.4 (data in the `db` volume; not published on the host)
+
+name: announcementslides
+
+# ============================== YOUR SETTINGS ===============================
+x-settings: &settings
+  # The address people type into their browser. Used for links and the Google
+  # sign-in redirect. Include http:// or https:// (and the port if it isn't
+  # 80/443). If you change the port, change the "8080:80" mapping under `app`.
+  APP_URL: http://localhost:8080
+
+  # --- First-run setup ------------------------------------------------------
+  # While nobody has an account, opening the site goes to a setup wizard that
+  # creates the administrator. By default anyone who reaches that page first can
+  # do so, which is fine on your own computer. If this server is reachable from
+  # the internet before you finish the wizard, require a code (pick any string):
+  # SETUP_TOKEN: choose-a-code
+
+  # Show the email/password login form. The wizard's administrator has a
+  # password, so this defaults to true. Set to "false" if you use Google
+  # sign-in only.
+  PASSWORD_LOGIN: "true"
+
+  # --- Optional: uncomment and edit what you need ---------------------------
+  # Site name in the header, page titles and emails (default: AnnouncementSlides).
+  # APP_NAME: AnnouncementSlides
+  # APP_NAME_es: Anuncios                # a different name for one language
+
+  # Behind an HTTPS reverse proxy: its address(es), comma separated, or * if
+  # only the proxy can reach this container.
+  # TRUSTED_PROXIES: "*"
+
+  # Outbound email (invitations, password resets).
+  # MAIL_MAILER: smtp
+  # MAIL_HOST: smtp.example.com
+  # MAIL_PORT: 587
+  # MAIL_USERNAME: me@example.com
+  # MAIL_PASSWORD: secret
+  # MAIL_FROM_ADDRESS: slides@example.com
+
+  # Google sign-in (create credentials in the Google Cloud Console; the
+  # redirect URI is APP_URL + /auth/google/callback).
+  # GOOGLE_CLIENT_ID: your-client-id
+  # GOOGLE_CLIENT_SECRET: your-client-secret
+
+  # S3-compatible file storage instead of the local volume.
+  # FILESYSTEM_DISK: s3
+  # AWS_ACCESS_KEY_ID: key
+  # AWS_SECRET_ACCESS_KEY: secret
+  # AWS_DEFAULT_REGION: us-east-1
+  # AWS_BUCKET: my-bucket
+  # AWS_ENDPOINT: https://s3.example.com
+
+  # Manage the encryption key yourself instead of using the generated one
+  # (kept in the storage volume). Generate one with:
+  #   docker run --rm ghcr.io/fiforms/announcementslides php artisan key:generate --show
+  # APP_KEY: base64:...
+# ============================================================================
+
 services:
   app:
+    # Pin a release instead of :latest with APP_IMAGE, e.g. ...announcementslides:1.2.0
     image: ${APP_IMAGE:-ghcr.io/fiforms/announcementslides:latest}
-    build:
-      context: ..
-      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "8080:80"
+    # Optional extra settings file next to this one; everything in it is passed
+    # through. Not required.
     env_file:
       - path: .env
         required: false
     environment:
-      APP_URL: ${APP_URL:-http://localhost:8080}
-      GOOGLE_REDIRECT_URI: ${APP_URL:-http://localhost:8080}/auth/google/callback
+      <<: *settings
       DB_CONNECTION: mysql
       DB_HOST: ${DB_HOST:-db}
       DB_PORT: ${DB_PORT:-3306}
       DB_DATABASE: ${DB_DATABASE:-announcementslides}
       DB_USERNAME: ${DB_USERNAME:-announcementslides}
       DB_PASSWORD: ${DB_PASSWORD:-announcementslides}
-      # First-run wizard (/setup, only while there are no users). Empty = open:
-      # whoever opens the page first creates the admin, fine for a local test.
-      # Set a value (and keep it secret) for anything reachable from outside.
-      SETUP_TOKEN: ${SETUP_TOKEN:-}
-      # Show the email/password login form (the wizard's admin has a password).
-      # Set false once Google sign-in is configured and you want it Google-only.
-      PASSWORD_LOGIN: ${PASSWORD_LOGIN:-true}
     volumes:
       - storage:/var/www/html/storage
     depends_on:
@@ -50,7 +104,7 @@ services:
       MYSQL_DATABASE: ${DB_DATABASE:-announcementslides}
       MYSQL_USER: ${DB_USERNAME:-announcementslides}
       # The database is only reachable on the compose network. For anything
-      # public, set DB_PASSWORD in .env instead of using this default.
+      # public, set DB_PASSWORD (in the shell or a .env file next to this one).
       MYSQL_PASSWORD: ${DB_PASSWORD:-announcementslides}
       MYSQL_RANDOM_ROOT_PASSWORD: "yes"
     volumes:
