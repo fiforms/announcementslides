@@ -4,8 +4,10 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Console\PromptsForMissingInput;
+use Illuminate\Support\Facades\Validator;
 
-class UserSetPassword extends Command
+class UserSetPassword extends Command implements PromptsForMissingInput
 {
     protected $signature = 'user:setpassword
                             {email : Email address of the user}
@@ -23,10 +25,33 @@ class UserSetPassword extends Command
             return self::FAILURE;
         }
 
-        $password = $this->option('password') ?? $this->secret('New password');
+        $password = $this->option('password');
 
-        if (strlen($password) < 8) {
-            $this->error('Password must be at least 8 characters.');
+        if ($password === null) {
+            if (! $this->input->isInteractive()) {
+                $this->error('The --password option is required when running non-interactively.');
+                return self::FAILURE;
+            }
+
+            $password = $this->secret('New password');
+
+            if ($password !== $this->secret('Confirm new password')) {
+                $this->error('Passwords do not match.');
+                return self::FAILURE;
+            }
+        }
+
+        // Same rule user:create validates against, so both commands agree on
+        // what a valid password is (min counts characters, not bytes).
+        $validator = Validator::make(
+            ['password' => $password],
+            ['password' => 'required|string|min:8']
+        );
+
+        if ($validator->fails()) {
+            foreach ($validator->errors()->all() as $error) {
+                $this->error($error);
+            }
             return self::FAILURE;
         }
 

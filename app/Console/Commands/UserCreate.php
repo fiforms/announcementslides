@@ -8,11 +8,14 @@ use Illuminate\Support\Facades\Validator;
 
 class UserCreate extends Command
 {
+    /** Global roles, in menu order. Keep in sync with the users.role enum. */
+    private const ROLES = ['viewer', 'contributor', 'admin', 'banned'];
+
     protected $signature = 'user:create
                             {--name= : Full name}
                             {--email= : Email address}
                             {--password= : Password}
-                            {--role=viewer : Role (admin, contributor, viewer)}';
+                            {--role= : Role (viewer, contributor, admin, banned); prompted if omitted}';
 
     protected $description = 'Create a new user account';
 
@@ -23,8 +26,17 @@ class UserCreate extends Command
         $password = $this->option('password') ?? $this->secret('Password');
         $role     = $this->option('role');
 
-        if (! in_array($role, ['admin', 'contributor', 'viewer'])) {
-            $role = $this->choice('Role', ['viewer', 'contributor', 'admin'], 0);
+        if ($role === null) {
+            // No default on --role, so an omitted role is prompted for rather
+            // than silently becoming a viewer. Non-interactively it stays null
+            // and the validator reports it with any other missing field.
+            if ($this->input->isInteractive()) {
+                $role = $this->choice('Role', self::ROLES, 0);
+            }
+        } elseif (! in_array($role, self::ROLES, true)) {
+            $this->error("Invalid role: {$role}");
+            $this->line('Valid roles are: ' . implode(', ', self::ROLES));
+            return self::FAILURE;
         }
 
         $validator = Validator::make(
@@ -33,7 +45,7 @@ class UserCreate extends Command
                 'name'     => 'required|string|max:255',
                 'email'    => 'required|email|unique:users,email',
                 'password' => 'required|min:8',
-                'role'     => 'required|in:admin,contributor,viewer',
+                'role'     => 'required|in:' . implode(',', self::ROLES),
             ]
         );
 
