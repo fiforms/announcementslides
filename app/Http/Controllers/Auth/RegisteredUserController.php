@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Http\Controllers\Concerns\RedirectsToHome;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
@@ -16,6 +17,8 @@ use Inertia\Response;
 
 class RegisteredUserController extends Controller
 {
+    use RedirectsToHome;
+
     /**
      * Display the registration view.
      */
@@ -47,6 +50,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect($this->homeRouteFor($user));
     }
 }
