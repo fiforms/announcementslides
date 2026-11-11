@@ -1,11 +1,7 @@
 name: Docker image
 
 on:
-  push:
-    branches: [master]
-    tags: ["v*"]
-  pull_request:
-    branches: [master]
+  # Manual only: run from the Actions tab (Run workflow) when you want an image.
   workflow_dispatch:
 
 env:
