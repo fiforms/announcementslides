@@ -65,6 +65,16 @@ x-settings: &settings
   # AWS_BUCKET: my-bucket
   # AWS_ENDPOINT: https://s3.example.com
 
+  # Backups (Admin > Backups, `php artisan backup:create`). Defaults shown.
+  # A database backup is taken daily, and before an update applies migrations.
+  # BACKUP_SCHEDULE: daily            # off | daily | weekly (weekly = Sundays)
+  # BACKUP_TIME: "02:30"              # UTC
+  # BACKUP_KEEP: 14                   # scheduled backups kept
+  # BACKUP_KEEP_SAFETY: 3             # pre-update / pre-restore backups kept
+  # BACKUP_BEFORE_MIGRATE: "true"
+  # BACKUP_DISK: local               # filesystem disk for archives (default: private storage volume)
+  # BACKUP_CLIENT_OPTIONS: "--skip-ssl"   # extra mysqldump/mysql arguments, if your DB server needs them
+
   # Manage the encryption key yourself instead of using the generated one
   # (kept in the storage volume). Generate one with:
   #   docker run --rm ghcr.io/fiforms/announcementslides php artisan key:generate --show

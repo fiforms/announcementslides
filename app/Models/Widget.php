@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\TolerantEncryptedArray;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +25,7 @@ class Widget extends Model
             'manifest'    => 'array',
             'files'       => 'array',
             'enabled'     => 'boolean',
-            'settings'    => 'encrypted:array',
+            'settings'    => TolerantEncryptedArray::class,
             'extra_allow' => 'array',
         ];
     }

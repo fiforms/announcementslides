@@ -13,6 +13,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->bind(\App\Services\Backup\DatabaseDumper::class, \App\Services\Backup\MysqlDumper::class);
         $this->app->scoped('widgets.enabled', fn () => Widget::where('enabled', true)->get()->keyBy('slug')->all());
     }
 
