@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SlideAnnouncerHeartbeat extends Model
 {
@@ -20,7 +21,7 @@ class SlideAnnouncerHeartbeat extends Model
         'created_at' => 'datetime',
     ];
 
-    public function slideAnnouncer()
+    public function slideAnnouncer(): BelongsTo
     {
         return $this->belongsTo(SlideAnnouncer::class);
     }

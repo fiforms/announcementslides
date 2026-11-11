@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SlideAnnouncerReleaseChannel extends Model
 {
@@ -18,12 +19,12 @@ class SlideAnnouncerReleaseChannel extends Model
         'created_at' => 'datetime',
     ];
 
-    public function release()
+    public function release(): BelongsTo
     {
         return $this->belongsTo(SlideAnnouncerRelease::class, 'slide_announcer_release_id');
     }
 
-    public function taggedBy()
+    public function taggedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'tagged_by');
     }
