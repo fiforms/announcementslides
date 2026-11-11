@@ -66,6 +66,24 @@ validated mime type rather than the client's filename (`config/slides.php`'s
 `mime_extensions`), but denying execution under that path is cheap
 defence in depth.
 
+Uploaded SVGs are sanitized on upload (see *SVG security model* in
+[ARCHITECTURE.md](ARCHITECTURE.md)), and the web server should also send a
+sandboxing CSP for them so one opened directly in a browser tab can never run
+script. The Docker image's `docker/nginx.conf` already does this. On your own
+nginx:
+
+```nginx
+location ~* ^/storage/.+\.svg$ {
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Content-Security-Policy "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:" always;
+    try_files $uri =404;
+}
+```
+
+On Apache, the equivalent is a `<FilesMatch "\.svg$">` block with
+`Header always set` for the same two headers. This does not affect SVGs shown
+through `<img>`.
+
 ## Queue worker (required)
 
 `QUEUE_CONNECTION=database` by default, which means thumbnail generation
