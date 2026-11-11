@@ -105,3 +105,13 @@ cd docker && APP_IMAGE=announcementslides:local docker compose up -d
 ```bash
 docker compose pull && docker compose up -d
 ```
+
+## Image tags
+
+| Tag | What it is |
+|---|---|
+| `latest` | the newest published **release** (what `compose.yaml` uses) |
+| `1.4.0`, `1.4` | an exact release, or the newest patch of a minor version; pin one with `APP_IMAGE` |
+| `edge` | a manual build of unreleased work, for testing only |
+
+Maintainers: see [RELEASING.md](RELEASING.md) for how each tag is published.
