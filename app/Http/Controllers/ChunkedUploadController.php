@@ -14,6 +14,7 @@ use App\Support\ImageResize;
 use App\Support\PublicToken;
 use App\Support\SlideToken;
 use App\Support\SortZones;
+use App\Services\SvgSanitizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -22,6 +23,9 @@ use Illuminate\Validation\Rule;
 
 class ChunkedUploadController extends Controller
 {
+    /** Largest SVG we'll read into memory to sanitize. */
+    private const SVG_MAX_BYTES = 5 * 1024 * 1024;
+
     public function chunk(Request $request)
     {
         $mediaType = $request->input('media_type', 'slide');
@@ -75,7 +79,15 @@ class ChunkedUploadController extends Controller
         $filename = "{$uuid}.{$ext}";
 
         Storage::disk('public')->makeDirectory('slides');
-        $destPath = Storage::disk('public')->path("slides/{$filename}");
+        $publicPath = Storage::disk('public')->path("slides/{$filename}");
+
+        // An SVG is executable content when opened directly, so it is
+        // assembled in the private chunk directory and only reaches the public
+        // disk once sanitized. Nothing raw is ever web-reachable, including
+        // uploads that are never attached to a slide. See "SVG security
+        // model" in ARCHITECTURE.md.
+        $isSvg    = $request->mime_type === 'image/svg+xml';
+        $destPath = $isSvg ? "{$chunkDir}/assembled.svg" : $publicPath;
 
         $dest = fopen($destPath, 'wb');
         for ($i = 0; $i < $totalChunks; $i++) {
@@ -86,6 +98,25 @@ class ChunkedUploadController extends Controller
             fclose($fp);
         }
         fclose($dest);
+
+        if ($isSvg) {
+            $clean = filesize($destPath) <= self::SVG_MAX_BYTES
+                ? app(SvgSanitizer::class)->sanitize(file_get_contents($destPath))
+                : null;
+
+            @unlink($destPath);
+
+            if ($clean === null) {
+                $this->discardChunks($chunkDir);
+
+                return response()->json([
+                    'message' => 'That file is not a valid SVG image.',
+                ], 422);
+            }
+
+            file_put_contents($publicPath, $clean);
+            $destPath = $publicPath;
+        }
 
         $this->discardChunks($chunkDir);
 
