@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\Admin\UpscalerSettingsController as AdminUpscalerSettingsController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\WidgetController as AdminWidgetController;
+use App\Http\Controllers\Admin\BackupController as AdminBackupController;
 use App\Http\Controllers\ChunkedUploadController;
 use App\Http\Controllers\EntityController;
 use App\Http\Controllers\EntitySlideAnnouncerController;
@@ -233,6 +234,12 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/widgets', [AdminWidgetController::class, 'store'])->name('widgets.store');
     Route::patch('/widgets/{widget}', [AdminWidgetController::class, 'update'])->name('widgets.update');
     Route::delete('/widgets/{widget}', [AdminWidgetController::class, 'destroy'])->name('widgets.destroy');
+
+    // ── Backups (database-only or full; restore is CLI-only) ──────────────
+    Route::get('/backups', [AdminBackupController::class, 'index'])->name('backups.index');
+    Route::post('/backups', [AdminBackupController::class, 'store'])->middleware('throttle:6,1')->name('backups.store');
+    Route::get('/backups/{backup}/download', [AdminBackupController::class, 'download'])->middleware('throttle:10,1')->name('backups.download');
+    Route::delete('/backups/{backup}', [AdminBackupController::class, 'destroy'])->name('backups.destroy');
 
     // ── Slide Announcer releases (OS bundles + local-app archives) ────────
     Route::prefix('slide-announcer-releases')->name('slide-announcer-releases.')->group(function () {

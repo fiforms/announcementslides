@@ -13,3 +13,14 @@ Artisan::command('inspire', function () {
 // `php artisan schedule:run` every minute — no scheduler currently runs in
 // this app, so this is new infrastructure, not just a new command.
 Schedule::command('shows:prune-empty')->daily();
+
+// Database-only backups (see config/backup.php). Full backups are started by hand.
+if (config('backup.schedule') !== 'off') {
+    $backup = Schedule::command('backup:create --tag=scheduled --prune')
+        ->withoutOverlapping()
+        ->runInBackground();
+
+    config('backup.schedule') === 'weekly'
+        ? $backup->weeklyOn(0, config('backup.time'))
+        : $backup->dailyAt(config('backup.time'));
+}

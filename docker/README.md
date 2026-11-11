@@ -79,12 +79,51 @@ docker run -d -p 8080:80 -v announcementslides:/var/www/html/storage \
 | Generated `APP_KEY` | same volume, `storage/app/.app_key` |
 | MySQL data | the `db` volume (or your own MySQL server) |
 
-A complete backup is the MySQL database plus the storage volume. The volume
+A complete backup is the MySQL database plus the storage volume (see [Backups](#backups)). The volume
 contains the generated `APP_KEY`, so treat a copy of it as sensitive. If you set `APP_KEY` yourself,
 keep a copy: a restore needs the same key to read encrypted values and sessions.
 
 Remote S3 storage: set `FILESYSTEM_DISK` and the `AWS_*` variables in the settings block
 (see [config/filesystems.php](../config/filesystems.php)).
+
+## Backups
+
+One mechanism covers everything: a ZIP with a `manifest.json` (app version, last
+migration, database driver, timestamp, contents), a `mysqldump` of the database and,
+for a **full** backup, the uploaded slide files and widget bundles. It is created by
+
+| Trigger | How |
+|---|---|
+| Command line | `docker compose exec app php artisan backup:create [--full]` |
+| Schedule | Database-only, daily at 02:30 UTC by default, keeps the newest 14 (`BACKUP_SCHEDULE=off\|daily\|weekly`, where weekly runs Sundays; `BACKUP_TIME` in UTC; `BACKUP_KEEP`) |
+| Image update | Before `migrate` runs on start, if the install already exists and migrations are pending (`BACKUP_BEFORE_MIGRATE=false` disables; keeps the newest 3, `BACKUP_KEEP_SAFETY`). If that backup fails, the container does not start. |
+| Web | **Admin → Backups**: database-only or full, with download and delete. |
+
+Archives are written to `storage/app/private/backups/` (never web-served). That is the
+same volume as your data, so **download copies and keep them elsewhere**
+(`docker compose cp app:/var/www/html/storage/app/private/backups ./backups`). Backups
+you start yourself (web or CLI) are never pruned automatically.
+
+The archive does **not** contain the `APP_KEY`. Without it a restored site works, but
+everyone has to sign in again and widget API keys (Admin → Widgets) must be re-entered;
+nothing else is encrypted. Keep `APP_KEY` (or `storage/app/.app_key`) if you want a seamless move.
+Full backups skip files on S3 storage (use the provider's versioning/replication).
+
+### Restoring
+
+Restoring is command-line only:
+
+```bash
+docker compose exec app php artisan backup:list
+docker compose exec app php artisan backup:restore backup-20261111-023000-database-12.zip
+# or a file you copied in:  docker compose cp my.zip app:/tmp/my.zip
+docker compose exec app php artisan backup:restore /tmp/my.zip [--db-only|--files-only] [--force]
+```
+
+It checks the manifest, refuses a backup from a newer app version or another database
+type, takes a database backup of the current state first (`--no-safety-backup` skips),
+puts the site in maintenance mode, loads the database, runs any newer migrations, and
+(full backups) copies the files back, overwriting files with the same name. It warns if the `APP_KEY` differs.
 
 ## Behind a reverse proxy
 

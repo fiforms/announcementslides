@@ -35,13 +35,17 @@ php artisan storage:link --force >/dev/null
 
 if [ "${AUTO_MIGRATE:-true}" = "true" ]; then
     tries=0
-    until su-exec www-data php artisan migrate --force; do
+    # An existing install with migrations to apply gets a database backup first
+    # (BACKUP_BEFORE_MIGRATE=false disables); if the backup fails, startup stops
+    # rather than migrating without a safety net. Fresh installs are skipped.
+    until su-exec www-data php artisan backup:create --if-migrations-pending --tag=pre-migrate --prune \
+        && su-exec www-data php artisan migrate --force; do
         tries=$((tries + 1))
         if [ "$tries" -ge 30 ]; then
-            echo "ERROR: database migration failed after $tries attempts." >&2
+            echo "ERROR: pre-migration backup or database migration failed after $tries attempts." >&2
             exit 1
         fi
-        echo "Database not ready (attempt $tries/30), retrying in 2s..." >&2
+        echo "Database not ready or backup/migration failed (attempt $tries/30), retrying in 2s..." >&2
         sleep 2
     done
 fi

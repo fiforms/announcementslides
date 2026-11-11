@@ -98,6 +98,15 @@ const user  = computed(() => page.props.auth?.user);
                         </svg>
                         {{ $t('nav.upscaler') }}
                     </Link>
+                    <Link :href="route('admin.backups.index')"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        :class="route().current('admin.backups.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 7v10c0 2 3.6 3 8 3s8-1 8-3V7M4 7c0 2 3.6 3 8 3s8-1 8-3M4 7c0-2 3.6-3 8-3s8 1 8 3m0 5c0 2-3.6 3-8 3s-8-1-8-3" />
+                        </svg>
+                        {{ $t('nav.backups') }}
+                    </Link>
                     <Link :href="route('admin.slide-announcers.index')"
                         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
                         :class="route().current('admin.slide-announcers.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
