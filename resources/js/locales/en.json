@@ -868,7 +868,7 @@
         "back_to_slides": "Back to slides",
         "add_title": "Add an editor",
         "email_label": "Email address",
-        "email_placeholder": "name@example.com",
+        "email_placeholder": "name{'@'}example.com",
         "add": "Add editor",
         "add_hint": "If they don't have an account yet, they become an editor the first time they sign in with this email address.",
         "role_admin": "Leader",
