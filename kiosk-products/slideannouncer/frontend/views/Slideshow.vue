@@ -220,6 +220,17 @@ function resetStages() {
 // prepared slide.
 const playlistSignature = computed(() => JSON.stringify(playlist.value))
 
+// Picking a different show from the Menu is a wholesale replacement, not a
+// playlist refresh: the slide on screen belongs to the old show, so start the
+// new one from its first slide. Without this the old slide stayed up (and, if
+// it was a single slide or a play-through video, no advance timer ran to ever
+// leave it). Restarting also clears any stale prefetched stage.
+watch(() => activeShow()?.id, (id, prev) => {
+  if (prev === undefined || id === prev) return
+  resetStages()
+  restartAdvanceTimer()
+})
+
 watch(playlistSignature, () => {
   const list = playlist.value
   if (!list.length) {
