@@ -708,7 +708,12 @@
         "mode_rist_unicast": "RIST Unicast Listener",
         "mode_rist_caller": "RIST Unicast Caller",
         "sender_host": "Sender host",
-        "mode_hint": {"srt": "This device waits for a sender (OBS, vMix, an encoder) to connect to it over SRT. Paste the connect URL below into the sender.", "rist_unicast": "This device waits for a sender to connect to it over RIST. Best when one sender feeds this one device.", "rist_caller": "This device connects out to a sender that is waiting for receivers (in OBS, a RIST output set to listen, e.g. rist://@0.0.0.0:5000). Lets one sender feed many devices. Playback starts by itself when the sender starts, and ends when it stops.", "rist_multicast": "This device joins a multicast group the sender transmits to. Lets one sender feed many devices on a wired network; the group, port and passphrase must match the sender's."},
+        "mode_hint": {
+            "srt": "This device waits for a sender (OBS, vMix, an encoder) to connect to it over SRT. Paste the connect URL below into the sender.",
+            "rist_unicast": "This device waits for a sender to connect to it over RIST. Best when one sender feeds this one device.",
+            "rist_caller": "This device connects out to a sender that is waiting for receivers (in OBS, a RIST output set to listen, e.g. rist://@0.0.0.0:5000). Lets one sender feed many devices. Playback starts by itself when the sender starts, and ends when it stops.",
+            "rist_multicast": "This device joins a multicast group the sender transmits to. Lets one sender feed many devices on a wired network; the group, port and passphrase must match the sender's."
+        },
         "multicast_ip": "Multicast IP",
         "udp_port": "UDP Port",
         "passphrase_placeholder": "Must match the sender's",
@@ -844,5 +849,14 @@
         "revoke": "Revoke",
         "revoke_confirm": "Revoke \"{title}\"? Any screen using this link will stop playing, and the link can't be restored.",
         "seconds": "{n} s"
+    },
+    "setup": {
+        "title": "Set up",
+        "heading": "Welcome — create the first admin",
+        "intro": "This is a new installation. Create the administrator account to get started. This page disappears as soon as an account exists.",
+        "token": "Setup token",
+        "token_help": "Required by this installation (the SETUP_TOKEN setting).",
+        "install_widgets": "Install the bundled widgets ({widgets})",
+        "create": "Create admin and start"
     }
 }

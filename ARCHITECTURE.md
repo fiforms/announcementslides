@@ -36,6 +36,10 @@ There are two independent permission layers:
 
 **Per-entity role** (`user_entities.role`, e.g. `admin`/member): a user can be a leader of one or more churches independent of their global role. Resolved via `User::entityRole()`, `adminEntities()`, and `memberEntityIds()`.
 
+### First-run setup wizard
+
+While the `users` table is empty the app offers `/setup` ([SetupController](app/Http/Controllers/SetupController.php), page `Pages/Setup/Index.vue`), which creates the first `admin` (email pre-verified, signed in on success) and optionally installs the bundled widgets listed in [config/setup.php](config/setup.php) through `WidgetInstaller`. The gate is [FirstRunSetup::needed()](app/Support/FirstRunSetup.php): [EnsureSetupIsOpen](app/Http/Middleware/EnsureSetupIsOpen.php) 404s both routes as soon as any user exists, and the controller re-checks under a cache lock so two simultaneous submissions cannot create two admins. [RedirectToSetup](app/Http/Middleware/RedirectToSetup.php) sends the home, login and register pages there while the install is empty (`SETUP_REDIRECT=false` disables it; the test suite does). `SETUP_TOKEN`, when set, must be entered on the form; empty means open, which suits a local test but not an exposed one. `auth.password_login` (`PASSWORD_LOGIN`) controls whether the email/password login form is shown at all (default: only in the `local` environment); `POST /login` works regardless. The Docker compose file sets both for a test-friendly default (see [docker/README.md](docker/README.md)).
+
 ## Data model
 
 Models live in [app/Models/](app/Models/); schema in [database/migrations/](database/migrations/).

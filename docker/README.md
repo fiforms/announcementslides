@@ -21,12 +21,24 @@ need. Every variable in `.env` is passed into the container as-is, so any Larave
 setting (mail, Google sign-in, S3 storage, `APP_URL`, ...) works without editing
 `compose.yaml`.
 
-Create the first admin and install the widgets:
+Then open <http://localhost:8080>. A new install has no users yet, so it takes you
+to a one-page **setup wizard** that creates the first admin and (by default) installs
+the bundled clock, calendar and weather widgets. It signs you in when done. The wizard
+exists only while there are no users: once an account exists `/setup` is a 404 and
+cannot be reopened.
+
+By default the wizard is **open**, so whoever reaches the page first creates the admin.
+That is fine for a local test, but for anything reachable from outside set a
+`SETUP_TOKEN` in `.env` (the form then requires it) or create the admin from the
+command line before exposing the port:
 
 ```bash
 docker compose exec app php artisan user:create          # prompts for details
 docker compose exec app php artisan widget:install resources/widgets/clock resources/widgets/calendar
 ```
+
+The wizard's admin has a password, so the compose file shows the email/password login
+form (`PASSWORD_LOGIN=true`). Set it to `false` once Google sign-in is configured.
 
 Any `docker compose exec app <command>` / `docker compose run --rm app <command>`
 runs as `www-data`.
