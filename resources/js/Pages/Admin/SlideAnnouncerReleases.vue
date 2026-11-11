@@ -57,7 +57,7 @@ function parseReleaseFilename(filename) {
     const [, version, base, virt] = match;
     return {
         version,
-        release_type: base ? 'hotfix' : (virt ? 'virt_image' : 'full'),
+        release_type: base ? 'hotfix' : (virt ? 'virt_image' : (/\.img\.xz$/i.test(filename) ? 'disk_image' : 'full')),
         required_base_version: base ?? null,
     };
 }

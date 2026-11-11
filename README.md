@@ -1,28 +1,26 @@
 # AnnouncementSlides
 
-A web-based announcement slide distribution system designed for Seventh-day Adventist churches. Administrators and authorized contributors can push slides to any church in the system; registered users can submit slides for review; and church leader users can configure slides specific to their local congregation.
+A web-based announcement slide distribution system designed for Seventh-day Adventist churches. Administrators and authorized contributors can push slides to any church in the system; registered users can submit slides for review; and church leaders can build the shows their own congregation displays.
 
-> For a tour of the project layout, data model, and where the implementation lives, see [ARCHITECTURE.md](ARCHITECTURE.md). For production deployment specifics (queue worker, ffmpeg), see [INSTALLING.md](INSTALLING.md).
+> **Docs:** [Docker deployment](docker/README.md) · [Manual / developer install](INSTALLING.md) · [Architecture](ARCHITECTURE.md) · [Slide Announcer devices](SLIDE_ANNOUNCER.md) · [Release notes](CHANGELOG.md)
 
 ## Features
 
-- **Multi-tier role system** — admins, contributors, and church leaders each have scoped permissions
-- **Church directory integration** — loads congregations from adventistdirectory.org, organized by conference
-- **Slide submission and review workflow** — users submit slides that go through an approval process before distribution
-- **Google OAuth login** — optional single sign-on via Google accounts
-- **Multilingual support** — i18n-ready with per-language configuration
+- **Multi-tier role system** — site admins and contributors, plus per-church leaders, editors and followers, each with scoped permissions
+- **Church directory integration** — congregations and pastors imported from the Adventist directory, organized by conference
+- **Submission and review workflow** — users submit slides that are approved before distribution; slides can be scheduled and expire automatically
+- **Shows** — each church assembles one or more shows, optionally with a background, overlay and live widgets (clock, calendar, weather) framing every slide
+- **Overlay editor and widgets** — build text, QR-code and image overlays in the browser; install overlay widgets as packages
+- **Shareable playback links** — a no-login link for each screen (a hallway TV, a lobby display)
+- **Slide Announcer devices** — a Raspberry Pi appliance that pairs with a church and shows its slides full-screen, even through network drops
+- **Downloads and exports** — ZIP, PowerPoint and REVELation Snapshot exports
+- **Image quality tools** — validation, plus in-browser 2× AI upscaling and downscaling, with no server GPU required
+- **Backups** — scheduled, on-demand and pre-update backups, with a command-line restore
+- **Google sign-in** and **English / Spanish** interface, with slides tagged by language
 
-## Requirements
+## Quick start (Docker)
 
-- PHP 8.4+
-- Composer
-- Node.js / npm
-- SQLite (default) or a supported relational database
-- `ffmpeg` (for video slide thumbnails) — see [INSTALLING.md](INSTALLING.md) for production setup, including the queue worker required for thumbnails to actually generate
-
-## Docker
-
-The quickest way to run AnnouncementSlides is the prebuilt Docker image (`amd64` and
+The recommended way to run AnnouncementSlides is the prebuilt Docker image (`amd64` and
 `arm64`, published to GHCR). It runs the web app, queue worker and scheduler together,
 and the Compose file adds MySQL, so you only need Docker.
 
@@ -40,139 +38,29 @@ bundled widgets (clock, calendar, weather). To upgrade, run
 **If the server is reachable from the internet, set `SETUP_TOKEN` in `compose.yaml`
 before you start it.** Until the wizard has been completed, anyone who opens the page
 first can become the administrator; the token makes the form ask for a code you
-chose. See [docker/README.md](docker/README.md) for HTTPS behind a reverse proxy, email,
-Google sign-in, S3 storage, backups, and building the image yourself.
+chose.
 
-## Installation
+[docker/README.md](docker/README.md) covers HTTPS behind a reverse proxy, email, Google
+sign-in, S3 storage, backups and restores, image tags, and building the image yourself.
 
-```bash
-git clone <repo-url> announcementslides
-cd announcementslides
+## Other ways to install
 
-composer install
-npm install
-```
-
-Copy the environment file and generate an application key:
-
-```bash
-cp .env.example .env
-php artisan key:generate
-```
-
-Run database migrations:
-
-```bash
-php artisan migrate
-```
-
-Link the public storage directory:
-
-```bash
-php artisan storage:link
-```
-
-Uploaded slides, thumbnails and overlays are written to the `public` disk
-(`storage/app/public`) and served from `/storage/...`. Without this symlink
-the app runs, but no slide image or video renders anywhere — and nothing
-reports an error, so it looks like an empty or broken install.
-
-Point `APP_URL` at the port you actually serve on:
-
-```dotenv
-# .env
-APP_URL=http://localhost:8000
-```
-
-`.env.example` ships `http://localhost`, but `composer dev` serves on port
-8000. Media URLs are built from `APP_URL` (see `config/filesystems.php`'s
-`public` disk), so leaving the port off produces `http://localhost/storage/...`
-— port 80, where nothing is listening. The page loads fine and every image
-is broken, which reads like a failed upload rather than a URL problem. Run
-`php artisan config:clear` after changing it.
-
-Build frontend assets:
-
-```bash
-npm run build
-```
-
-### Create the first user
-
-On a fresh install, just open the site: with no users yet it redirects to a
-setup wizard (`/setup`) that creates the first admin and can install the bundled
-widgets. The wizard disappears once any user exists. Or from the command line:
-
-```bash
-php artisan user:create
-php artisan user:setrole
-```
-
-Both commands prompt for anything you don't pass. `user:create` asks for name,
-email, password and role; `user:setrole` asks for the email address and the new
-role (`viewer`, `contributor`, `admin` or `banned`).
-
-To skip the prompts, pass the values instead:
-
-```bash
-php artisan user:create --name="Jane Doe" --email=jane@example.org --password=secret123 --role=admin
-php artisan user:setrole jane@example.org admin
-```
-
-Don't paste a trailing `# comment` onto these lines — zsh doesn't treat `#` as a
-comment in an interactive shell, so the words become extra arguments and the
-command fails with "Too many arguments".
-
-### Load church data
-
-```bash
-php artisan church:load        # load entities for a conference from adventistdirectory.org
-php artisan entity:sync        # sync the local entities table
-```
-
-## Google OAuth Setup
-
-To enable Google single sign-on, create OAuth 2.0 credentials in the [Google Cloud Console](https://console.cloud.google.com/):
-
-1. Create a project and enable the **Google+ API** (or **Google Identity**).
-2. Under **Credentials**, create an **OAuth 2.0 Client ID** of type *Web application*.
-3. Add your app URL as an authorized origin and set the redirect URI to:
-   ```
-   https://your-domain.com/auth/google/callback
-   ```
-4. Copy the client ID and secret into `.env`:
-   ```ini
-   GOOGLE_CLIENT_ID=your-client-id
-   GOOGLE_CLIENT_SECRET=your-client-secret
-   GOOGLE_REDIRECT_URI="${APP_URL}/auth/google/callback"
-   ```
-
-Users can then sign in with their Google account from the login page.
-
-## Artisan Commands
-
-| Command | Description |
-|---|---|
-| `user:create` | Create a new user account |
-| `user:list` | List all users (optionally filter by role) |
-| `user:setrole` | Set a user's role |
-| `user:setpassword` | Set a user's password |
-| `church:load` | Load Adventist entities for a conference from AdventistDirectory.org |
-| `church:list` | List all entities in the database |
-| `church:detail` | Show all stored fields for a single entity |
-| `entity:sync` | Sync the entities table |
-| `entity:assign` | Assign or remove a user role for an entity |
-| `language:add` | Add a supported language |
-| `language:list` | List all supported languages |
+Running without Docker — a local development checkout, or a production server with your own
+nginx/PHP-FPM, queue worker and cron — is covered in [INSTALLING.md](INSTALLING.md). That
+file also has the Google OAuth setup, church-data loading and the Artisan command reference.
 
 ## Development
 
-Start the development server:
+Requires PHP 8.4+, Composer and Node.js. See [INSTALLING.md](INSTALLING.md#local-development-install)
+for the full setup, then:
 
 ```bash
-php artisan serve
-npm run dev
+composer dev      # app server + queue worker + logs + Vite
+composer test     # PHPUnit
 ```
+
+[ARCHITECTURE.md](ARCHITECTURE.md) describes the project layout, data model and where to
+start for common changes.
 
 ## License
 
