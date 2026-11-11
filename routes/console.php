@@ -15,7 +15,9 @@ Artisan::command('inspire', function () {
 Schedule::command('shows:prune-empty')->daily();
 
 // Database-only backups (see config/backup.php). Full backups are started by hand.
-if (config('backup.schedule') !== 'off') {
+$backupDriver = config('database.connections.'.config('database.default').'.driver');
+
+if (config('backup.schedule') !== 'off' && in_array($backupDriver, ['mysql', 'mariadb'], true)) {
     $backup = Schedule::command('backup:create --tag=scheduled --prune')
         ->withoutOverlapping()
         ->runInBackground();

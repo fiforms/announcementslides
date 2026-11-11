@@ -172,3 +172,21 @@ php artisan queue:failed                 # see why a job failed
 tail -100 storage/logs/laravel.log | grep -A5 "Video thumbnail generation failed"
 php artisan queue:flush                  # clear out stale/failed jobs once resolved
 ```
+
+## Backups (non-Docker installs)
+
+Backups (`php artisan backup:create`, **Admin → Backups**, `backup:restore`) are
+described in [docker/README.md](docker/README.md#backups); the same commands work
+here with these differences:
+
+- **MySQL only.** On SQLite (the local-development default) the commands and the
+  admin page say so; back that up by copying `database/database.sqlite` and `storage/`.
+- **Install the MySQL client tools** (`mysql-client` or `mariadb-client`) so
+  `mysqldump` and `mysql` are on the `PATH` of the user running PHP-FPM, the queue
+  worker and cron.
+- **The Admin → Backups button needs the queue worker** (see above).
+- **Scheduled backups need cron.** Nothing runs the scheduler for you here; add
+  (as the app's user) `* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1`.
+  Settings are the `BACKUP_*` variables in `.env` (see [config/backup.php](config/backup.php)).
+- **No automatic backup before an update.** Run `php artisan backup:create` before
+  `php artisan migrate` when you deploy.

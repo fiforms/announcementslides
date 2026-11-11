@@ -952,6 +952,10 @@
         "geocode_cli": "O desde la línea de comandos: php artisan entity:geocode"
     },
     "backups": {
+        "unsupported_title": "Las copias de seguridad no están disponibles en esta instalación",
+        "unsupported_driver": "La herramienta de copias necesita una base de datos MySQL, y esta instalación usa otra (por ejemplo SQLite, la opción predeterminada para desarrollo local).",
+        "unsupported_sqlite_howto": "Para copiar una instalación con SQLite, detenga la aplicación y copie el archivo de la base de datos (database/database.sqlite) junto con el directorio storage.",
+        "unsupported_client": "Las herramientas cliente de MySQL (mysqldump y mysql) no están instaladas en este servidor, o no están en el PATH del proceso web/de colas. Instálelas (por ejemplo el paquete mysql-client o mariadb-client) e inténtelo de nuevo.",
         "intro": "Una copia de seguridad es un único archivo ZIP con una copia de la base de datos (usuarios, diapositivas, presentaciones, ajustes). Una copia completa incluye además los archivos subidos y los widgets. Descargue las copias y guarde una fuera de este servidor.",
         "create_db": "Copiar la base de datos",
         "create_full": "Copiar base de datos y archivos",

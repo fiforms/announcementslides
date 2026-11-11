@@ -8,7 +8,8 @@ const { t } = useI18n();
 
 const props = defineProps({
     backups:  { type: Array, required: true },
-    settings: { type: Object, required: true },
+    settings: { type: Object, default: null },
+    unsupported: { type: String, default: null }, // 'driver' | 'client' when backups cannot work here
     running:  { type: Boolean, default: false },
 });
 
@@ -61,7 +62,13 @@ const statusClass = {
             <h1 class="text-xl font-semibold text-gray-900">{{ $t('nav.backups') }}</h1>
         </template>
 
-        <div class="mx-auto max-w-5xl space-y-6">
+        <div v-if="unsupported" class="mx-auto max-w-3xl space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+            <h2 class="text-base font-semibold">{{ $t('backups.unsupported_title') }}</h2>
+            <p>{{ $t(`backups.unsupported_${unsupported}`) }}</p>
+            <p v-if="unsupported === 'driver'">{{ $t('backups.unsupported_sqlite_howto') }}</p>
+        </div>
+
+        <div v-else class="mx-auto max-w-5xl space-y-6">
             <section class="space-y-4 rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
                 <p class="text-sm text-gray-600">{{ $t('backups.intro') }}</p>
 

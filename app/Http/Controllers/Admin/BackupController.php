@@ -22,6 +22,11 @@ class BackupController extends Controller
 {
     public function index(BackupService $backups): Response
     {
+        // Not usable here (e.g. SQLite): the page shows an explanation instead.
+        if ($reason = $backups->unsupported()) {
+            return Inertia::render('Admin/Backups', ['unsupported' => $reason['code'], 'backups' => [], 'settings' => null, 'running' => false]);
+        }
+
         $backups->syncFromDisk();
 
         return Inertia::render('Admin/Backups', [
@@ -57,6 +62,10 @@ class BackupController extends Controller
         $data = $request->validate([
             'mode' => ['required', Rule::in([Backup::MODE_DATABASE, Backup::MODE_FULL])],
         ]);
+
+        if ($reason = $backups->unsupported()) {
+            return back()->with('error', trim($reason['message']));
+        }
 
         if ($backups->isRunning()) {
             return back()->with('error', 'A backup is already running.');
