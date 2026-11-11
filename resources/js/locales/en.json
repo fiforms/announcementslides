@@ -938,6 +938,16 @@
         "col_role": "Role",
         "col_leader_of": "Churches",
         "manage_users": "Manage users",
-        "sample_link": "Download a sample CSV"
+        "sample_link": "Download a sample CSV",
+        "geocode_title": "3. Map coordinates",
+        "geocode_help": "The directory file has addresses but no coordinates, and \"nearby churches\" needs them. This looks up missing coordinates with the free U.S. Census geocoder (street addresses only are sent) and never changes coordinates that already exist.",
+        "geocode_eligible": "{n} active entities have an address but no coordinates.",
+        "geocode_none": "Every active entity with an address already has coordinates.",
+        "geocode_btn": "Look up coordinates",
+        "geocode_running": "Looking up coordinates… this page refreshes automatically.",
+        "geocode_done": "Last lookup: {matched} found, {unmatched} with no match.",
+        "geocode_failed": "Last lookup failed: {error}",
+        "geocode_unmatched": "No match (fix the address or set coordinates by hand):",
+        "geocode_cli": "Or from the command line: php artisan entity:geocode"
     }
 }

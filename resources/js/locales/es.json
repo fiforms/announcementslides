@@ -938,6 +938,16 @@
         "col_role": "Rol",
         "col_leader_of": "Iglesias",
         "manage_users": "Administrar usuarios",
-        "sample_link": "Descargar un CSV de ejemplo"
+        "sample_link": "Descargar un CSV de ejemplo",
+        "geocode_title": "3. Coordenadas del mapa",
+        "geocode_help": "El archivo del directorio tiene direcciones pero no coordenadas, y \"iglesias cercanas\" las necesita. Esto busca las coordenadas faltantes con el geocodificador gratuito del Censo de EE. UU. (solo se envían direcciones postales) y nunca cambia coordenadas existentes.",
+        "geocode_eligible": "{n} entidades activas tienen dirección pero no coordenadas.",
+        "geocode_none": "Toda entidad activa con dirección ya tiene coordenadas.",
+        "geocode_btn": "Buscar coordenadas",
+        "geocode_running": "Buscando coordenadas… esta página se actualiza sola.",
+        "geocode_done": "Última búsqueda: {matched} encontradas, {unmatched} sin coincidencia.",
+        "geocode_failed": "La última búsqueda falló: {error}",
+        "geocode_unmatched": "Sin coincidencia (corrija la dirección o ponga las coordenadas a mano):",
+        "geocode_cli": "O desde la línea de comandos: php artisan entity:geocode"
     }
 }

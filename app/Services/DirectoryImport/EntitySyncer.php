@@ -50,6 +50,12 @@ class EntitySyncer
 
                 $existing = Entity::where('org_mast_id', $ae->org_mast_id)->first();
 
+                // A source row without coordinates (e.g. from data.json) must not
+                // wipe ones that were geocoded or came from an earlier scrape.
+                if ($existing && ($ae->latitude === null || $ae->longitude === null)) {
+                    unset($data['latitude'], $data['longitude']);
+                }
+
                 if ($existing) {
                     if ($existing->deactivated) {
                         $result['reactivated']++;

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\GeocodeEntities;
+use App\Services\DirectoryImport\EntityGeocoder;
 use App\Services\DirectoryImport\EntityImporter;
 use App\Services\DirectoryImport\EntitySyncer;
 use App\Services\DirectoryImport\PastorImporter;
@@ -25,12 +27,16 @@ class DirectoryImportController extends Controller
 {
     private const SESSION_KEY = 'directory_import';
 
-    public function index(PastorImporter $pastors): Response
+    public function index(PastorImporter $pastors, EntityGeocoder $geocoder): Response
     {
         $pending = session(self::SESSION_KEY);
 
         return Inertia::render('Admin/DirectoryImport', [
             'pending' => $pending ? collect($pending)->except('path')->all() : null,
+            'geocode' => [
+                'eligible' => $geocoder->eligible()->count(),
+                'status'   => GeocodeEntities::status(),
+            ],
             'missing' => $pastors->missingFromLatestImport()->map(fn ($u) => [
                 'id'             => $u->id,
                 'name'           => $u->name,
@@ -147,6 +153,22 @@ class DirectoryImportController extends Controller
             }
             fclose($out);
         }, "sample-{$kind}.csv", ['Content-Type' => 'text/csv']);
+    }
+
+    public function geocode(EntityGeocoder $geocoder): RedirectResponse
+    {
+        if (GeocodeEntities::isRunning()) {
+            return back()->with('error', 'A coordinate lookup is already running.');
+        }
+
+        if ($geocoder->eligible()->count() === 0) {
+            return back()->with('success', 'Every entity with an address already has coordinates.');
+        }
+
+        GeocodeEntities::markQueued();
+        GeocodeEntities::dispatch();
+
+        return back()->with('success', 'Coordinate lookup started. This page updates when it finishes.');
     }
 
     public function cancel(): RedirectResponse

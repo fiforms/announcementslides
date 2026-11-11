@@ -217,6 +217,7 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/directory-import/entities', [DirectoryImportController::class, 'previewEntities'])->name('directory-import.entities');
     Route::post('/directory-import/pastors', [DirectoryImportController::class, 'previewPastors'])->name('directory-import.pastors');
     Route::post('/directory-import/apply', [DirectoryImportController::class, 'apply'])->name('directory-import.apply');
+    Route::post('/directory-import/geocode', [DirectoryImportController::class, 'geocode'])->name('directory-import.geocode');
     Route::delete('/directory-import', [DirectoryImportController::class, 'cancel'])->name('directory-import.cancel');
 
     // ── Slide Announcer fleet console (cross-entity device list) ──────────
