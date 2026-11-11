@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\EntityInvitation;
 use App\Models\User;
 use App\Models\UserInvitation;
 use Illuminate\Support\Facades\Auth;
@@ -45,6 +46,9 @@ class GoogleController extends Controller
                 $invitation?->delete();
             }
         }
+
+        // Google has verified this address, so leaders' editor invitations for it apply.
+        EntityInvitation::redeemFor($user);
 
         Auth::login($user, true);
 

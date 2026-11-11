@@ -90,12 +90,27 @@ class User extends Authenticatable
         return $this->entityRoles()->get($entityId);
     }
 
+    /** Entity roles that manage an entity's slides, shows, links and devices. */
+    public const MANAGER_ENTITY_ROLES = ['admin', 'editor'];
+
+    /** Entities this user manages: ones they lead plus ones they edit. */
     public function adminEntities(): BelongsToMany
     {
-        return $this->entities()->wherePivot('role', 'admin');
+        return $this->entities()->wherePivotIn('role', self::MANAGER_ENTITY_ROLES);
     }
 
+    /**
+     * Whether this user manages the entity's content (leader or editor).
+     * Despite the name this is the "may manage" check; use isEntityLeader()
+     * for the stricter leader-only one.
+     */
     public function isEntityAdmin(int $entityId): bool
+    {
+        return in_array($this->entityRole($entityId), self::MANAGER_ENTITY_ROLES, true);
+    }
+
+    /** Leader only (pivot role `admin`): the people-management privilege. */
+    public function isEntityLeader(int $entityId): bool
     {
         return $this->entityRole($entityId) === 'admin';
     }
@@ -111,16 +126,22 @@ class User extends Authenticatable
      * switched subscriptions off keeps its leaders and kiosk links only —
      * existing followers stay on record but lose access.)
      */
-    /** Entities this user leads (entity-admin role): the only ones whose archive they may see. */
+    /** Entities this user leads or edits: the only ones whose archive they may see. */
     public function leaderEntityIds(): array
     {
         return $this->adminEntities()->pluck('entities.id')->toArray();
     }
 
+    /** Entities where this user is the leader (pivot role `admin`) and so manages editors. */
+    public function ledEntityIds(): array
+    {
+        return $this->entities()->wherePivot('role', 'admin')->pluck('entities.id')->toArray();
+    }
+
     public function viewableEntities(): BelongsToMany
     {
         return $this->entities()->where(
-            fn ($q) => $q->where('user_entities.role', 'admin')->orWhere('entities.allow_subscription', true)
+            fn ($q) => $q->whereIn('user_entities.role', self::MANAGER_ENTITY_ROLES)->orWhere('entities.allow_subscription', true)
         );
     }
 

@@ -34,7 +34,12 @@ There are two independent permission layers:
 - Admin routes are gated by [EnsureAdmin](app/Http/Middleware/EnsureAdmin.php) and live under `/admin`.
 - Banned users are blocked by [EnsureNotBanned](app/Http/Middleware/EnsureNotBanned.php) (aliased `not-banned` in [bootstrap/app.php](bootstrap/app.php)).
 
-**Per-entity role** (`user_entities.role`, e.g. `admin`/member): a user can be a leader of one or more churches independent of their global role. Resolved via `User::entityRole()`, `adminEntities()`, and `memberEntityIds()`.
+**Per-entity role** (`user_entities.role`): a user can hold a role on one or more churches independent of their global role (entity-scoped actions never check `users.role`, so a new editor needs no global promotion). Three tiers:
+- `viewer` — a follower (self-service subscribe).
+- `editor` — manages the entity's slides, shows, shared links, devices and archive, exactly like a leader.
+- `admin` — the entity **leader**: everything an editor does, plus the Team page (`/entity/{entity}/people`, [EntityPeopleController](app/Http/Controllers/EntityPeopleController.php)) which lists every leader/editor/follower and lets them add or revoke **editors only**. Leaders are only ever changed by a site admin (Admin → Users, Directory Import, `entity:assign`), and removing/replacing a pastor never touches the editors they added.
+
+`User::isEntityAdmin()` / `adminEntities()` / `leaderEntityIds()` mean "may manage" and include editors (`User::MANAGER_ENTITY_ROLES`); `isEntityLeader()` / `ledEntityIds()` are the strict leader-only checks used for people management. A leader inviting an email with no account creates an [EntityInvitation](app/Models/EntityInvitation.php), redeemed (`redeemFor()`) when that address signs in with Google or verifies its email, so an unverified password signup can't claim it. Resolved via `User::entityRole()` and `memberEntityIds()`.
 
 ### First-run setup wizard
 
@@ -199,7 +204,7 @@ Under [resources/js/](resources/js/):
 In [app/Console/Commands/](app/Console/Commands/) — primarily for bootstrapping and data import:
 
 - **Users:** `user:create`, `user:list`, `user:setrole`, `user:setpassword`
-- **Churches/entities:** `church:load` (scrape a conference from adventistdirectory.org into `adventist_entities`), `church:list`, `church:detail`, `entity:sync` (distill into `entities`), `entity:assign` (grant/revoke a user's entity role)
+- **Churches/entities:** `church:load` (scrape a conference from adventistdirectory.org into `adventist_entities`), `church:list`, `church:detail`, `entity:sync` (distill into `entities`), `entity:assign` (grant/revoke a user's entity role: `admin`=leader, `editor`, `viewer`)
 - **Directory import UI:** **Admin → Directory Import** ([DirectoryImportController](app/Http/Controllers/Admin/DirectoryImportController.php), services in [app/Services/DirectoryImport/](app/Services/DirectoryImport/)) is an upload → preview → confirm flow. Churches come from the pastor-directory `data.json` (`churchAddresses`, keyed by `orgCode` = `org_mast_id`) or a `church:export` CSV into `adventist_entities`, optionally followed by the `entity:sync` logic ([EntitySyncer](app/Services/DirectoryImport/EntitySyncer.php)). Pastors (`data.json` `pastors`, or a CSV) become users, with entity role `admin` on their churches; `users.created_by_import` / `users.in_latest_import` drive the "imported users no longer in master data" report on that page.
 - **Coordinates:** `entity:geocode [--limit=N] [--dry-run]` fills missing `entities.latitude/longitude` from the free U.S. Census batch geocoder ([EntityGeocoder](app/Services/DirectoryImport/EntityGeocoder.php); street addresses only; never overwrites existing coordinates). The same lookup is a background job ([GeocodeEntities](app/Jobs/GeocodeEntities.php)) behind a button on Admin → Directory Import. `EntitySyncer` keeps existing coordinates when the source row has none.
 - **Languages:** `language:add`, `language:list`

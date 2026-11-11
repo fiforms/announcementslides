@@ -23,6 +23,7 @@
         "log_in": "Iniciar sesión",
         "powered_by": "Desarrollado con",
         "play_links": "Enlaces compartidos",
+        "team": "Equipo",
         "shows": "Presentaciones",
         "directory_import": "Importar directorio"
     },
@@ -91,6 +92,7 @@
         "no_subscriptions": "Aún no estás conectado a ninguna entidad.",
         "role_viewer": "Espectador",
         "role_admin": "Administrador",
+        "role_editor": "Editor",
         "admin_managed": "Admin (gestionado)"
     },
     "shows": {
@@ -150,6 +152,7 @@
         "col_actions": "Acciones",
         "role_viewer": "espectador",
         "role_leader": "líder",
+        "role_editor": "editor",
         "no_entity_relationships": "Aún no hay relaciones con entidades.",
         "confirm_detach_entity": "¿Eliminar la relación de {user} con \"{entity}\"?",
         "modal_add_entity_title": "Agregar entidad para {name}",
@@ -158,6 +161,7 @@
         "role_label": "Rol",
         "role_viewer_member": "Espectador (miembro)",
         "role_leader_admin": "Líder (administrador)",
+        "role_editor_member": "Editor (puede gestionar diapositivas)",
         "no_entity_results": "No se encontraron resultados.",
         "preregister_title": "Preinscribir un usuario",
         "email_label": "Correo electrónico",
@@ -294,7 +298,8 @@
         "col_entity_role": "Rol en la entidad",
         "col_global_role": "Rol global",
         "role_admin": "Líder",
-        "role_viewer": "Suscriptor"
+        "role_viewer": "Suscriptor",
+        "role_editor": "Editor"
     },
     "admin": {
         "immutable": "Diapositiva obligatoria (global)",
@@ -856,6 +861,30 @@
     "play": {
         "revoked": "Este enlace ya no está activo.",
         "no_slides": "No hay diapositivas para mostrar por ahora."
+    },
+    "people": {
+        "title": "Equipo — {name}",
+        "intro": "Todas las personas conectadas a esta iglesia. Los líderes pueden añadir y quitar editores. Los editores pueden gestionar diapositivas, programas, enlaces compartidos y dispositivos, pero no pueden cambiar quién forma parte del equipo. Los cambios en los líderes los realiza un administrador del sitio.",
+        "back_to_slides": "Volver a las diapositivas",
+        "add_title": "Añadir un editor",
+        "email_label": "Correo electrónico",
+        "email_placeholder": "nombre@ejemplo.com",
+        "add": "Añadir editor",
+        "add_hint": "Si aún no tiene una cuenta, será editor la primera vez que inicie sesión con este correo.",
+        "role_admin": "Líder",
+        "role_editor": "Editor",
+        "role_viewer": "Suscriptor",
+        "col_name": "Nombre",
+        "col_email": "Correo",
+        "col_role": "Rol",
+        "col_actions": "Acciones",
+        "remove": "Quitar",
+        "confirm_remove": "¿Quitar a {name} como editor?",
+        "pending_title": "Invitaciones pendientes",
+        "pending_hint": "Esperando el primer inicio de sesión",
+        "cancel_invite": "Cancelar invitación",
+        "confirm_cancel_invite": "¿Cancelar la invitación para {email}?",
+        "none": "Todavía no hay nadie conectado a esta iglesia."
     },
     "play_links": {
         "title": "Enlaces compartidos — {name}",

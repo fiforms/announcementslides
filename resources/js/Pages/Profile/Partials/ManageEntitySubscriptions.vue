@@ -100,7 +100,7 @@ function entityLabel(entity) {
                         class="ml-2 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
                         :class="sub.role === 'admin'
                             ? 'bg-indigo-100 text-indigo-800'
-                            : 'bg-gray-100 text-gray-700'"
+                            : sub.role === 'editor' ? 'bg-sky-100 text-sky-800' : 'bg-gray-100 text-gray-700'"
                     >
                         {{ $t('profile.role_' + sub.role) }}
                     </span>
