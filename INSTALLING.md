@@ -60,29 +60,45 @@ Two deployment notes:
   symlink is created after that, or a release will link to its own empty
   directory and previously uploaded slides will appear to vanish.
 
-Related: whatever serves `public/` should decline to execute scripts under
+Related: whatever serves `public/` must never execute anything under
 `public/storage`. Uploads land there, and the extension is derived from the
 validated mime type rather than the client's filename (`config/slides.php`'s
-`mime_extensions`), but denying execution under that path is cheap
-defence in depth.
+`mime_extensions`), but the web server has to enforce this too.
 
-Uploaded SVGs are sanitized on upload (see *SVG security model* in
-[ARCHITECTURE.md](ARCHITECTURE.md)), and the web server should also send a
-sandboxing CSP for them so one opened directly in a browser tab can never run
-script. The Docker image's `docker/nginx.conf` already does this. On your own
-nginx:
+**Beware nginx location precedence.** The usual Laravel config has a
+`location ~ \.php$` block. A plain `location /storage/` prefix does *not*
+shield the uploads directory from it: after matching the prefix nginx still
+checks regex locations, so `/storage/x.php` would be passed to PHP-FPM and
+executed. Use `^~`, which stops the regex search for that subtree. The Docker
+image's `docker/nginx.conf` does this and is verified by hand against a
+`.php` file in `storage/`. On your own nginx:
 
 ```nginx
-location ~* ^/storage/.+\.svg$ {
+location ^~ /storage/ {
     add_header X-Content-Type-Options "nosniff" always;
-    add_header Content-Security-Policy "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:" always;
+
+    location ~* \.(php[0-9]?|phtml|pht|phar|inc)$ { return 403; }
+
+    # Uploaded SVGs are sanitized on upload (see "SVG security model" in
+    # ARCHITECTURE.md); this CSP means one opened directly can never run script.
+    # It does not affect SVGs shown through <img>.
+    location ~* \.svg$ {
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Content-Security-Policy "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:; font-src data:" always;
+        try_files $uri =404;
+    }
+
     try_files $uri =404;
 }
+
+# Only index.php is a PHP entry point.
+location = /index.php { include fastcgi_params; fastcgi_pass ...; }
+location ~ \.php$ { return 404; }
 ```
 
-On Apache, the equivalent is a `<FilesMatch "\.svg$">` block with
-`Header always set` for the same two headers. This does not affect SVGs shown
-through `<img>`.
+On Apache, use `php_admin_flag engine off` (or `RemoveHandler .php .phtml`) in
+a `<Directory .../storage/app/public>` block, plus a `<FilesMatch "\.svg$">`
+block with `Header always set` for the same two headers.
 
 ## Queue worker (required)
 
