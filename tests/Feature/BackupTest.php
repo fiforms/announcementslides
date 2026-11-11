@@ -20,9 +20,16 @@ class FakeDumper implements DatabaseDumper
 {
     public ?string $loaded = null;
 
+    public ?array $unsupported = null;
+
     public function driver(): string
     {
         return 'mysql';
+    }
+
+    public function unsupported(): ?array
+    {
+        return $this->unsupported;
     }
 
     public function dump(string $toFile): void
@@ -246,5 +253,30 @@ class BackupTest extends TestCase
         $this->actingAs($admin)->delete(route('admin.backups.destroy', $row))->assertRedirect();
         $this->assertSame(0, Backup::count());
         Storage::disk('local')->assertMissing('backups/'.$row->filename);
+    }
+
+    public function test_unsupported_install_gets_clear_errors_and_an_explanation_page(): void
+    {
+        $this->withoutVite();
+        $this->dumper->unsupported = ['code' => 'driver', 'message' => 'Backups need a MySQL database, but this install uses sqlite. '];
+
+        $this->artisan('backup:create')->expectsOutputToContain('Backups need a MySQL database')->assertFailed();
+        $this->artisan('backup:restore', ['file' => 'x.zip', '--force' => true])->expectsOutputToContain('Backups need a MySQL database')->assertFailed();
+        $this->assertSame(0, Backup::count());
+
+        $admin = $this->admin();
+        $this->actingAs($admin)->get(route('admin.backups.index'))->assertOk()
+            ->assertInertia(fn ($page) => $page->component('Admin/Backups')->where('unsupported', 'driver')->where('settings', null));
+        $this->actingAs($admin)->post(route('admin.backups.store'), ['mode' => 'database'])
+            ->assertSessionHas('error');
+        $this->assertSame(0, Backup::count());
+    }
+
+    public function test_the_real_dumper_reports_sqlite_as_unsupported(): void
+    {
+        $reason = (new \App\Services\Backup\MysqlDumper())->unsupported();
+
+        $this->assertSame('driver', $reason['code']);
+        $this->assertStringContainsString('sqlite', $reason['message']);
     }
 }

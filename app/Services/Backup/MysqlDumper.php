@@ -18,6 +18,31 @@ class MysqlDumper implements DatabaseDumper
         return 'mysql';
     }
 
+    public function unsupported(): ?array
+    {
+        $driver = DB::connection()->getDriverName();
+
+        if (! in_array($driver, ['mysql', 'mariadb'], true)) {
+            return [
+                'code'    => 'driver',
+                'message' => "Backups need a MySQL database, but this install uses {$driver}. "
+                    .($driver === 'sqlite' ? 'For SQLite, copy the database file (database/database.sqlite) and the storage directory.' : ''),
+            ];
+        }
+
+        $finder = new ExecutableFinder();
+        foreach ([['mariadb-dump', 'mysqldump'], ['mariadb', 'mysql']] as $pair) {
+            if (! $finder->find($pair[0]) && ! $finder->find($pair[1])) {
+                return [
+                    'code'    => 'client',
+                    'message' => 'The MySQL client tools (mysqldump and mysql, or mariadb-dump and mariadb) are not installed or not on the PATH of this process.',
+                ];
+            }
+        }
+
+        return null;
+    }
+
     public function dump(string $toFile): void
     {
         [$binary, $isMaria] = $this->binary(['mariadb-dump', 'mysqldump']);

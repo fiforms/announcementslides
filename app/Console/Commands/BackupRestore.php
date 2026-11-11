@@ -33,6 +33,10 @@ class BackupRestore extends Command
         $tmp = null;
 
         try {
+            if (! $this->option('files-only')) {
+                $backups->assertSupported();
+            }
+
             $path = $this->locate($backups, $this->argument('file'), $tmp);
             if ($zip->open($path) !== true) {
                 throw new BackupException('Not a readable ZIP archive: '.$path);
@@ -86,7 +90,11 @@ class BackupRestore extends Command
 
             return self::FAILURE;
         } finally {
-            $zip->close();
+            try {
+                $zip->close();
+            } catch (\Throwable) {
+                // never opened (failed before reaching the archive)
+            }
             if ($tmp) {
                 @unlink($tmp);
             }

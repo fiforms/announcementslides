@@ -42,9 +42,25 @@ class BackupService
         return trim(config('backup.path'), '/');
     }
 
+    /** @return array{code: string, message: string}|null see DatabaseDumper::unsupported() */
+    public function unsupported(): ?array
+    {
+        return $this->dumper->unsupported();
+    }
+
+    /** @throws BackupException when backups cannot work on this install */
+    public function assertSupported(): void
+    {
+        if ($reason = $this->unsupported()) {
+            throw new BackupException(trim($reason['message']));
+        }
+    }
+
     /** Create the bookkeeping row; run() does the work (now or from a queued job). */
     public function start(string $mode, string $trigger, ?int $userId = null): Backup
     {
+        $this->assertSupported();
+
         return Backup::create([
             'mode'       => $mode,
             'trigger'    => $trigger,

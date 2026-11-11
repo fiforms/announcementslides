@@ -952,6 +952,10 @@
         "geocode_cli": "Or from the command line: php artisan entity:geocode"
     },
     "backups": {
+        "unsupported_title": "Backups are not available on this install",
+        "unsupported_driver": "The in-app backup tool needs a MySQL database, and this install uses a different one (such as SQLite, the default for local development).",
+        "unsupported_sqlite_howto": "To back up a SQLite install, stop the app and copy the database file (database/database.sqlite) together with the storage directory.",
+        "unsupported_client": "The MySQL client tools (mysqldump and mysql) are not installed on this server, or are not on the PATH of the web/queue process. Install them (for example the mysql-client or mariadb-client package) and try again.",
         "intro": "A backup is a single ZIP file with a copy of the database (users, slides, shows, settings). A full backup also contains the uploaded slide files and widget bundles. Download backups and keep a copy somewhere other than this server.",
         "create_db": "Back up database",
         "create_full": "Back up database and files",
