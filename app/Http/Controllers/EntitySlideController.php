@@ -121,10 +121,7 @@ class EntitySlideController extends Controller
 
     private function authorizeMediaAction(Request $request, Entity $entity, Slide $slide): void
     {
-        $user = $request->user();
-        abort_unless($user->isAdmin() || $user->isEntityAdmin($entity->id), 403);
-        abort_unless($user->isAdmin() || $slide->uploaded_by === $user->id, 403);
-        abort_unless($slide->entity_id === $entity->id, 404);
+        $this->authorize('manageForEntity', [$slide, $entity]);
     }
 
     public function archive(Request $request, Entity $entity, Slide $slide)
