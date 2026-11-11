@@ -868,7 +868,7 @@
         "back_to_slides": "Volver a las diapositivas",
         "add_title": "Añadir un editor",
         "email_label": "Correo electrónico",
-        "email_placeholder": "nombre@ejemplo.com",
+        "email_placeholder": "nombre{'@'}ejemplo.com",
         "add": "Añadir editor",
         "add_hint": "Si aún no tiene una cuenta, será editor la primera vez que inicie sesión con este correo.",
         "role_admin": "Líder",
