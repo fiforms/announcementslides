@@ -25,6 +25,8 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            'created_by_import' => 'boolean',
+            'in_latest_import' => 'boolean',
             'password' => 'hashed',
         ];
     }

@@ -196,6 +196,7 @@ In [app/Console/Commands/](app/Console/Commands/) — primarily for bootstrappin
 
 - **Users:** `user:create`, `user:list`, `user:setrole`, `user:setpassword`
 - **Churches/entities:** `church:load` (scrape a conference from adventistdirectory.org into `adventist_entities`), `church:list`, `church:detail`, `entity:sync` (distill into `entities`), `entity:assign` (grant/revoke a user's entity role)
+- **Directory import UI:** **Admin → Directory Import** ([DirectoryImportController](app/Http/Controllers/Admin/DirectoryImportController.php), services in [app/Services/DirectoryImport/](app/Services/DirectoryImport/)) is an upload → preview → confirm flow. Churches come from the pastor-directory `data.json` (`churchAddresses`, keyed by `orgCode` = `org_mast_id`) or a `church:export` CSV into `adventist_entities`, optionally followed by the `entity:sync` logic ([EntitySyncer](app/Services/DirectoryImport/EntitySyncer.php)). Pastors (`data.json` `pastors`, or a CSV) become users, with entity role `admin` on their churches; `users.created_by_import` / `users.in_latest_import` drive the "imported users no longer in master data" report on that page.
 - **Languages:** `language:add`, `language:list`
 - **Widgets:** `widget:install <dir|zip>…` (same checks as the admin upload; e.g. `php artisan widget:install resources/widgets/clock resources/widgets/calendar`)
 - **Thumbnails:** `slide:resync-thumbnails [--all] [--now]` rebuilds slide+overlay composite previews (fixes stale "ghost" previews); queued by default.

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
+use App\Http\Controllers\Admin\DirectoryImportController;
 use App\Http\Controllers\Admin\EntityConsoleController;
 use App\Http\Controllers\Admin\PromoShowController as AdminPromoShowController;
 use App\Http\Controllers\Admin\SlideAnnouncerConsoleController;
@@ -208,6 +209,14 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     // ── Entity console (admin oversight of entity-scoped slides) ──────────
     Route::get('/entities', [EntityConsoleController::class, 'index'])->name('entities.index');
     Route::get('/entities/{entity}/slides', [EntityConsoleController::class, 'slides'])->name('entities.slides');
+
+    // ── Directory import (churches + pastors from files) ───────────────────
+    Route::get('/directory-import', [DirectoryImportController::class, 'index'])->name('directory-import.index');
+    Route::get('/directory-import/sample/{kind}', [DirectoryImportController::class, 'sample'])->name('directory-import.sample');
+    Route::post('/directory-import/entities', [DirectoryImportController::class, 'previewEntities'])->name('directory-import.entities');
+    Route::post('/directory-import/pastors', [DirectoryImportController::class, 'previewPastors'])->name('directory-import.pastors');
+    Route::post('/directory-import/apply', [DirectoryImportController::class, 'apply'])->name('directory-import.apply');
+    Route::delete('/directory-import', [DirectoryImportController::class, 'cancel'])->name('directory-import.cancel');
 
     // ── Slide Announcer fleet console (cross-entity device list) ──────────
     Route::get('/slide-announcers', [SlideAnnouncerConsoleController::class, 'index'])->name('slide-announcers.index');
