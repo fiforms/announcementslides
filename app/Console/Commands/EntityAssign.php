@@ -11,7 +11,7 @@ class EntityAssign extends Command
     protected $signature = 'entity:assign
                             {email : The user\'s email address}
                             {entity : Entity ID or partial name}
-                            {--role=admin : Role to assign (admin or viewer)}
+                            {--role=admin : Role to assign (admin = leader, editor or viewer)}
                             {--remove : Remove this user\'s role from the entity instead}';
 
     protected $description = 'Assign (or remove) a user role for an entity';
@@ -40,8 +40,8 @@ class EntityAssign extends Command
 
         $role = $this->option('role');
 
-        if (! in_array($role, ['admin', 'viewer'])) {
-            $this->error("Invalid role \"{$role}\". Must be admin or viewer.");
+        if (! in_array($role, ['admin', 'editor', 'viewer'])) {
+            $this->error("Invalid role \"{$role}\". Must be admin, editor or viewer.");
             return self::FAILURE;
         }
 

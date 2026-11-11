@@ -41,6 +41,7 @@ class HandleInertiaRequests extends Middleware
             'auth' => [
                 'user'             => $request->user()?->only('id', 'name', 'email', 'role', 'avatar_url'),
                 'admin_entities'   => $request->user()?->adminEntities()->get(['entities.id', 'entities.name']) ?? [],
+                'led_entity_ids'   => $request->user()?->ledEntityIds() ?? [],
                 'user_entities'    => $request->user()?->viewableEntities()->orderBy('name')->get(['entities.id', 'entities.name']) ?? [],
             ],
             // Options for the in-browser upscaler (uploads and the media manager).

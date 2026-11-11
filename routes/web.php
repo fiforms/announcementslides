@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\WidgetController as AdminWidgetController;
 use App\Http\Controllers\Admin\BackupController as AdminBackupController;
 use App\Http\Controllers\ChunkedUploadController;
 use App\Http\Controllers\EntityController;
+use App\Http\Controllers\EntityPeopleController;
 use App\Http\Controllers\EntitySlideAnnouncerController;
 use App\Http\Controllers\EntitySlideController;
 use App\Http\Controllers\LocalSlideController;
@@ -154,6 +155,14 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::get('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'show'])->name('show');
         Route::patch('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'update'])->name('update');
         Route::delete('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'destroy'])->name('destroy');
+    });
+
+    // ── Entity leader: see the team, add/revoke editors ─────────────────────
+    Route::prefix('entity/{entity}/people')->name('entity.people.')->group(function () {
+        Route::get('/', [EntityPeopleController::class, 'index'])->name('index');
+        Route::post('/', [EntityPeopleController::class, 'store'])->name('store');
+        Route::delete('/invitations/{invitation}', [EntityPeopleController::class, 'destroyInvitation'])->name('invitations.destroy');
+        Route::delete('/{user}', [EntityPeopleController::class, 'destroy'])->name('destroy');
     });
 
     // ── Entity leader: shareable no-login playback links ────────────────────

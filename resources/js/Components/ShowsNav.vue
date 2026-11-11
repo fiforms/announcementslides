@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import { usePage } from '@inertiajs/vue3';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
@@ -13,10 +14,21 @@ const props = defineProps({
     responsive: { type: Boolean, default: false },
 });
 
+const page = usePage();
+
+// Leaders (and site admins) also get the Team page; editors don't.
+const canManageTeam = computed(() => {
+    const auth = page.props.auth;
+    return auth?.user?.role === 'admin' || (auth?.led_entity_ids ?? []).includes(props.entityId);
+});
+
 const items = computed(() => [
     { label: 'nav.show_editor', href: route('shows.index', { entity_id: props.entityId }), active: route().current('shows.*') },
     { label: 'nav.slide_announcers', href: route('slide-announcers.index', { entity_id: props.entityId }), active: route().current('slide-announcers.*') },
     { label: 'nav.play_links', href: route('play-links.index', { entity_id: props.entityId }), active: route().current('play-links.*') },
+    ...(canManageTeam.value
+        ? [{ label: 'nav.team', href: route('entity.people.index', { entity: props.entityId }), active: route().current('entity.people.*') }]
+        : []),
 ]);
 
 const anyActive = computed(() => items.value.some(i => i.active));

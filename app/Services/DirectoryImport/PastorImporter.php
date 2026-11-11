@@ -153,7 +153,7 @@ class PastorImporter
                     continue;
                 }
 
-                $current === 'viewer' ? $out['upgrades']++ : $out['new_links']++;
+                in_array($current, ['viewer', 'editor'], true) ? $out['upgrades']++ : $out['new_links']++;
                 $links[] = $entity->name;
             }
 

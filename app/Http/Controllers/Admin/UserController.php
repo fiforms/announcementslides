@@ -75,7 +75,7 @@ class UserController extends Controller
     {
         $data = $request->validate([
             'entity_id' => ['required', 'integer', 'exists:entities,id'],
-            'role'      => ['required', 'in:viewer,admin'],
+            'role'      => ['required', 'in:viewer,editor,admin'],
         ]);
 
         $user->entities()->syncWithoutDetaching([
@@ -92,7 +92,7 @@ class UserController extends Controller
     public function updateEntityRole(Request $request, User $user, Entity $entity): RedirectResponse
     {
         $data = $request->validate([
-            'role' => ['required', 'in:viewer,admin'],
+            'role' => ['required', 'in:viewer,editor,admin'],
         ]);
 
         $user->entities()->updateExistingPivot($entity->id, [

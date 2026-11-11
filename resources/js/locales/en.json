@@ -23,6 +23,7 @@
         "log_in": "Log In",
         "powered_by": "Powered by",
         "play_links": "Shared Links",
+        "team": "Team",
         "shows": "Shows",
         "directory_import": "Directory Import"
     },
@@ -91,6 +92,7 @@
         "no_subscriptions": "You are not connected to any entities yet.",
         "role_viewer": "Viewer",
         "role_admin": "Admin",
+        "role_editor": "Editor",
         "admin_managed": "Admin (managed)"
     },
     "shows": {
@@ -150,6 +152,7 @@
         "col_actions": "Actions",
         "role_viewer": "viewer",
         "role_leader": "leader",
+        "role_editor": "editor",
         "no_entity_relationships": "No entity relationships yet.",
         "confirm_detach_entity": "Remove {user}'s relationship with \"{entity}\"?",
         "modal_add_entity_title": "Add Entity for {name}",
@@ -158,6 +161,7 @@
         "role_label": "Role",
         "role_viewer_member": "Viewer (member)",
         "role_leader_admin": "Leader (admin)",
+        "role_editor_member": "Editor (can manage slides)",
         "no_entity_results": "No results found.",
         "preregister_title": "Pre-register a user",
         "email_label": "Email address",
@@ -294,7 +298,8 @@
         "col_entity_role": "Entity role",
         "col_global_role": "Global role",
         "role_admin": "Leader",
-        "role_viewer": "Subscriber"
+        "role_viewer": "Subscriber",
+        "role_editor": "Editor"
     },
     "admin": {
         "immutable": "Required slide (global)",
@@ -856,6 +861,30 @@
     "play": {
         "revoked": "This link is no longer active.",
         "no_slides": "There are no slides to show right now."
+    },
+    "people": {
+        "title": "Team — {name}",
+        "intro": "Everyone connected to this church. Leaders can add and remove editors. Editors can manage slides, shows, shared links and devices, but cannot change who is on the team. Changes to leaders are made by a site administrator.",
+        "back_to_slides": "Back to slides",
+        "add_title": "Add an editor",
+        "email_label": "Email address",
+        "email_placeholder": "name@example.com",
+        "add": "Add editor",
+        "add_hint": "If they don't have an account yet, they become an editor the first time they sign in with this email address.",
+        "role_admin": "Leader",
+        "role_editor": "Editor",
+        "role_viewer": "Follower",
+        "col_name": "Name",
+        "col_email": "Email",
+        "col_role": "Role",
+        "col_actions": "Actions",
+        "remove": "Remove",
+        "confirm_remove": "Remove {name} as an editor?",
+        "pending_title": "Pending invitations",
+        "pending_hint": "Waiting for first sign-in",
+        "cancel_invite": "Cancel invitation",
+        "confirm_cancel_invite": "Cancel the invitation for {email}?",
+        "none": "No one is connected to this church yet."
     },
     "play_links": {
         "title": "Shared links — {name}",

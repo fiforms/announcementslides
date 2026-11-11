@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Concerns\RedirectsToHome;
 use App\Http\Controllers\Controller;
+use App\Models\EntityInvitation;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Foundation\Auth\EmailVerificationRequest;
 use Illuminate\Http\RedirectResponse;
@@ -23,6 +24,8 @@ class VerifyEmailController extends Controller
 
         if ($request->user()->markEmailAsVerified()) {
             event(new Verified($request->user()));
+            // A verified address now proves ownership, so editor invitations for it apply.
+            EntityInvitation::redeemFor($request->user());
         }
 
         return redirect()->intended($this->homeRouteFor($request->user()).'?verified=1');

@@ -278,6 +278,7 @@ function inviteMailtoLink(inv) {
                                                                 class="rounded border border-gray-300 px-1.5 py-0.5 text-xs focus:border-indigo-500 focus:ring-indigo-500"
                                                                 :class="entityRoleBadgeClass(entity.role)">
                                                                 <option value="viewer">{{ $t('admin_users.role_viewer') }}</option>
+                                                                <option value="editor">{{ $t('admin_users.role_editor') }}</option>
                                                                 <option value="admin">{{ $t('admin_users.role_leader') }}</option>
                                                             </select>
                                                         </td>
@@ -413,6 +414,7 @@ function inviteMailtoLink(inv) {
                         <select v-model="attachRole"
                             class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <option value="viewer">{{ $t('admin_users.role_viewer_member') }}</option>
+                            <option value="editor">{{ $t('admin_users.role_editor_member') }}</option>
                             <option value="admin">{{ $t('admin_users.role_leader_admin') }}</option>
                         </select>
                     </div>

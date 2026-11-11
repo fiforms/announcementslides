@@ -188,7 +188,7 @@ const safeWebsite = computed(() => {
                                     </td>
                                     <td class="px-3 py-2">
                                         <span class="rounded-full px-2 py-0.5 text-xs font-semibold"
-                                            :class="u.entity_role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600'">
+                                            :class="u.entity_role === 'admin' ? 'bg-indigo-100 text-indigo-700' : u.entity_role === 'editor' ? 'bg-sky-100 text-sky-700' : 'bg-gray-100 text-gray-600'">
                                             {{ $t('admin_entities.role_' + u.entity_role) }}
                                         </span>
                                     </td>
