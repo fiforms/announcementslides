@@ -22,7 +22,26 @@ A web-based announcement slide distribution system designed for Seventh-day Adve
 
 ## Docker
 
-A ready-to-run image is built by GitHub Actions and published to GHCR. See [docker/README.md](docker/README.md) for a Compose setup with MySQL.
+The quickest way to run AnnouncementSlides is the prebuilt Docker image (`amd64` and
+`arm64`, published to GHCR). It runs the web app, queue worker and scheduler together,
+and the Compose file adds MySQL, so you only need Docker.
+
+```bash
+curl -O https://raw.githubusercontent.com/fiforms/announcementslides/master/docker/compose.yaml
+# set APP_URL at the top of compose.yaml to the address people will type into a browser
+docker compose up -d
+```
+
+Then open `APP_URL` (default <http://localhost:8080>). A new install has no users, so
+it opens a **setup wizard** that creates your administrator account and installs the
+bundled widgets (clock, calendar, weather). To upgrade, run
+`docker compose pull && docker compose up -d`.
+
+**If the server is reachable from the internet, set `SETUP_TOKEN` in `compose.yaml`
+before you start it.** Until the wizard has been completed, anyone who opens the page
+first can become the administrator; the token makes the form ask for a code you
+chose. See [docker/README.md](docker/README.md) for HTTPS behind a reverse proxy, email,
+Google sign-in, S3 storage, backups, and building the image yourself.
 
 ## Installation
 
