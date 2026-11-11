@@ -24,13 +24,8 @@ if [ -z "$APP_KEY" ]; then
 fi
 
 mkdir -p storage/app/public storage/app/private storage/framework/cache/data \
-    storage/framework/sessions storage/framework/views storage/logs storage/database \
+    storage/framework/sessions storage/framework/views storage/logs \
     bootstrap/cache
-
-if [ "$DB_CONNECTION" = "sqlite" ] && [ ! -e "$DB_DATABASE" ]; then
-    mkdir -p "$(dirname "$DB_DATABASE")"
-    touch "$DB_DATABASE"
-fi
 
 # Volumes may arrive owned by root; only touch what's wrong (fast on big volumes).
 find storage bootstrap/cache \( ! -user www-data -o ! -group www-data \) \
