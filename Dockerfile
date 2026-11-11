@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.7
 #
 # AnnouncementSlides web app image: nginx + php-fpm + queue worker + scheduler
-# in one container (supervisord). See docker/README.md.
+# in one container (supervisord). MySQL only: the database is a separate service.
+# See docker/README.md.
 
 ARG PHP_VERSION=8.4
 ARG NODE_VERSION=22
@@ -35,7 +36,7 @@ RUN npm run build
 FROM php:${PHP_VERSION}-fpm-alpine AS app
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
-RUN apk add --no-cache nginx supervisor ffmpeg su-exec curl tzdata \
+RUN apk add --no-cache nginx supervisor ffmpeg su-exec curl tzdata mysql-client mariadb-connector-c \
  && install-php-extensions gd pdo_mysql zip pcntl opcache exif intl bcmath \
  && rm -f /usr/local/bin/install-php-extensions \
  && mkdir -p /run/nginx
@@ -54,7 +55,7 @@ COPY --from=assets --chown=www-data:www-data /app/public/build public/build
 COPY --from=assets --chown=www-data:www-data /app/public/upscaler-models public/upscaler-models
 
 RUN mkdir -p storage/app/public storage/app/private storage/framework/cache/data \
-        storage/framework/sessions storage/framework/views storage/logs storage/database \
+        storage/framework/sessions storage/framework/views storage/logs \
  && chown -R www-data:www-data storage bootstrap/cache \
  && su-exec www-data php artisan package:discover --ansi
 
@@ -63,11 +64,10 @@ ENV APP_VERSION=${APP_VERSION} \
     APP_ENV=production \
     APP_DEBUG=false \
     LOG_CHANNEL=stderr \
-    DB_CONNECTION=sqlite \
-    DB_DATABASE=/var/www/html/storage/database/database.sqlite
+    DB_CONNECTION=mysql
 
 # Everything that must survive a container rebuild lives under storage/
-# (uploads, widget bundles, and the SQLite file when MySQL isn't used).
+# (uploads, thumbnails, widget bundles). The database is MySQL, a separate service.
 VOLUME ["/var/www/html/storage"]
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \

@@ -12,7 +12,7 @@ cd docker
 docker compose up -d
 ```
 
-That's it: no `.env` and no secrets are needed. The app runs on SQLite at
+That's it: no `.env` and no secrets are needed. The app runs with a bundled MySQL at
 <http://localhost:8080>, migrations run on start (`AUTO_MIGRATE=false` disables
 that), and an `APP_KEY` is generated on first start and kept in the storage volume.
 
@@ -31,21 +31,25 @@ docker compose exec app php artisan widget:install resources/widgets/clock resou
 Any `docker compose exec app <command>` / `docker compose run --rm app <command>`
 runs as `www-data`.
 
-## MySQL instead of SQLite
+## Database
 
-```bash
-docker compose -f compose.yaml -f compose.mysql.yaml up -d
-```
-
-Set `DB_PASSWORD` in `.env` for anything reachable from outside (the default is
-only safe because MySQL isn't published on a host port). Use the same `-f` pair
-for every later `docker compose` command.
+The image supports **MySQL only** (SQLite is for local development outside
+Docker). `compose.yaml` starts MySQL 8.4 for you; its default password is only
+reasonably safe because the port isn't published on the host, so set
+`DB_PASSWORD` in `.env` for anything reachable from outside. To use your own
+MySQL server, set `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME` and
+`DB_PASSWORD` in `.env` and start only the app: `docker compose up -d --no-deps app`.
 
 ## Single container without Compose
 
+You need a MySQL server reachable from the container:
+
 ```bash
 docker run -d -p 8080:80 -v announcementslides:/var/www/html/storage \
-  -e APP_URL=http://localhost:8080 ghcr.io/fiforms/announcementslides
+  -e APP_URL=http://localhost:8080 \
+  -e DB_HOST=mysql.example.com -e DB_DATABASE=announcementslides \
+  -e DB_USERNAME=announcementslides -e DB_PASSWORD=... \
+  ghcr.io/fiforms/announcementslides
 ```
 
 ## Where state lives
@@ -53,12 +57,11 @@ docker run -d -p 8080:80 -v announcementslides:/var/www/html/storage \
 | What | Where |
 |---|---|
 | Uploaded slides, thumbnails, widget bundles | volume at `/var/www/html/storage` |
-| SQLite database (default) | same volume, `storage/database/database.sqlite` |
 | Generated `APP_KEY` | same volume, `storage/app/.app_key` |
-| MySQL data (overlay only) | the `db` volume |
+| MySQL data | the `db` volume (or your own MySQL server) |
 
-With the defaults, the storage volume is the whole installation. It contains the
-`APP_KEY`, so treat a backup of it as sensitive. If you set `APP_KEY` yourself,
+A complete backup is the MySQL database plus the storage volume. The volume
+contains the generated `APP_KEY`, so treat a copy of it as sensitive. If you set `APP_KEY` yourself,
 keep a copy: a restore needs the same key to read encrypted values and sessions.
 
 Remote S3 storage: set `FILESYSTEM_DISK` and the `AWS_*` variables in `.env`
