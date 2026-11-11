@@ -53,8 +53,24 @@ class ChunkedUploadController extends Controller
             return response()->json(['status' => 'partial', 'received' => $receivedChunks]);
         }
 
-        // All chunks received — assemble the file
-        $ext      = strtolower(pathinfo($request->filename, PATHINFO_EXTENSION));
+        // All chunks received — assemble the file.
+        //
+        // The extension comes from the validated mime type, never from
+        // $request->filename. The assembled file lands on the `public` disk,
+        // which is web-served, so letting the client name the extension let
+        // any authenticated user drop a .php (or .html) under the document
+        // root. mime_type is already constrained by Rule::in() above, so this
+        // lookup can only miss if config is internally inconsistent.
+        $ext = config("slides.mime_extensions.{$request->mime_type}");
+
+        if (! $ext) {
+            $this->discardChunks($chunkDir);
+
+            return response()->json([
+                'message' => "Unsupported file type: {$request->mime_type}",
+            ], 422);
+        }
+
         $uuid     = (string) Str::uuid();
         $filename = "{$uuid}.{$ext}";
 
@@ -71,8 +87,7 @@ class ChunkedUploadController extends Controller
         }
         fclose($dest);
 
-        array_map('unlink', glob("{$chunkDir}/chunk_*"));
-        rmdir($chunkDir);
+        $this->discardChunks($chunkDir);
 
         return response()->json([
             'status'            => 'complete',
@@ -84,14 +99,42 @@ class ChunkedUploadController extends Controller
         ]);
     }
 
+    /**
+     * Drop a partial upload's chunk directory. Called both on the happy path
+     * once the file is assembled and when a rejected upload has to leave
+     * nothing behind.
+     */
+    private function discardChunks(string $chunkDir): void
+    {
+        array_map('unlink', glob("{$chunkDir}/chunk_*"));
+
+        if (is_dir($chunkDir)) {
+            rmdir($chunkDir);
+        }
+    }
+
+    /**
+     * The extensions chunk() can produce, as an alternation for the path
+     * rules below — derived from the same config map rather than restated,
+     * so adding a media type can't quietly widen what finalize() accepts.
+     */
+    private function storedExtensionPattern(): string
+    {
+        $extensions = array_unique(array_values(config('slides.mime_extensions', [])));
+
+        return implode('|', array_map('preg_quote', $extensions));
+    }
+
     public function finalize(Request $request, ImageValidationService $validationService)
     {
+        $ext = $this->storedExtensionPattern();
+
         $request->validate([
             // No files at all creates a slide with no image (overlay and/or
             // widgets only, or just a title); it then needs a title.
             'uploads'                     => 'sometimes|array',
-            'uploads.*.filename'          => ['required', 'string', 'regex:/^[0-9a-f\-]{36}\.[a-z0-9]+$/'],
-            'uploads.*.disk_path'         => ['required', 'string', 'regex:/^slides\/[0-9a-f\-]{36}\.[a-z0-9]+$/'],
+            'uploads.*.filename'          => ['required', 'string', "regex:/^[0-9a-f\-]{36}\.({$ext})$/"],
+            'uploads.*.disk_path'         => ['required', 'string', "regex:/^slides\/[0-9a-f\-]{36}\.({$ext})$/"],
             'uploads.*.original_filename' => 'required|string|max:255',
             'uploads.*.file_size'         => 'required|integer|min:0',
             'uploads.*.mime_type'         => ['required', 'string', Rule::in(config('slides.media_types.slide.mimes'))],
