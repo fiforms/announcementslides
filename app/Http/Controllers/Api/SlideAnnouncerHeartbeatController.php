@@ -77,10 +77,14 @@ class SlideAnnouncerHeartbeatController extends Controller
         ]);
 
         $activeAppRelease = SlideAnnouncerRelease::resolveForDevice('app', $device->architecture, $device->update_channel, $device->app_version);
-        $appUpdateAvailable = $activeAppRelease && static::releaseIsNewer($activeAppRelease, $device->app_version);
+        // A release still being copied to the offload disk (R2) isn't offered
+        // yet, so the fleet downloads it from there, not from this host.
+        $appUpdateAvailable = $activeAppRelease && ! $activeAppRelease->awaitingOffload()
+            && static::releaseIsNewer($activeAppRelease, $device->app_version);
 
         $activeOsRelease = SlideAnnouncerRelease::resolveForDevice('os', $device->architecture, $device->update_channel, $device->os_version);
-        $osUpdateAvailable = $activeOsRelease && static::releaseIsNewer($activeOsRelease, $device->os_version);
+        $osUpdateAvailable = $activeOsRelease && ! $activeOsRelease->awaitingOffload()
+            && static::releaseIsNewer($activeOsRelease, $device->os_version);
 
         return response()->json([
             'ok' => true,

@@ -363,7 +363,13 @@ async function copyToClipboard(text, which) {
                                     {{ typeShort(release.release_type) }}
                                     <span v-if="release.release_type === 'hotfix'" class="text-gray-500">{{ $t('slide_announcers.hotfix_from', { version: release.required_base_version }) }}</span>
                                 </td>
-                                <td class="px-4 py-3 font-mono">{{ release.version }}</td>
+                                <td class="px-4 py-3 font-mono">
+                                    {{ release.version }}
+                                    <span v-if="release.awaiting_offload" :title="$t('slide_announcers.awaiting_offload_hint')"
+                                        class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 font-sans text-xs font-medium text-amber-800">
+                                        {{ $t('slide_announcers.awaiting_offload') }}
+                                    </span>
+                                </td>
                                 <td class="px-4 py-3">{{ release.architecture }}</td>
                                 <td class="px-4 py-3">
                                     <span v-for="c in sortedChannels(release.channels)" :key="c.channel" :class="channelBadgeClass(c.channel)"
@@ -408,7 +414,13 @@ async function copyToClipboard(text, which) {
                                     {{ typeShort(release.release_type) }}
                                     <span v-if="release.release_type === 'hotfix'" class="text-gray-500">{{ $t('slide_announcers.hotfix_from', { version: release.required_base_version }) }}</span>
                                 </td>
-                                <td class="px-4 py-3 font-mono">{{ release.version }}</td>
+                                <td class="px-4 py-3 font-mono">
+                                    {{ release.version }}
+                                    <span v-if="release.awaiting_offload" :title="$t('slide_announcers.awaiting_offload_hint')"
+                                        class="ml-1 rounded-full bg-amber-100 px-2 py-0.5 font-sans text-xs font-medium text-amber-800">
+                                        {{ $t('slide_announcers.awaiting_offload') }}
+                                    </span>
+                                </td>
                                 <td class="px-4 py-3">{{ release.architecture }}</td>
                                 <td class="px-4 py-3 hidden md:table-cell text-gray-600">{{ formatBytes(release.file_size) }}</td>
                                 <td class="px-4 py-3 hidden lg:table-cell text-gray-600">

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\OffloadRelease;
 use App\Models\SlideAnnouncerRelease;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -172,6 +173,9 @@ class SlideAnnouncerReleaseController extends Controller
             $release->tagChannel($data['channel'], $request->user()->id);
         }
 
+        // Moves the file to the offload disk (R2) when that is configured.
+        OffloadRelease::dispatch($release);
+
         return response()->json(['success' => true, 'release' => $this->releaseResource($release->fresh('channels'))]);
     }
 
@@ -199,7 +203,7 @@ class SlideAnnouncerReleaseController extends Controller
     {
         abort_if($slideAnnouncerRelease->channels()->exists(), 422, 'Untag this release from every channel before deleting it.');
 
-        Storage::disk('public')->delete($slideAnnouncerRelease->disk_path);
+        $slideAnnouncerRelease->deleteFile();
         $slideAnnouncerRelease->delete();
 
         return back()->with('success', 'Release deleted.');
@@ -246,10 +250,9 @@ class SlideAnnouncerReleaseController extends Controller
             'sha256' => $release->sha256,
             'disk_path' => $release->disk_path,
             'url' => $release->url(),
+            'awaiting_offload' => $release->awaitingOffload(),
             'notes' => $release->notes,
-            'file_size' => Storage::disk('public')->exists($release->disk_path)
-                ? Storage::disk('public')->size($release->disk_path)
-                : null,
+            'file_size' => $release->fileSize(),
             'created_at' => $release->created_at->toIso8601String(),
             'creator' => $release->creator?->only('id', 'name'),
             'channels' => $release->channels->map(fn ($c) => [

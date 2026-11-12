@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStore;
 
 class SlideAnnouncerRelease extends Model
 {
@@ -37,9 +37,15 @@ class SlideAnnouncerRelease extends Model
         'release_type',
         'required_base_version',
         'disk_path',
+        'disk',
         'sha256',
         'notes',
         'created_by',
+    ];
+
+    /** Release files start local; OffloadRelease may move them (see MediaStore). */
+    protected $attributes = [
+        'disk' => MediaStore::LOCAL,
     ];
 
     public function creator(): BelongsTo
@@ -163,7 +169,35 @@ class SlideAnnouncerRelease extends Model
 
     public function url(): string
     {
-        return Storage::disk('public')->url($this->disk_path);
+        return app(MediaStore::class)->url($this->disk, $this->disk_path);
+    }
+
+    /** The release file's size in bytes, or null if it is missing. */
+    public function fileSize(): ?int
+    {
+        return app(MediaStore::class)->size($this->disk, $this->disk_path);
+    }
+
+    /**
+     * True while this release should not be handed out yet: release
+     * offloading is on, `media.releases_wait_for_offload` is set, and the
+     * file is still on the local disk (OffloadRelease hasn't finished). The
+     * heartbeat then offers no update and download pages show it as being
+     * prepared, so devices never download it from the web host.
+     */
+    public function awaitingOffload(): bool
+    {
+        $store = app(MediaStore::class);
+
+        return $store->offloadEnabled()
+            && config('media.offload_releases')
+            && config('media.releases_wait_for_offload')
+            && $store->isLocal($this->disk);
+    }
+
+    public function deleteFile(): void
+    {
+        app(MediaStore::class)->delete($this->disk, $this->disk_path);
     }
 
     /**

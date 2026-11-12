@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\OffloadRelease;
 use App\Models\SlideAnnouncerRelease;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Storage;
@@ -48,7 +49,13 @@ class SlideAnnouncerPublishRelease extends Command
         $extension = $this->fullExtension($path);
         $diskPath = "slide-announcer/releases/{$kind}/{$architecture}/{$version}{$extension}";
 
-        Storage::disk('public')->put($diskPath, file_get_contents($path));
+        // Streamed: release files (disk images especially) can be several GB.
+        $in = fopen($path, 'rb');
+        try {
+            Storage::disk('public')->writeStream($diskPath, $in);
+        } finally {
+            fclose($in);
+        }
 
         $release = SlideAnnouncerRelease::create([
             'kind' => $kind,
@@ -57,6 +64,9 @@ class SlideAnnouncerPublishRelease extends Command
             'disk_path' => $diskPath,
             'sha256' => $sha256,
         ]);
+
+        // Moves the file to the offload disk (R2) when that is configured.
+        OffloadRelease::dispatch($release);
 
         if ($channel !== null) {
             $release->tagChannel($channel);

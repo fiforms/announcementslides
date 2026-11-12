@@ -21,7 +21,7 @@ start (`AUTO_MIGRATE=false` disables that), and an `APP_KEY` is generated on fir
 start and kept in the storage volume.
 
 Settings live in the **YOUR SETTINGS** block at the top of `compose.yaml`: `APP_URL`
-and the setup token are there, and mail, Google sign-in, S3 storage, the site name and
+and the setup token are there, and mail, Google sign-in, Cloudflare R2 offloading, the site name and
 the rest are commented out ready to uncomment. Any Laravel setting can be added to that
 block. (An optional `.env` file next to `compose.yaml` is also passed through if you
 prefer to keep secrets out of the compose file; a value set in the settings block wins
@@ -83,8 +83,11 @@ A complete backup is the MySQL database plus the storage volume (see [Backups](#
 contains the generated `APP_KEY`, so treat a copy of it as sensitive. If you set `APP_KEY` yourself,
 keep a copy: a restore needs the same key to read encrypted values and sessions.
 
-Remote S3 storage: set `FILESYSTEM_DISK` and the `AWS_*` variables in the settings block
-(see [config/filesystems.php](../config/filesystems.php)).
+Large files (videos, big images, Slide Announcer updates) can be moved to Cloudflare R2,
+which has no egress fees, while small files stay in the volume: set `MEDIA_OFFLOAD_DISK: r2`
+and the `R2_*` variables in the settings block. See
+[INSTALLING.md](../INSTALLING.md#offloading-large-files-to-cloudflare-r2-optional) for bucket
+setup and moving existing files (`docker compose exec app php artisan media:offload`).
 
 ## Backups
 
@@ -107,7 +110,8 @@ you start yourself (web or CLI) are never pruned automatically.
 The archive does **not** contain the `APP_KEY`. Without it a restored site works, but
 everyone has to sign in again and widget API keys (Admin → Widgets) must be re-entered;
 nothing else is encrypted. Keep `APP_KEY` (or `storage/app/.app_key`) if you want a seamless move.
-Full backups skip files on S3 storage (use the provider's versioning/replication).
+Full backups skip files offloaded to R2 (the manifest's `offloaded_files` counts them; use
+R2 bucket versioning or replication for those).
 
 ### Restoring
 

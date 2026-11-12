@@ -155,7 +155,9 @@ Users can then sign in with their Google account from the login page.
 | `language:list` | List all supported languages |
 | `widget:install` | Install or upgrade overlay widgets from a directory or zip |
 | `backup:create` / `backup:list` / `backup:restore` | Create, list and restore backups |
-| `slide:resync-thumbnails` | Rebuild slide and overlay composite thumbnails |
+| `slide:resync-thumbnails` | Rebuild slide and overlay composite thumbnails (`--posters`: store missing video poster frames) |
+| `media:offload` / `media:localize` | Move large files to the offload disk (R2) / bring them back (see [below](#offloading-large-files-to-cloudflare-r2-optional)) |
+| `media:prune-cache` | Trim the local cache of offloaded files (scheduled every 15 minutes) |
 
 Run `php artisan list` for the complete set, including the Slide Announcer commands.
 
@@ -345,3 +347,125 @@ here with these differences:
   Settings are the `BACKUP_*` variables in `.env` (see [config/backup.php](config/backup.php)).
 - **No automatic backup before an update.** Run `php artisan backup:create` before
   `php artisan migrate` when you deploy.
+
+### Offloading large files to Cloudflare R2 (optional)
+
+By default every uploaded file is stored and served by this server. On a host
+with metered outbound traffic (e.g. AWS Lightsail), videos, large images and
+Slide Announcer updates downloaded by many devices add up quickly. With offloading
+on, those files move to a [Cloudflare R2](https://developers.cloudflare.com/r2/)
+bucket after upload and are downloaded from there. R2 has no egress fees.
+SVGs, thumbnails, video poster frames and anything under the size threshold
+stay on this server. Without these settings nothing changes.
+
+How it works: an upload is processed here as usual (sanitizing, validation,
+thumbnail, and for a video a full-size poster frame). The queue worker then
+copies the file to R2, verifies it, points the database row at R2 and deletes
+the local copy. Release files (app bundles, OS bundles, disk images) move the
+same way. When the server itself needs an offloaded file (ZIP or REVELation
+export, overlay compositing), it pulls a copy into a size-limited local cache
+(`storage/app/media-cache`). "Download" buttons for offloaded files redirect to
+a short-lived signed R2 link, so those bytes don't pass through this server either.
+
+1. **Create a bucket** in the Cloudflare dashboard (R2 → Create bucket).
+2. **Connect a custom domain** to it (bucket → Settings → Custom Domains), e.g.
+   `media.example.org`. The domain's DNS must be on Cloudflare. Don't use the
+   `r2.dev` address in production: it is rate-limited. Files are served publicly
+   by their random (UUID) names, as they are from `/storage` today.
+3. **Add a CORS policy** (bucket → Settings → CORS) so the web app can read images
+   (Upscale/Downscale on existing images, QR checking):
+   ```json
+   [{ "AllowedOrigins": ["https://slides.example.org"], "AllowedMethods": ["GET", "HEAD"], "AllowedHeaders": ["*"], "MaxAgeSeconds": 86400 }]
+   ```
+   Use your `APP_URL` as the origin.
+4. **Create an API token** (R2 → Manage API tokens) with *Object Read & Write* on
+   that bucket.
+5. **Set the variables** in `.env` (or the settings block of `docker/compose.yaml`):
+   ```dotenv
+   MEDIA_OFFLOAD_DISK=r2
+   R2_ACCOUNT_ID=…            # from the R2 overview page
+   R2_ACCESS_KEY_ID=…
+   R2_SECRET_ACCESS_KEY=…
+   R2_BUCKET=announcementslides-media
+   R2_PUBLIC_URL=https://media.example.org
+   # Optional, defaults shown:
+   # MEDIA_OFFLOAD_MIN_BYTES=1048576     # smaller files stay here
+   # MEDIA_OFFLOAD_RELEASES=true         # also Slide Announcer update files
+   # MEDIA_RELEASES_WAIT_FOR_OFFLOAD=true  # hold releases back from devices until they're on R2
+   # MEDIA_CACHE_MAX_BYTES=2147483648    # target size of the local cache
+   # MEDIA_CACHE_MIN_AGE=60              # minutes a cached file is never evicted after use
+   ```
+   Then `php artisan config:cache` (non-Docker) or restart the container.
+6. **Move existing files**: `php artisan slide:resync-thumbnails --posters --now`
+   (poster frames for older videos, made while they're still local), then
+   `php artisan media:offload --dry-run` to see what would move, then
+   `php artisan media:offload` (queued; the queue worker does the work). Each
+   moved file gets a new URL, so paired devices download it once more.
+
+**Releases wait for R2.** A newly published Slide Announcer release is not offered
+to devices (`app_update_available` / `os_update_available` stay false) and its
+disk-image download link reads "preparing download…" until its file has finished
+copying to R2. Admin → Slide Announcer Releases shows an "Uploading to storage" badge
+meanwhile. Without this, a fleet checking in right after the release is tagged would
+download it from this server. If the copy keeps failing, the release stays held back
+(see `storage/logs/laravel.log`); retry with `php artisan media:offload --only=releases`.
+This also applies to releases that already exist when offloading is switched on:
+they are held back until step 6 moves them. Set `MEDIA_RELEASES_WAIT_FOR_OFFLOAD=false`
+to offer releases from this server while they upload.
+
+The queue worker and the scheduler (`schedule:run`, which trims the cache) must
+be running. Full backups don't include offloaded files. The database still points
+at them, so keep the bucket safe (consider R2 bucket versioning or a lifecycle
+copy). The backup manifest's `offloaded_files` shows how much lives there.
+
+**Switching back** to a single host: remove `MEDIA_OFFLOAD_DISK`, keep the `R2_*`
+settings, and run `php artisan media:localize`. This copies everything back,
+points the rows here, and deletes the R2 copies (`--keep-remote` keeps them).
+Until then, files already in R2 keep being served from there.
+
+#### Other S3-compatible providers (e.g. Backblaze B2): not yet supported
+
+Offloading only depends on a Laravel filesystem disk: [MediaStore](app/Support/MediaStore.php),
+the media cache, the offload jobs and the `media:*` commands work with any disk name
+set in `MEDIA_OFFLOAD_DISK`. Only the `r2` disk is configured and tested. Backblaze B2
+looks feasible, but these points would need to change or be checked first:
+
+- **Why B2 might be chosen:** storage is cheaper (about $6.95/TB/month against R2's ~$15),
+  but downloads are only free up to 3× the stored data, then $0.01/GB, unless they go
+  through a partner CDN such as Cloudflare (unlimited free egress). R2 makes all
+  downloads free without conditions. B2 pays off when far more data is stored than
+  downloaded (e.g. as a backup target); this app mostly serves the same media many times.
+- **A `b2` disk** would be added in [config/filesystems.php](config/filesystems.php) next to `r2`:
+  driver `s3`, endpoint `https://s3.<region>.backblazeb2.com`, region e.g. `us-west-004`,
+  `use_path_style_endpoint` true, `throw` true, and `B2_*` env variables (plus
+  `.env.example` / `docker/compose.yaml`).
+- **Public URL (`url`):** B2's public download URL has a path prefix:
+  `https://f00X.backblazeb2.com/file/<bucket>/<key>`. Setting `url` to
+  `https://<host>/file/<bucket>` gives correct `file_url`s without a rewrite rule.
+  Devices need these URLs to be direct and stable (see *Storage tiers* in
+  ARCHITECTURE.md), so a public bucket is required, as with R2.
+- **Cloudflare in front (for free downloads):** use a proxied CNAME (e.g. `media.example.org`)
+  to the `f00X.backblazeb2.com` host, with `url` set to `https://media.example.org/file/<bucket>`.
+  Check two things: Cloudflare's self-serve CDN terms allow limits on sites that mainly
+  serve video or other large files through the CDN (this doesn't apply to R2), and the
+  free plan doesn't cache files over ~512 MB (e.g. OS disk images), so those are
+  fetched from B2 every time.
+- **ACL header (verify):** Laravel's S3 driver sends an `x-amz-acl` header (`private`
+  by default) on every write, and B2's S3 API documents ACLs as unsupported (access is
+  set per bucket). Test whether B2 ignores or rejects it. If it rejects it,
+  `MediaStore::copyToOffload()` / `copyToLocal()` would need to skip the ACL for that
+  disk (or the disk's `visibility` set to match the bucket).
+- **Download filenames (verify):** `MediaStore::download()` redirects to a presigned URL
+  with `ResponseContentDisposition` so the file downloads under the slide's title. B2
+  supports SigV4 presigned URLs, but it's unconfirmed whether its S3 API honours
+  `response-content-disposition`. If it doesn't, downloads would get the UUID name.
+  The fallback is to stream offloaded downloads through the app for that disk, which
+  costs host egress, or to use B2's native `b2ContentDisposition` authorization.
+- **Cache-Control (verify):** offloaded objects are written with
+  `Cache-Control: public, max-age=31536000, immutable`. Check that B2 stores this header
+  and returns it, so Cloudflare caches the files.
+- **CORS:** B2 sets CORS rules per bucket (`b2 bucket update --cors-rules` or the web UI).
+  The same GET/HEAD rule for `APP_URL` as for R2 is needed.
+- **Tests:** add a `b2` variant of the URL-building cases in
+  [MediaOffloadTest](tests/Feature/MediaOffloadTest.php) (path-prefixed `url`), then try a
+  real bucket: upload, offload, device sync, "Download" button, ZIP export.

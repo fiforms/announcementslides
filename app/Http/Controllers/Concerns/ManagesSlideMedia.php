@@ -12,6 +12,7 @@ use App\Services\ImageValidationService;
 use App\Services\OverlaySource;
 use App\Services\SvgSanitizer;
 use App\Support\ImageResize;
+use App\Support\MediaStore;
 use App\Services\Widgets\OverlayWidgets;
 use App\Services\Widgets\WidgetPackageException;
 use Illuminate\Http\JsonResponse;
@@ -83,7 +84,7 @@ trait ManagesSlideMedia
     {
         abort_unless($media->slide_id === $slide->id, 404);
 
-        Storage::disk('public')->delete($media->allFilePaths());
+        $media->deleteFiles();
         $media->delete();
 
         // A slide may have no image (overlay/widgets only, or hidden), but then
@@ -150,7 +151,8 @@ trait ManagesSlideMedia
 
         [$w, $h] = [$media->image_width, $media->image_height];
         if (!$w || !$h) {
-            [$w, $h] = array_slice(@getimagesize($disk->path($media->disk_path)) ?: [null, null], 0, 2);
+            $current = $media->localPath();
+            [$w, $h] = array_slice(($current ? @getimagesize($current) : null) ?: [null, null], 0, 2);
         }
 
         // Exactly the size the kind calls for (a pixel of slack for rounding).
@@ -176,9 +178,11 @@ trait ManagesSlideMedia
             'filename'          => basename($path),
             'original_filename' => $media->original_filename,
             'disk_path'         => $path,
+            'disk'              => MediaStore::LOCAL, // OffloadMedia may move it after its thumbnail is made
             'file_size'         => $disk->size($path),
             'mime_type'         => 'image/jpeg',
             'thumbnail_path'    => null,
+            'poster_path'       => null,
             'image_width'       => $validation['width'],
             'image_height'      => $validation['height'],
             'validation_issues' => $validation['issues'],
@@ -191,7 +195,7 @@ trait ManagesSlideMedia
         $media->adoptResized($original, $resized, $kind, $kind === ImageResize::UPSCALE ? $request->model : null);
 
         if ($stale) {
-            $disk->delete(array_filter([$stale['disk_path'] ?? null, $stale['thumbnail_path'] ?? null]));
+            SlideMedia::deleteVersionFiles($stale);
         }
 
         GenerateThumbnail::dispatch($media);
@@ -254,15 +258,16 @@ trait ManagesSlideMedia
     {
         // A Show's frame overlay is edited exactly like a slide's.
         $media = $slide->overlayMedia;
-        $disk = Storage::disk('public');
 
         $widgets = Widget::editorCatalog($media?->overlay_settings['widgets'] ?? []);
 
-        if (!$media || !$disk->exists($media->disk_path)) {
+        // A large raster overlay may have been offloaded: read it via the cache.
+        $path = $media?->localPath();
+        if (!$path) {
             return response()->json(['source' => null, 'overlay' => null, 'widgets' => $widgets]);
         }
 
-        $bytes = $disk->get($media->disk_path);
+        $bytes = file_get_contents($path);
 
         if ($media->mime_type !== 'image/svg+xml') {
             return response()->json(['source' => null, 'widgets' => $widgets, 'overlay' => [
@@ -335,7 +340,7 @@ trait ManagesSlideMedia
             ]);
         });
 
-        $disk->delete($old->flatMap(fn ($m) => array_filter([$m->disk_path, $m->thumbnail_path]))->all());
+        $old->each->deleteFiles();
 
         if ($slide instanceof Slide) {
             SyncOverlayThumbnail::dispatch($slide->id);

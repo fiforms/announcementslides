@@ -237,7 +237,7 @@ class SlideController extends Controller
             ])->deleteFileAfterSend(true);
         }
 
-        return Storage::disk('public')->download($media->disk_path, $media->titledDownloadName());
+        return $media->downloadResponse($media->titledDownloadName());
     }
 
     /**
@@ -262,7 +262,7 @@ class SlideController extends Controller
             default            => '',
         };
 
-        return Storage::disk('public')->download($media->disk_path, $media->titledDownloadName($suffix));
+        return $media->downloadResponse($media->titledDownloadName($suffix));
     }
 
     public function downloadZip(Request $request, OverlayCompositor $compositor)
@@ -289,8 +289,9 @@ class SlideController extends Controller
             if (! $media) {
                 continue;
             }
-            $fullPath = Storage::disk('public')->path($media->disk_path);
-            if (! file_exists($fullPath)) {
+            // Offloaded files are pulled into the local media cache.
+            $fullPath = $media->localPath();
+            if (! $fullPath) {
                 continue;
             }
             $name = $media->titledDownloadName();
@@ -335,7 +336,8 @@ class SlideController extends Controller
         }
 
         $path = sys_get_temp_dir() . '/slide-composite-' . Str::uuid() . '.jpg';
-        $ok   = $compositor->flatten(Storage::disk('public')->path($media->disk_path), $overlay, $path, quality: 92);
+        $base = $media->localPath();
+        $ok   = $base && $compositor->flatten($base, $overlay, $path, quality: 92);
 
         return $ok ? $path : null;
     }
@@ -411,14 +413,19 @@ class SlideController extends Controller
             // A slide may have no image: its overlay (and widget stand-ins) is
             // then drawn on black. With neither, there's nothing to export.
             $media = $slide->primaryMedia;
-            $fullPath = $media ? $disk->path($media->disk_path) : null;
+            $fullPath = $media && ! $media->isVideo() ? $media->localPath() : null;
 
-            // Videos aren't embedded yet — export a full-size still frame
-            // instead, falling back to the small listing thumbnail if ffmpeg
-            // can't produce one (and drawing no base if there's neither).
+            // Videos aren't embedded yet — export the stored full-size poster
+            // frame instead (GenerateThumbnail), else grab one with ffmpeg if
+            // the video is still local (never fetching an offloaded video
+            // just for this), else the small listing thumbnail (and no base
+            // if there's none of these).
             if ($media?->isVideo()) {
                 $framePath = sys_get_temp_dir() . '/slide-frame-' . Str::uuid() . '.jpg';
-                if ($frames->extract($fullPath, $framePath, logContext: ['slide_media_id' => $media->id])) {
+                if ($poster = $media->posterPath()) {
+                    $fullPath = $poster;
+                } elseif (! $media->isOffloaded() && ($video = $media->localPath())
+                    && $frames->extract($video, $framePath, logContext: ['slide_media_id' => $media->id])) {
                     $tempImages[] = $framePath;
                     $fullPath = $framePath;
                 } elseif ($media->thumbnail_path) {
