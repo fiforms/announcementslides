@@ -84,7 +84,10 @@ function formatBytes(bytes) {
                                 <td class="px-4 py-2 font-mono text-gray-900">{{ row.architecture }}</td>
                                 <td class="px-4 py-2">
                                     <template v-if="row.stable">
-                                        <a :href="row.stable.url" download class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                        <span v-if="row.stable.preparing" class="text-gray-700 font-medium">
+                                            v{{ row.stable.version }} <span class="text-gray-500 font-normal">({{ $t('slide_announcers.image_preparing') }})</span>
+                                        </span>
+                                        <a v-else :href="row.stable.url" download class="text-indigo-600 hover:text-indigo-800 font-medium">
                                             v{{ row.stable.version }}
                                         </a>
                                         <span class="text-gray-500"> &middot; {{ formatBytes(row.stable.file_size) }}</span>
@@ -93,7 +96,10 @@ function formatBytes(bytes) {
                                 </td>
                                 <td class="px-4 py-2">
                                     <template v-if="row.testing">
-                                        <a :href="row.testing.url" download class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                        <span v-if="row.testing.preparing" class="text-gray-700 font-medium">
+                                            v{{ row.testing.version }} <span class="text-gray-500 font-normal">({{ $t('slide_announcers.image_preparing') }})</span>
+                                        </span>
+                                        <a v-else :href="row.testing.url" download class="text-indigo-600 hover:text-indigo-800 font-medium">
                                             v{{ row.testing.version }}
                                         </a>
                                         <span class="text-gray-500"> &middot; {{ formatBytes(row.testing.file_size) }}</span>
@@ -134,7 +140,10 @@ function formatBytes(bytes) {
                                 <td class="px-4 py-2 font-mono text-gray-900">{{ row.architecture }}</td>
                                 <td v-for="channel in ['stable', 'testing']" :key="channel" class="px-4 py-2">
                                     <template v-if="row[channel]">
-                                        <a :href="row[channel].url" download class="text-indigo-600 hover:text-indigo-800 font-medium">
+                                        <span v-if="row[channel].preparing" class="text-gray-700 font-medium">
+                                            v{{ row[channel].version }} (VM) <span class="text-gray-500 font-normal">({{ $t('slide_announcers.image_preparing') }})</span>
+                                        </span>
+                                        <a v-else :href="row[channel].url" download class="text-indigo-600 hover:text-indigo-800 font-medium">
                                             v{{ row[channel].version }} (VM)
                                         </a>
                                         <span class="text-gray-500"> &middot; {{ formatBytes(row[channel].file_size) }}</span>

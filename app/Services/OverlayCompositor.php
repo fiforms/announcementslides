@@ -6,7 +6,6 @@ use App\Models\SlideMedia;
 use App\Models\Widget;
 use GdImage;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
@@ -46,8 +45,8 @@ class OverlayCompositor
         ?int $canvasHeight = null,
         int $quality = 85,
     ): bool {
-        $overlayPath = Storage::disk('public')->path($overlay->disk_path);
-        if (!file_exists($overlayPath) || ($basePath !== null && !file_exists($basePath))) {
+        $overlayPath = $overlay->localPath();
+        if (!$overlayPath || ($basePath !== null && !file_exists($basePath))) {
             return false;
         }
 

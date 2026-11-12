@@ -149,9 +149,8 @@ class ShowController extends Controller
         abort_if($show->is_main, 422, "The main show can't be deleted.");
 
         // The show's frame files go with it.
-        $disk = Storage::disk('public');
-        $show->media->each(function (SlideMedia $m) use ($disk) {
-            $disk->delete($m->allFilePaths());
+        $show->media->each(function (SlideMedia $m) {
+            $m->deleteFiles();
             $m->delete();
         });
         $show->delete();
@@ -210,8 +209,8 @@ class ShowController extends Controller
             'file_size'         => (int) $request->file_size,
             'mime_type'         => $request->mime_type,
         ]);
-        $old->each(function (SlideMedia $m) use ($disk) {
-            $disk->delete($m->allFilePaths());
+        $old->each(function (SlideMedia $m) {
+            $m->deleteFiles();
             $m->delete();
         });
 
@@ -242,9 +241,8 @@ class ShowController extends Controller
             throw ValidationException::withMessages(['url' => 'That is not a YouTube video or playlist link.']);
         }
 
-        $disk = Storage::disk('public');
-        $show->media()->where('media_type', 'show-base')->get()->each(function (SlideMedia $m) use ($disk) {
-            $disk->delete($m->allFilePaths());
+        $show->media()->where('media_type', 'show-base')->get()->each(function (SlideMedia $m) {
+            $m->deleteFiles();
             $m->delete();
         });
         $show->update(['frame_youtube' => $source + ['muted' => $request->boolean('muted')]]);
@@ -257,7 +255,7 @@ class ShowController extends Controller
         abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
         abort_unless($media->show_id === $show->id, 404);
 
-        Storage::disk('public')->delete($media->allFilePaths());
+        $media->deleteFiles();
         $media->delete();
 
         return back()->with('success', 'Removed.');

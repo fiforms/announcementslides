@@ -57,13 +57,22 @@ x-settings: &settings
   # GOOGLE_CLIENT_ID: your-client-id
   # GOOGLE_CLIENT_SECRET: your-client-secret
 
-  # S3-compatible file storage instead of the local volume.
-  # FILESYSTEM_DISK: s3
-  # AWS_ACCESS_KEY_ID: key
-  # AWS_SECRET_ACCESS_KEY: secret
-  # AWS_DEFAULT_REGION: us-east-1
-  # AWS_BUCKET: my-bucket
-  # AWS_ENDPOINT: https://s3.example.com
+  # Move large files (videos, big images, PDFs, Slide Announcer updates) to
+  # Cloudflare R2, which has no download (egress) fees, and serve them from
+  # there. SVGs, thumbnails and small files stay on this server. Leave this
+  # off to keep everything here. Setup: INSTALLING.md, "Offloading large
+  # files to Cloudflare R2". Existing files: `php artisan media:offload`.
+  # MEDIA_OFFLOAD_DISK: r2
+  # R2_ACCOUNT_ID: your-cloudflare-account-id
+  # R2_ACCESS_KEY_ID: key
+  # R2_SECRET_ACCESS_KEY: secret
+  # R2_BUCKET: announcementslides-media
+  # R2_PUBLIC_URL: https://media.example.org   # the bucket's custom domain
+  # MEDIA_OFFLOAD_MIN_BYTES: 1048576           # files smaller than this stay here
+  # MEDIA_OFFLOAD_RELEASES: "true"             # also Slide Announcer update files
+  # MEDIA_RELEASES_WAIT_FOR_OFFLOAD: "true"    # hold releases back from devices until on R2
+  # MEDIA_CACHE_MAX_BYTES: 2147483648          # local cache of files pulled back for exports
+  # MEDIA_CACHE_MIN_AGE: 60                    # minutes a cached file is kept after use
 
   # Backups (Admin > Backups, `php artisan backup:create`). Defaults shown.
   # A database backup is taken daily, and before an update applies migrations.

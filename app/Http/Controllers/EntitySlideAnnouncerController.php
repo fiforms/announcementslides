@@ -12,7 +12,6 @@ use App\Models\SlideAnnouncerRelease;
 use App\Support\SlideAnnouncerVideoReceiver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -94,11 +93,11 @@ class EntitySlideAnnouncerController extends Controller
     {
         return [
             'version' => $release->version,
-            'url' => $release->url(),
+            // Null while the image is still being copied to the offload disk.
+            'url' => $release->awaitingOffload() ? null : $release->url(),
+            'preparing' => $release->awaitingOffload(),
             'sha256' => $release->sha256,
-            'file_size' => Storage::disk('public')->exists($release->disk_path)
-                ? Storage::disk('public')->size($release->disk_path)
-                : null,
+            'file_size' => $release->fileSize(),
             'created_at' => $release->created_at->toIso8601String(),
         ];
     }

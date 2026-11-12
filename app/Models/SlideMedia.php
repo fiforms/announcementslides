@@ -5,17 +5,23 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Facades\Storage;
+use App\Support\MediaStore;
+use Symfony\Component\HttpFoundation\Response;
 
 class SlideMedia extends Model
 {
     protected $table = 'slide_media';
 
     protected $fillable = [
-        'slide_id', 'show_id', 'media_type', 'filename', 'original_filename', 'disk_path',
-        'file_size', 'mime_type', 'thumbnail_path', 'image_width', 'image_height',
+        'slide_id', 'show_id', 'media_type', 'filename', 'original_filename', 'disk_path', 'disk',
+        'file_size', 'mime_type', 'thumbnail_path', 'poster_path', 'image_width', 'image_height',
         'validation_issues', 'validation_status', 'overlay_settings', 'sort_order',
         'variants', 'active_variant',
+    ];
+
+    /** New rows start local; OffloadMedia moves them (mirrors the column default). */
+    protected $attributes = [
+        'disk' => MediaStore::LOCAL,
     ];
 
     protected function casts(): array
@@ -42,14 +48,86 @@ class SlideMedia extends Model
         return $this->belongsTo(Show::class);
     }
 
+    // ── Storage (see MediaStore and "Storage tiers" in ARCHITECTURE.md) ─────
+    //
+    // `disk_path` lives on `disk` (local `public`, or an offload disk such as
+    // R2 once OffloadMedia has moved it). Thumbnails and video posters are
+    // small and always stay on `public`.
+
     public function getFileUrlAttribute(): string
     {
-        return Storage::disk('public')->url($this->disk_path);
+        return app(MediaStore::class)->url($this->disk, $this->disk_path);
     }
 
     public function getThumbnailUrlAttribute(): ?string
     {
-        return $this->thumbnail_path ? Storage::disk('public')->url($this->thumbnail_path) : null;
+        return $this->thumbnail_path ? app(MediaStore::class)->url(MediaStore::LOCAL, $this->thumbnail_path) : null;
+    }
+
+    /** A real path to the file for server-side processing (cached if offloaded), or null if missing. */
+    public function localPath(): ?string
+    {
+        return app(MediaStore::class)->localPath($this->disk, $this->disk_path);
+    }
+
+    /** A local path to the video's full-size poster frame, if one is stored. */
+    public function posterPath(): ?string
+    {
+        return app(MediaStore::class)->localPath(MediaStore::LOCAL, $this->poster_path);
+    }
+
+    public function fileExists(): bool
+    {
+        return app(MediaStore::class)->exists($this->disk, $this->disk_path);
+    }
+
+    public function isOffloaded(): bool
+    {
+        return !app(MediaStore::class)->isLocal($this->disk);
+    }
+
+    /** The file as an attachment download (a signed redirect if offloaded). */
+    public function downloadResponse(string $name, array $headers = []): Response
+    {
+        return app(MediaStore::class)->download($this->disk, $this->disk_path, $name, $headers);
+    }
+
+    /** Deletes every file this row owns (all versions, thumbnails, posters) from wherever each lives. */
+    public function deleteFiles(): void
+    {
+        foreach ($this->versions() as $version) {
+            static::deleteVersionFiles($version);
+        }
+    }
+
+    /** Deletes one version snapshot's files (see VERSION_FIELDS). */
+    public static function deleteVersionFiles(array $version): void
+    {
+        $store = app(MediaStore::class);
+        $store->delete($version['disk'] ?? MediaStore::LOCAL, $version['disk_path'] ?? null);
+        $store->delete(MediaStore::LOCAL, array_filter([
+            $version['thumbnail_path'] ?? null,
+            $version['poster_path'] ?? null,
+        ]));
+    }
+
+    /**
+     * Every version of the file this row holds: the active one first, then
+     * the stored variants (keyed by name), each as a VERSION_FIELDS snapshot.
+     * Versions sharing a file are listed once.
+     *
+     * @return array<string, array>
+     */
+    public function versions(): array
+    {
+        $versions = ['current' => $this->currentVersion()];
+        foreach ($this->variants ?? [] as $name => $v) {
+            if (($v['disk_path'] ?? null) !== $this->disk_path) {
+                $versions[$name] = $v + ['disk' => MediaStore::LOCAL];
+            }
+        }
+
+        return $versions;
     }
 
     public function isImage(): bool
@@ -66,8 +144,8 @@ class SlideMedia extends Model
 
     /** The columns that describe a version of the file (see the variants migration). */
     public const VERSION_FIELDS = [
-        'filename', 'original_filename', 'disk_path', 'file_size', 'mime_type',
-        'thumbnail_path', 'image_width', 'image_height', 'validation_issues', 'validation_status',
+        'filename', 'original_filename', 'disk_path', 'disk', 'file_size', 'mime_type',
+        'thumbnail_path', 'poster_path', 'image_width', 'image_height', 'validation_issues', 'validation_status',
     ];
 
     /** Whether the browser may be asked to resize (upscale/downscale) this file (not GIF/SVG/video/PDF). */
@@ -106,7 +184,11 @@ class SlideMedia extends Model
             $variants[$this->active_variant] = $this->currentVersion() + $variants[$this->active_variant];
         }
 
+        // Snapshots taken before storage tiers have no disk/poster: local, none.
         $this->forceFill(Arr::only($variants[$which], self::VERSION_FIELDS) + [
+            'disk'           => MediaStore::LOCAL,
+            'poster_path'    => null,
+        ] + [
             'variants'       => $variants,
             'active_variant' => $which,
         ])->save();
@@ -179,15 +261,4 @@ class SlideMedia extends Model
         return $this->variants['resized']['kind'] ?? null;
     }
 
-    /** Every file this row owns: both versions' files and thumbnails. */
-    public function allFilePaths(): array
-    {
-        $paths = [$this->disk_path, $this->thumbnail_path];
-        foreach ($this->variants ?? [] as $v) {
-            $paths[] = $v['disk_path'] ?? null;
-            $paths[] = $v['thumbnail_path'] ?? null;
-        }
-
-        return array_values(array_unique(array_filter($paths)));
-    }
 }

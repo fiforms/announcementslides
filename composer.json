@@ -13,6 +13,7 @@
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.27",
         "laravel/tinker": "^3.0",
+        "league/flysystem-aws-s3-v3": "^3.0",
         "phpoffice/phppresentation": "^1.2",
         "sabre/vobject": "^4.5",
         "symfony/dom-crawler": "^8.1",

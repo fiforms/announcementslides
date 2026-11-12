@@ -285,9 +285,40 @@ class BackupService
             'latest_migration' => $this->latestMigration(),
             'files'            => $backup->mode === Backup::MODE_FULL ? ['public' => $files['public'], 'private' => $files['private']] : null,
             'files_skipped'    => $skipped,
+            // Files on an offload disk (e.g. R2) are not in the archive; the
+            // database still points at them, so they must be kept there.
+            'offloaded_files'  => $backup->mode === Backup::MODE_FULL ? $this->offloadedSummary() : null,
             'app_key_included' => false,
             'app_key_fingerprint' => $this->keyFingerprint(),
         ];
+    }
+
+    /**
+     * Media and release files living on a non-local disk, per disk:
+     * {disk: {count, bytes}}. Empty when nothing is offloaded (or before the
+     * storage-tier migration has run, e.g. for a pre-migrate backup).
+     */
+    private function offloadedSummary(): array
+    {
+        $summary = [];
+        try {
+            foreach (['slide_media' => 'file_size', 'slide_announcer_releases' => null] as $table => $sizeColumn) {
+                if (! Schema::hasColumn($table, 'disk')) {
+                    continue;
+                }
+                $rows = DB::table($table)->where('disk', '!=', 'public')
+                    ->selectRaw('disk, count(*) as n'.($sizeColumn ? ", sum({$sizeColumn}) as bytes" : ''))
+                    ->groupBy('disk')->get();
+                foreach ($rows as $row) {
+                    $summary[$row->disk]['count'] = ($summary[$row->disk]['count'] ?? 0) + (int) $row->n;
+                    $summary[$row->disk]['bytes'] = ($summary[$row->disk]['bytes'] ?? 0) + (int) ($row->bytes ?? 0);
+                }
+            }
+        } catch (Throwable) {
+            // Informational only: never fail a backup over it.
+        }
+
+        return $summary;
     }
 
     /** Add a directory tree uncompressed; returns the file count. */

@@ -72,7 +72,6 @@ class RevelationSnapshotBuilder
      */
     public function build(Collection $slides, string $title, ?array $location = null, ?int $slideDelaySeconds = null): string
     {
-        $disk  = Storage::disk('public');
         $total = $slides->count();
 
         /** @var array<string, string> entry name => absolute source path */
@@ -85,8 +84,11 @@ class RevelationSnapshotBuilder
             // (with its widgets); one with neither has nothing to show.
             $media   = $slide->primaryMedia;
             $overlay = $slide->overlayMedia;
-            $hasBase    = $media && file_exists($disk->path($media->disk_path));
-            $hasOverlay = $overlay && file_exists($disk->path($overlay->disk_path));
+            // Real paths; offloaded files come from the local media cache.
+            $basePath    = $media?->localPath();
+            $overlayPath = $overlay?->localPath();
+            $hasBase    = $basePath !== null;
+            $hasOverlay = $overlayPath !== null;
             if (! $hasBase && ! $hasOverlay) {
                 continue;
             }
@@ -95,7 +97,7 @@ class RevelationSnapshotBuilder
             if ($hasBase) {
                 $media->setRelation('slide', $slide);
                 $baseName = self::entryName($position, $total, $media->titledDownloadName($hasOverlay ? 'Background' : ''));
-                $files[$baseName] = $disk->path($media->disk_path);
+                $files[$baseName] = $basePath;
             }
             if (! $hasOverlay) {
                 $sections[] = $this->image('fill', $baseName);
@@ -104,7 +106,7 @@ class RevelationSnapshotBuilder
 
             $overlay->setRelation('slide', $slide);
             $overlayName = self::entryName($position, $total, $overlay->titledDownloadName('Overlay'));
-            $files[$overlayName] = $disk->path($overlay->disk_path);
+            $files[$overlayName] = $overlayPath;
 
             $section = $hasBase
                 ? $this->image('fill:background', $baseName) . "\n\n" . $this->image('fill', $overlayName)

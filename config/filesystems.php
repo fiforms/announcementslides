@@ -60,6 +60,23 @@ return [
             'report' => false,
         ],
 
+        // Cloudflare R2 (S3-compatible, no egress fees): the optional offload
+        // tier for large media and Slide Announcer releases. Always defined,
+        // so files already offloaded keep resolving even if offloading is
+        // later switched off (MEDIA_OFFLOAD_DISK). See config/media.php.
+        'r2' => [
+            'driver' => 's3',
+            'key' => env('R2_ACCESS_KEY_ID'),
+            'secret' => env('R2_SECRET_ACCESS_KEY'),
+            'region' => 'auto',
+            'bucket' => env('R2_BUCKET'),
+            'url' => env('R2_PUBLIC_URL'),
+            'endpoint' => env('R2_ENDPOINT', env('R2_ACCOUNT_ID') ? 'https://'.env('R2_ACCOUNT_ID').'.r2.cloudflarestorage.com' : null),
+            'use_path_style_endpoint' => true,
+            'throw' => true,
+            'report' => false,
+        ],
+
     ],
 
     /*

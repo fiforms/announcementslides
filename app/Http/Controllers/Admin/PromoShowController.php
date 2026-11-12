@@ -8,7 +8,6 @@ use App\Models\Slide;
 use App\Models\SlideMedia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -92,10 +91,9 @@ class PromoShowController extends Controller
      */
     public function destroy(GlobalShowTemplate $promo)
     {
-        $disk = Storage::disk('public');
         SlideMedia::whereIn('show_id', $promo->shows()->withTrashed()->select('id'))
-            ->each(function (SlideMedia $m) use ($disk) {
-                $disk->delete($m->allFilePaths());
+            ->each(function (SlideMedia $m) {
+                $m->deleteFiles();
                 $m->delete();
             });
 

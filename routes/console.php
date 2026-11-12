@@ -14,6 +14,10 @@ Artisan::command('inspire', function () {
 // this app, so this is new infrastructure, not just a new command.
 Schedule::command('shows:prune-empty')->daily();
 
+// Keeps the local cache of offloaded media (config/media.php) near its size
+// target. A no-op when nothing has been offloaded.
+Schedule::command('media:prune-cache')->everyFifteenMinutes()->withoutOverlapping();
+
 // Database-only backups (see config/backup.php). Full backups are started by hand.
 $backupDriver = config('database.connections.'.config('database.default').'.driver');
 
