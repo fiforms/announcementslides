@@ -50,6 +50,15 @@ return [
     'download_url_minutes' => (int) env('MEDIA_DOWNLOAD_URL_MINUTES', 30),
 
     /*
+     * Deleted offloaded files are moved under this key prefix in the bucket
+     * instead of being deleted, so restoring an older backup still finds them
+     * (`media:verify --restore-trash`). Add an R2 lifecycle rule that deletes
+     * objects under this prefix after longer than you keep backups (e.g. 60
+     * days); see INSTALLING.md. Empty = delete immediately.
+     */
+    'trash_prefix' => env('MEDIA_TRASH_PREFIX', 'trash/'),
+
+    /*
      * Local copies of offloaded files pulled back for server-side work (ZIP
      * and REVELation exports, compositing, resize checks). Least recently
      * used files are evicted once the cache is over max_bytes, but never a

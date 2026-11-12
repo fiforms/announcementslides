@@ -74,6 +74,33 @@ class MediaStore
         return false;
     }
 
+    /** Key prefix deleted offloaded files are moved under ('' = delete outright). */
+    public function trashPrefix(): string
+    {
+        $prefix = trim((string) config('media.trash_prefix'), '/');
+
+        return $prefix === '' ? '' : $prefix . '/';
+    }
+
+    /** Whether $path on remote $disk is sitting in the trash (deleted, not yet purged). */
+    public function inTrash(string $disk, string $path): bool
+    {
+        $trash = $this->trashPrefix();
+
+        return $trash !== '' && !$this->isLocal($disk) && $this->disk($disk)->exists($trash . $path);
+    }
+
+    /** Moves $path on remote $disk back out of the trash. */
+    public function restoreFromTrash(string $disk, string $path): bool
+    {
+        if (!$this->inTrash($disk, $path)) {
+            return false;
+        }
+        $this->disk($disk)->move($this->trashPrefix() . $path, $path);
+
+        return $this->disk($disk)->exists($path);
+    }
+
     public function url(?string $disk, string $path): string
     {
         return $this->disk($disk)->url($path);
@@ -206,7 +233,13 @@ class MediaStore
         return $this->disk(self::LOCAL)->size($path) === $expected;
     }
 
-    /** Deletes files from a disk, and any cached copy of them. */
+    /**
+     * Deletes files from a disk, and any cached copy of them. On a remote
+     * (offload) disk with a trash prefix configured (`media.trash_prefix`),
+     * files are moved under that prefix instead, a server-side copy, so a
+     * restored older backup can still find them (`media:verify
+     * --restore-trash`). An R2 lifecycle rule on the prefix purges them later.
+     */
     public function delete(?string $disk, array|string $paths): void
     {
         $paths = array_values(array_filter((array) $paths));
@@ -214,10 +247,23 @@ class MediaStore
             return;
         }
 
-        try {
-            $this->disk($disk)->delete($paths);
-        } catch (Throwable $e) {
-            Log::warning('Media delete failed', ['disk' => $disk, 'paths' => $paths, 'error' => $e->getMessage()]);
+        $trash = $this->isLocal($disk) ? '' : $this->trashPrefix();
+        if ($trash !== '') {
+            foreach ($paths as $path) {
+                try {
+                    if ($this->disk($disk)->exists($path)) {
+                        $this->disk($disk)->move($path, $trash . $path);
+                    }
+                } catch (Throwable $e) {
+                    Log::warning('Media move to trash failed', ['disk' => $disk, 'path' => $path, 'error' => $e->getMessage()]);
+                }
+            }
+        } else {
+            try {
+                $this->disk($disk)->delete($paths);
+            } catch (Throwable $e) {
+                Log::warning('Media delete failed', ['disk' => $disk, 'paths' => $paths, 'error' => $e->getMessage()]);
+            }
         }
 
         if (!$this->isLocal($disk)) {
