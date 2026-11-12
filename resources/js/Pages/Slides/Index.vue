@@ -22,6 +22,10 @@ const props = defineProps({
     frame: { type: Object, default: null },
     availableShows: { type: Array, default: () => [] },
     initialSlide: { type: Object, default: null },
+    // Media larger than this is left out of ZIP downloads (0 = no limit).
+    zipMaxMediaBytes: { type: Number, default: 0 },
+    // Media larger than this is linked, not embedded, in .revel downloads.
+    revelationLinkMediaBytes: { type: Number, default: 0 },
 });
 
 // The Main Show / Global Board are system shows: their names are translated
@@ -84,7 +88,24 @@ const selectedTokens = () => props.slides.filter(s => selectedIds.value.has(s.id
 
 const hasSelection = computed(() => selectedIds.value.size > 0);
 
+// Slides with large media that a download handles specially, shown as a
+// notice when the download starts. The server applies the same size rules:
+// a ZIP leaves them out (and lists them in the archive); a .revel links them
+// through REVELation's media library instead of embedding them.
+const largeMedia = ref({ kind: null, slides: [], max: 0 });
+
+function noteLargeMedia(kind, list) {
+    const max = kind === 'zip' ? props.zipMaxMediaBytes : props.revelationLinkMediaBytes;
+    const slides = max > 0 ? list.filter(s => (s.file_size ?? 0) > max) : [];
+    largeMedia.value = { kind: slides.length ? kind : null, slides, max };
+}
+
+function formatMegabytes(bytes) {
+    return `${Math.round(bytes / 1024 / 1024 * 10) / 10} MB`;
+}
+
 function downloadSelected() {
+    noteLargeMedia('zip', props.slides.filter(s => selectedIds.value.has(s.id)));
     const ids = selectedTokens();
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
@@ -94,6 +115,7 @@ function downloadSelected() {
 }
 
 function downloadAll() {
+    noteLargeMedia('zip', props.slides);
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showToken) params.append('show', props.showToken);
@@ -137,6 +159,7 @@ function startRevelationDownload(url) {
 }
 
 function downloadRevelationSelected() {
+    noteLargeMedia('revel', props.slides.filter(s => selectedIds.value.has(s.id)));
     const ids = selectedTokens();
     const params = new URLSearchParams();
     if (ids) params.append('ids', ids);
@@ -146,6 +169,7 @@ function downloadRevelationSelected() {
 }
 
 function downloadRevelationAll() {
+    noteLargeMedia('revel', props.slides);
     const params = new URLSearchParams();
     params.append('language', currentLanguageCode.value);
     if (props.showToken) params.append('show', props.showToken);
@@ -328,6 +352,24 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
                 </template>
                 </div>
             </div>
+        </div>
+
+        <div v-if="largeMedia.kind" role="status"
+            class="mb-4 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <svg class="mt-0.5 h-5 w-5 flex-none text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008zM10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+            </svg>
+            <div class="flex-1">
+                <p class="font-medium">{{ $t(`slides.${largeMedia.kind}_large_media`, { count: largeMedia.slides.length, size: formatMegabytes(largeMedia.max) }, largeMedia.slides.length) }}</p>
+                <p class="mt-1">{{ largeMedia.slides.map(s => s.title).join(', ') }}</p>
+                <p class="mt-1 text-amber-800">{{ $t(`slides.${largeMedia.kind}_large_media_hint`) }}</p>
+            </div>
+            <button type="button" @click="largeMedia = { kind: null, slides: [], max: 0 }" :aria-label="$t('slides.dismiss')"
+                class="flex-none rounded p-1 text-amber-700 hover:bg-amber-100">
+                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
         </div>
 
         <!-- Grid -->
