@@ -135,6 +135,8 @@ class SlideController extends Controller
             'selectedLanguage' => $languageCode,
             'entityId' => $entityId,
             'showToken' => $selectedShow?->token,
+            'zipMaxMediaBytes' => (int) config('slides.zip_max_media_bytes'),
+            'revelationLinkMediaBytes' => (int) config('slides.revelation_link_media_bytes'),
             'promoToken' => $promo?->token,
             'frame' => $frame,
             'availableShows' => $availableShows,
@@ -284,9 +286,17 @@ class SlideController extends Controller
 
         $position   = 0;
         $tempImages = [];
+        $excluded   = [];
+        $maxBytes   = (int) config('slides.zip_max_media_bytes');
         foreach ($slides as $slide) {
             $media = $slide->primaryMedia;
             if (! $media) {
+                continue;
+            }
+            // Large media (videos, mostly) is listed rather than included, and
+            // checked before localPath() so an offloaded one is never fetched.
+            if ($maxBytes > 0 && $media->file_size > $maxBytes) {
+                $excluded[] = $slide;
                 continue;
             }
             // Offloaded files are pulled into the local media cache.
@@ -308,6 +318,10 @@ class SlideController extends Controller
             $zip->addFile($fullPath, RevelationSnapshotBuilder::entryName(++$position, $slides->count(), $name));
         }
 
+        if ($excluded) {
+            $zip->addFromString('Large files not included.txt', $this->zipExclusionNote($excluded, $maxBytes));
+        }
+
         // The archive reads the files at close(), so they go afterwards.
         try {
             $zip->close();
@@ -320,6 +334,39 @@ class SlideController extends Controller
         return response()->download($tmpFile, 'announcement-slides.zip', [
             'Content-Type' => 'application/zip',
         ])->deleteFileAfterSend(true);
+    }
+
+    /**
+     * The text file added to a ZIP in place of slides whose media is over the
+     * size cutoff: each slide's title, file size and link, from which its file
+     * can be downloaded on its own.
+     */
+    private function zipExclusionNote(array $slides, int $maxBytes): string
+    {
+        $lines = [
+            'These slides have large media files (over ' . $this->humanBytes($maxBytes) . ') and are not included in this ZIP.',
+            'Open a slide\'s link to view it or download its file on its own.',
+            '',
+        ];
+        foreach ($slides as $slide) {
+            $lines[] = sprintf('- %s (%s)', $slide->title ?: $slide->primaryMedia->downloadName(), $this->humanBytes($slide->primaryMedia->file_size));
+            $lines[] = '  ' . route('slides.show', $slide->token);
+        }
+
+        return implode("\r\n", $lines) . "\r\n";
+    }
+
+    private function humanBytes(int $bytes): string
+    {
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $i = 0;
+        $value = (float) $bytes;
+        while ($value >= 1024 && $i < count($units) - 1) {
+            $value /= 1024;
+            $i++;
+        }
+
+        return ($i === 0 ? $value : round($value, 1)) . ' ' . $units[$i];
     }
 
     /**
@@ -611,6 +658,8 @@ class SlideController extends Controller
             'publish_at'        => $slide->publish_at?->toIso8601String(),
             'expires_at'        => $slide->expires_at?->toIso8601String(),
             'original_filename' => $slide->original_filename,
+            // Lets the page warn which slides a ZIP download will leave out.
+            'file_size'         => $slide->primaryMedia?->file_size,
             'validation_issues' => $slide->validation_issues,
             'validation_status' => $slide->validation_status,
             'entity_id'         => $slide->entity_id,

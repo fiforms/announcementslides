@@ -28,6 +28,15 @@ use ZipArchive;
  * it when changing the layout, manifest or the file types we package.
  *
  * A slide's overlay widgets follow its overlay as `:widget:` YAML blocks.
+ *
+ * A base file larger than `slides.revelation_link_media_bytes` (typically a
+ * video) is not embedded. It becomes a `media:` alias in the front matter
+ * whose `url_direct` is the file's public URL (on R2 when offloaded), and the
+ * slide references `media:<alias>`. When the file is opened, REVELation offers
+ * to download it into the user's media library and links it there, so this
+ * server never handles the video again, and the user downloads it once
+ * however many decks use it. `filename` is our UUID file name: a plain,
+ * unique basename that REVELation never overwrites in the library.
  */
 class RevelationSnapshotBuilder
 {
@@ -78,16 +87,20 @@ class RevelationSnapshotBuilder
         $files    = [];
         $sections = [];
         $position = 0;
+        /** @var array<string, array> front-matter media alias => fields */
+        $mediaLibrary = [];
 
         foreach ($slides as $slide) {
             // A slide may have no image: it is exported if it has an overlay
             // (with its widgets); one with neither has nothing to show.
             $media   = $slide->primaryMedia;
             $overlay = $slide->overlayMedia;
+            // Large base media is linked (media library), never fetched here.
+            $linkBase = $media && $this->linksToLibrary($media);
             // Real paths; offloaded files come from the local media cache.
-            $basePath    = $media?->localPath();
+            $basePath    = $linkBase ? null : $media?->localPath();
             $overlayPath = $overlay?->localPath();
-            $hasBase    = $basePath !== null;
+            $hasBase    = $linkBase || $basePath !== null;
             $hasOverlay = $overlayPath !== null;
             if (! $hasBase && ! $hasOverlay) {
                 continue;
@@ -96,8 +109,14 @@ class RevelationSnapshotBuilder
 
             if ($hasBase) {
                 $media->setRelation('slide', $slide);
-                $baseName = self::entryName($position, $total, $media->titledDownloadName($hasOverlay ? 'Background' : ''));
-                $files[$baseName] = $basePath;
+                if ($linkBase) {
+                    $alias = sprintf('slide_%0' . max(3, strlen((string) $total)) . 'd', $position);
+                    $mediaLibrary[$alias] = $this->libraryItem($slide, $media);
+                    $baseName = "media:{$alias}";
+                } else {
+                    $baseName = self::entryName($position, $total, $media->titledDownloadName($hasOverlay ? 'Background' : ''));
+                    $files[$baseName] = $basePath;
+                }
             }
             if (! $hasOverlay) {
                 $sections[] = $this->image('fill', $baseName);
@@ -119,12 +138,13 @@ class RevelationSnapshotBuilder
             $sections[] = $section;
         }
 
-        if (! $files) {
+        if (! $sections) {
             throw new RuntimeException('No slides to export.');
         }
 
         $generated = [
-            'presentation.md' => $this->frontMatter($title, $slideDelaySeconds ?? (int) config('slides.slide_delay_seconds')) . implode("\n\n---\n\n", $sections),
+            'presentation.md' => $this->frontMatter($title, $slideDelaySeconds ?? (int) config('slides.slide_delay_seconds'), $mediaLibrary)
+                . implode("\n\n---\n\n", $sections),
             'style.css'       => "/* Add custom styles here */\n",
         ];
 
@@ -151,6 +171,28 @@ class RevelationSnapshotBuilder
         $zip->close();
 
         return $tmpFile;
+    }
+
+    /** Whether $media is big enough to be linked through the media library instead of embedded. */
+    private function linksToLibrary(\App\Models\SlideMedia $media): bool
+    {
+        $max = (int) config('slides.revelation_link_media_bytes');
+
+        return $max > 0 && (int) $media->file_size > $max;
+    }
+
+    /** The front-matter `media:` entry for a linked base file. */
+    private function libraryItem(Slide $slide, \App\Models\SlideMedia $media): array
+    {
+        $type = strtok((string) $media->mime_type, '/');
+
+        return array_filter([
+            'filename'    => basename($media->disk_path),
+            'title'       => $media->titledDownloadName(),
+            'mediatype'   => in_array($type, ['video', 'image', 'audio'], true) ? $type : null,
+            'description' => $slide->text_description ?: $slide->title,
+            'url_direct'  => $media->file_url,
+        ], fn ($v) => $v !== null && $v !== '');
     }
 
     private function image(string $alt, string $filename): string
@@ -210,10 +252,22 @@ class RevelationSnapshotBuilder
         };
     }
 
-    private function frontMatter(string $title, int $slideDelaySeconds): string
+    private function frontMatter(string $title, int $slideDelaySeconds, array $mediaLibrary = []): string
     {
         $date      = now()->toDateString();
         $autoSlide = $slideDelaySeconds * 1000;
+
+        $media = '';
+        if ($mediaLibrary) {
+            $lines = ['media:'];
+            foreach ($mediaLibrary as $alias => $fields) {
+                $lines[] = "  {$alias}:";
+                foreach ($fields as $key => $value) {
+                    $lines[] = "    {$key}: " . $this->yaml((string) $value, multiline: true);
+                }
+            }
+            $media = implode("\n", $lines) . "\n";
+        }
 
         return <<<YAML
         ---
@@ -239,7 +293,7 @@ class RevelationSnapshotBuilder
           autoSlideStoppable: false
         confidence: {}
         version: 1.0.13
-        ---
+        {$media}---
 
         YAML;
     }

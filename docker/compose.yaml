@@ -74,6 +74,13 @@ x-settings: &settings
   # MEDIA_CACHE_MAX_BYTES: 2147483648          # local cache of files pulled back for exports
   # MEDIA_CACHE_MIN_AGE: 60                    # minutes a cached file is kept after use
 
+  # Slides with files larger than this (bytes, typically videos) are left out of
+  # "Download (.zip)" and listed in the archive instead. 0 = no limit.
+  # ZIP_MAX_MEDIA_BYTES: 10485760
+  # REVELation downloads link media larger than this (bytes) instead of
+  # embedding it; REVELation downloads it into its media library. 0 = embed.
+  # REVELATION_LINK_MEDIA_BYTES: 10485760
+
   # Backups (Admin > Backups, `php artisan backup:create`). Defaults shown.
   # A database backup is taken daily, and before an update applies migrations.
   # BACKUP_SCHEDULE: daily            # off | daily | weekly (weekly = Sundays)

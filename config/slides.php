@@ -42,6 +42,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | ZIP download size cutoff
+    |--------------------------------------------------------------------------
+    |
+    | A slide whose file is larger than this (in bytes; typically a video) is
+    | left out of "Download (.zip)" archives. The archive lists it instead, with
+    | a link to download it on its own, and the slides page warns about it when
+    | the download starts. This keeps bulk downloads small and avoids pulling
+    | big offloaded files back to this server just to zip them. 0 = no limit.
+    |
+    */
+    'zip_max_media_bytes' => (int) env('ZIP_MAX_MEDIA_BYTES', 10 * 1024 * 1024),
+
+    /*
+    |--------------------------------------------------------------------------
+    | REVELation media-library cutoff
+    |--------------------------------------------------------------------------
+    |
+    | A slide's base file larger than this (bytes, typically a video) is not
+    | embedded in a .revel download. It is listed in the presentation's `media:`
+    | front matter with its public URL (`url_direct`) instead, and REVELation
+    | offers to download it into the user's media library when the file is
+    | opened. 0 = always embed. Defaults to the ZIP cutoff.
+    |
+    */
+    'revelation_link_media_bytes' => (int) env('REVELATION_LINK_MEDIA_BYTES', env('ZIP_MAX_MEDIA_BYTES', 10 * 1024 * 1024)),
+
+    /*
+    |--------------------------------------------------------------------------
     | rsvg-convert binary
     |--------------------------------------------------------------------------
     |
