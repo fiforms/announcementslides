@@ -110,8 +110,10 @@ you start yourself (web or CLI) are never pruned automatically.
 The archive does **not** contain the `APP_KEY`. Without it a restored site works, but
 everyone has to sign in again and widget API keys (Admin → Widgets) must be re-entered;
 nothing else is encrypted. Keep `APP_KEY` (or `storage/app/.app_key`) if you want a seamless move.
-Full backups skip files offloaded to R2 (the manifest's `offloaded_files` counts them; use
-R2 bucket versioning or replication for those).
+Backups skip files offloaded to R2. The manifest lists them (`offloaded_objects`), and the
+bucket is backed up separately with rclone. See
+[Backing up and restoring with R2](../INSTALLING.md#backing-up-and-restoring-with-r2), which also
+covers restoring (`media:verify`, `media:localize --relink`).
 
 ### Restoring
 
