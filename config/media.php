@@ -59,6 +59,18 @@ return [
     'trash_prefix' => env('MEDIA_TRASH_PREFIX', 'trash/'),
 
     /*
+     * Purging archived media (media:purge-archived): offloaded files of slides
+     * that expired, or were deleted, more than `purge_archived_days` ago are
+     * removed from the bucket (moved to the trash above), keeping the database
+     * rows, thumbnails and posters. Back the bucket up with rclone first: the
+     * offline copy is then the only full copy. Un-archiving a slide brings its
+     * files back while they are still in the bucket or its trash. The command
+     * always works by hand; MEDIA_PURGE_ARCHIVED=true also runs it daily.
+     */
+    'purge_archived' => (bool) env('MEDIA_PURGE_ARCHIVED', false),
+    'purge_archived_days' => (int) env('MEDIA_PURGE_ARCHIVED_DAYS', 180),
+
+    /*
      * Local copies of offloaded files pulled back for server-side work (ZIP
      * and REVELation exports, compositing, resize checks). Least recently
      * used files are evicted once the cache is over max_bytes, but never a
