@@ -363,6 +363,7 @@ trait ManagesSlideMedia
             'mime_type'         => $m->mime_type,
             'original_filename' => $m->original_filename,
             'file_size'         => $m->file_size,
+            'purged'            => $m->isPurged(),
             'validation_status' => $m->validation_status,
             'image_width'       => $m->image_width,
             'image_height'      => $m->image_height,

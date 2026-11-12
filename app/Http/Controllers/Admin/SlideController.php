@@ -254,6 +254,11 @@ class SlideController extends Controller
     {
         $slide->update(['expires_at' => null]);
 
+        // The saved hook brings back purged media still in the bucket or its trash.
+        if ($slide->hasPurgedMedia()) {
+            return back()->with('error', 'Slide restored, but some of its media was purged from storage after archiving and is still missing. Restore it from the backup (media:purge-archived --restore after uploading the backup to the bucket).');
+        }
+
         return back()->with('success', 'Slide restored.');
     }
 

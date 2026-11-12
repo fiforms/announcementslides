@@ -28,8 +28,11 @@ class MediaInventory
 
         foreach (SlideMedia::query()->orderBy('id')->lazyById(500) as $media) {
             $owner = "slide_media #{$media->id}";
+            // Purged files are intentionally gone from the bucket (kept in
+            // offline backups only); their thumbnails and posters remain.
+            $purged = $tiered && $media->isPurged();
             foreach ($media->versions() as $version) {
-                if (!empty($version['disk_path'])) {
+                if (!empty($version['disk_path']) && !$purged) {
                     yield [
                         'disk' => $tiered ? ($version['disk'] ?? MediaStore::LOCAL) : MediaStore::LOCAL,
                         'path' => $version['disk_path'],

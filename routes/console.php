@@ -18,6 +18,12 @@ Schedule::command('shows:prune-empty')->daily();
 // target. A no-op when nothing has been offloaded.
 Schedule::command('media:prune-cache')->everyFifteenMinutes()->withoutOverlapping();
 
+// Optional (MEDIA_PURGE_ARCHIVED=true): remove long-archived slides' offloaded
+// media from the bucket, keeping their records (see config/media.php).
+if (config('media.purge_archived')) {
+    Schedule::command('media:purge-archived')->dailyAt('03:45')->withoutOverlapping();
+}
+
 // Database-only backups (see config/backup.php). Full backups are started by hand.
 $backupDriver = config('database.connections.'.config('database.default').'.driver');
 

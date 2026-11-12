@@ -69,6 +69,14 @@ class MediaVerify extends Command
             $missing[] = [$file['kind'], $file['disk'], $file['path'], $file['owner']];
         }
 
+        // Purged media must only belong to slides still archived or deleted.
+        $purgedInUse = \App\Models\SlideMedia::query()->whereNotNull('purged_at')
+            ->with(['slide' => fn ($q) => $q->withTrashed()])->get()
+            ->filter(fn ($m) => $m->slide && !$m->slide->isArchivedOrDeleted());
+        foreach ($purgedInUse as $m) {
+            $missing[] = ['media (purged)', $m->disk, $m->disk_path, "slide #{$m->slide_id}, no longer archived: run media:purge-archived --restore"];
+        }
+
         $this->info("Checked {$checked} file(s).");
         if ($restored) {
             $this->info("Moved {$restored} file(s) back out of the bucket trash.");
