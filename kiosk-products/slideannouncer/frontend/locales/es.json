@@ -2,7 +2,8 @@
     "menu": {
         "mainShow": "Programa Principal",
         "playing": "Reproduciendo",
-        "settings": "Configuración…"
+        "settings": "Configuración…",
+        "screenMirroring": "Duplicar pantalla…"
     },
     "slideshow": {
         "notPaired": "Aún no emparejado. Use Menú o la tecla Escape para abrir Configuración.",
@@ -13,7 +14,8 @@
     },
     "settingsLayout": {
         "videoReceiver": "Receptor de Video LAN",
-        "revelationPeering": "Emparejamiento Revelation"
+        "revelationPeering": "Emparejamiento Revelation",
+        "screenMirroring": "Duplicar pantalla"
     },
     "settings": {
         "srtSink": {
@@ -84,6 +86,19 @@
             "featureOffHint": "Esta función está desactivada — actívela en Configuración > Avanzado.",
             "revelationHint": "Permite que un presentador de Revelation en su red tome esta pantalla para una presentación en vivo.",
             "srtSinkHint": "Recibe una transmisión de video en vivo (OBS, vMix, etc.) desde la red de su iglesia mediante SRT."
+        },
+        "airshow": {
+            "intro": "Muestre un teléfono, tableta o computadora en esta pantalla con AirShow: AirPlay (iPhone, iPad, Mac), Miracast (Windows Win+K, Android Smart View), Google Cast y DLNA.",
+            "notInstalled": "AirShow no está instalado en el software de este dispositivo.",
+            "start": "Iniciar AirShow",
+            "starting": "Iniciando…",
+            "startHint": "La presentación se detiene mientras AirShow está abierto. Conéctese desde su dispositivo; un dispositivo nuevo pide aprobación aquí (OK para permitir). Pulse Inicio o Atrás en el control remoto para volver a la presentación.",
+            "backgroundTitle": "Permitir duplicar durante la presentación",
+            "backgroundHint": "Los dispositivos recordados pueden transmitir en cualquier momento y ocupar la pantalla; la presentación vuelve cuando se desconectan. Nunca se pregunta a dispositivos nuevos; apruébelos primero en AirShow. Cambiar esto reinicia la presentación.",
+            "restarting": "Reiniciando la presentación…",
+            "rememberedTitle": "Dispositivos recordados",
+            "noneRemembered": "Aún no hay dispositivos. Inicie AirShow y apruebe un dispositivo para recordarlo.",
+            "forget": "Olvidar"
         }
     }
 }

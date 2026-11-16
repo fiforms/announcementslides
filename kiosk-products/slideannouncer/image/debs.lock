@@ -1,0 +1,5 @@
+# Released .debs fetched at image build time (slideannouncer/image-builder/build.sh):
+# "<url> <sha256>" per line. Update both together when bumping a version.
+#
+# AirShow screen mirroring receiver (docs/AIRSHOW.md), https://github.com/fiforms/AirShow
+https://github.com/fiforms/AirShow/releases/download/v0.1.0%2Bfiforms1/airshow_0.1.0%2Bfiforms1_arm64.deb 0635d3bb799b0030a128bd0de3cd51406d4b191f1b8d209df8cbef2afa9454e4

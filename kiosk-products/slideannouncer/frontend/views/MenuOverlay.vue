@@ -8,6 +8,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { menuOpen, closeMenu } from '@core/menuOverlay.js'
 import { shows, pinnedShowId, pinShow } from '../slideshowState.js'
+import { features, loadFeatures } from '../features.js'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -20,6 +21,13 @@ async function selectShow(show) {
   closeMenu()
 }
 
+// Screen Mirroring goes through its Settings page, so the Settings PIN guards
+// AirShow mode (where new senders are approved) like everything else there.
+function openScreenMirroring() {
+  closeMenu()
+  router.push('/settings/airshow')
+}
+
 function openSettings() {
   closeMenu()
   router.push('/settings')
@@ -30,6 +38,7 @@ function openSettings() {
 // first item ourselves whenever it opens.
 watch(menuOpen, (open) => {
   if (!open) return
+  if (!features.loaded) loadFeatures().catch(() => {})
   nextTick(() => {
     document.querySelector('.menu-overlay .list-item')?.focus()
   })
@@ -50,6 +59,9 @@ watch(menuOpen, (open) => {
         <span v-if="show.id === pinnedShowId" class="pill ok">{{ t('menu.playing') }}</span>
       </button>
       <div class="menu-divider" />
+      <button v-if="features.airshow" class="list-item" @click="openScreenMirroring">
+        {{ t('menu.screenMirroring') }}
+      </button>
       <button class="list-item" @click="openSettings">
         {{ t('menu.settings') }}
       </button>

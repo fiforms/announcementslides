@@ -13,15 +13,22 @@ export const features = reactive({
   // Admin dashboard's fleet-wide SRT force-disable (see srt_sink.py) —
   // shown as a warning next to the switch, doesn't change what it does.
   srtSinkServerAllows: true,
+  // AirShow screen mirroring is in the image (not a switch: always offered when installed).
+  airshow: false,
 })
 
 export async function loadFeatures() {
-  const [revelation, srt] = await Promise.allSettled([api.revelationEnabled(), api.srtSinkStatus()])
+  const [revelation, srt, airshow] = await Promise.allSettled([
+    api.revelationEnabled(),
+    api.srtSinkStatus(),
+    api.airshowStatus(),
+  ])
   if (revelation.status === 'fulfilled') features.revelation = revelation.value.enabled
   if (srt.status === 'fulfilled') {
     features.srtSink = srt.value.local_enabled
     features.srtSinkServerAllows = srt.value.server_allows
   }
+  if (airshow.status === 'fulfilled') features.airshow = airshow.value.installed
   features.loaded = true
 }
 

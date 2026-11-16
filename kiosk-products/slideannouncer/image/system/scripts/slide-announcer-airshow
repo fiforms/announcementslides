@@ -1,0 +1,284 @@
+#!/usr/bin/python3
+"""AirShow screen mirroring on the Slide Announcer (AirPlay, Miracast, Google
+Cast, DLNA). See kiosk-products/slideannouncer/docs/AIRSHOW.md.
+
+Subcommands:
+
+  session attended CHROMIUM...
+      AirShow mode (slide-announcer-airshow.service). Runs inside that unit's
+      labwc session (kiosk-start.sh execs this as KIOSK_SESSION_WRAPPER, with
+      Chromium's command line, which this mode ignores). New senders get the
+      approval prompt; Home/Back on the remote quits, and the unit's
+      ExecStopPost brings the slideshow back.
+
+  session background CHROMIUM...
+      The kiosk unit's session (product.env's KIOSK_SESSION_WRAPPER). If
+      background mirroring is off (Settings > Screen Mirroring), it just execs
+      Chromium, exactly as the kiosk always did. If on, it starts AirShow
+      first (known senders only), waits until AirShow's window is on screen,
+      then runs Chromium on top. While a remembered sender is casting, AirShow's
+      session hooks have Chromium stopped, revealing AirShow; when the session
+      ends Chromium is started again. If Chromium exits on its own, this exits
+      too, so labwc exits and the unit's Restart=always recovers it as before.
+
+  hook
+      AirShow's --on-session-start/--on-session-end command (reads
+      AIRSHOW_SESSION). Only records the state; the session supervisor acts.
+
+  return-to-kiosk
+      slide-announcer-airshow.service's ExecStopPost: start the slideshow
+      again, unless the display was put to sleep or the system is shutting
+      down.
+
+  list | forget <identifier|name|all>
+      airshow --list-remembered / --forget-remembered against the kiosk's
+      AirShow settings. Run as slideannouncer (or root, which switches to it).
+
+stdlib only, /usr/bin/python3: it must work without the local app's venv.
+"""
+import json
+import os
+import signal
+import socket
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+AIRSHOW = "/usr/bin/airshow"
+KIOSK_USER = "slideannouncer"
+KIOSK_UNIT = "slide-announcer-kiosk.service"
+# QSettings ($XDG_CONFIG_HOME/AirShow/AirShow.conf) must persist: the kiosk
+# user's home is on the tmpfs /var overlay, which would forget every approved
+# sender at reboot.
+CONFIG_HOME = Path("/data/airshow")
+SETTINGS_FILE = Path("/data/status/airshow.json")  # written by the local app
+SLEEP_MARKER = Path("/run/slide-announcer/kiosk-sleeping")
+
+# Home (KEY_HOMEPAGE) and Back (KEY_BACK) on the 2.4 GHz remote in keyboard
+# mode. Never Power (116): logind and the power-button service own it.
+QUIT_KEYS = "172,158"
+READY_TIMEOUT_SECONDS = 30.0
+POLL_SECONDS = 0.25
+STOP_TIMEOUT_SECONDS = 8.0  # AirShow restores wpa_supplicant's P2P settings on SIGTERM
+
+
+def log(message: str) -> None:
+    print(f"slide-announcer-airshow: {message}", flush=True)
+
+
+def read_settings(path: Path | None = None) -> dict:
+    try:
+        data = json.loads((path or SETTINGS_FILE).read_text())
+    except (OSError, ValueError):
+        return {"background": False}
+    return {"background": data.get("background") is True}
+
+
+def airshow_env(base: dict | None = None) -> dict:
+    env = dict(os.environ if base is None else base)
+    env["XDG_CONFIG_HOME"] = str(CONFIG_HOME)
+    env.pop("NOTIFY_SOCKET", None)
+    return env
+
+
+def ensure_config_home() -> None:
+    try:
+        CONFIG_HOME.mkdir(mode=0o700, exist_ok=True)
+    except OSError as exc:
+        log(f"can't create {CONFIG_HOME} ({exc}); remembered senders won't persist")
+
+
+def runtime_dir() -> Path:
+    return Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+
+
+def casting_flag() -> Path:
+    return runtime_dir() / "airshow-casting"
+
+
+# --- AirShow mode -----------------------------------------------------------
+
+def attended() -> int:
+    ensure_config_home()
+    argv = [AIRSHOW, "--approval", "prompt", "--quit-keys", QUIT_KEYS]
+    log("AirShow mode: " + " ".join(argv))
+    os.execve(AIRSHOW, argv, airshow_env())
+    return 1  # not reached
+
+
+# --- Background mode --------------------------------------------------------
+
+def background_argv(self_path: str) -> list[str]:
+    hook = f"{self_path} hook"
+    return [AIRSHOW, "--approval", "known-only", "--on-session-start", hook, "--on-session-end", hook]
+
+
+def wait_ready(proc: subprocess.Popen, sock: socket.socket, timeout: float) -> bool:
+    """True once AirShow sends READY=1 (its window is on screen)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return False
+        sock.settimeout(min(0.5, max(0.01, deadline - time.monotonic())))
+        try:
+            if b"READY=1" in sock.recv(4096):
+                return True
+        except socket.timeout:
+            pass
+    return False
+
+
+def start_airshow(self_path: str) -> subprocess.Popen | None:
+    if not os.access(AIRSHOW, os.X_OK):
+        log(f"{AIRSHOW} is not installed; background mirroring is off")
+        return None
+    ensure_config_home()
+    sock_path = runtime_dir() / "airshow-notify.sock"
+    sock_path.unlink(missing_ok=True)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM)
+    try:
+        sock.bind(str(sock_path))
+        env = airshow_env()
+        env["NOTIFY_SOCKET"] = str(sock_path)
+        argv = background_argv(self_path)
+        log("background mirroring: " + " ".join(argv))
+        proc = subprocess.Popen(argv, env=env)
+        if wait_ready(proc, sock, READY_TIMEOUT_SECONDS):
+            log("AirShow is on screen; starting the slideshow above it")
+        elif proc.poll() is not None:
+            log(f"AirShow exited during startup (status {proc.returncode}); slideshow only")
+            return None
+        else:
+            # Starting Chromium now could map it under AirShow, but a kiosk with
+            # no slideshow is worse. Logged so it shows up when debugging.
+            log(f"no READY from AirShow after {READY_TIMEOUT_SECONDS:.0f}s; starting the slideshow anyway")
+        return proc
+    finally:
+        sock.close()
+        sock_path.unlink(missing_ok=True)
+
+
+def stop(proc: subprocess.Popen | None, name: str, timeout: float = STOP_TIMEOUT_SECONDS) -> None:
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        log(f"{name} didn't stop in {timeout:.0f}s; killing it")
+        proc.kill()
+        proc.wait()
+
+
+def is_casting() -> bool:
+    try:
+        return casting_flag().read_text().strip() == "start"
+    except OSError:
+        return False
+
+
+def background(chromium_argv: list[str]) -> int:
+    if not chromium_argv:
+        log("no Chromium command line given")
+        return 2
+    if not read_settings()["background"]:
+        os.execvp(chromium_argv[0], chromium_argv)
+
+    casting_flag().unlink(missing_ok=True)
+    stopping = False
+
+    def on_signal(signum, _frame):
+        nonlocal stopping
+        stopping = True
+
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, on_signal)
+
+    airshow = start_airshow(os.path.realpath(sys.argv[0]))
+    chromium: subprocess.Popen | None = None
+    chromium_env = {k: v for k, v in os.environ.items() if k != "NOTIFY_SOCKET"}
+    status = 0
+    try:
+        while not stopping:
+            if airshow is not None and airshow.poll() is not None:
+                # No end hook comes after a crash: make sure the slideshow returns.
+                log(f"AirShow exited (status {airshow.returncode}); slideshow only until the kiosk restarts")
+                airshow = None
+                casting_flag().unlink(missing_ok=True)
+
+            casting = airshow is not None and is_casting()
+            if chromium is not None and chromium.poll() is not None:
+                status = chromium.returncode
+                log(f"Chromium exited on its own (status {status}); ending the session")
+                break
+            if casting and chromium is not None:
+                log("a remembered sender is casting; stopping the slideshow")
+                stop(chromium, "Chromium")
+                chromium = None
+            elif not casting and chromium is None:
+                if airshow is not None:
+                    log("no one is casting; starting the slideshow")
+                chromium = subprocess.Popen(chromium_argv, env=chromium_env)
+            time.sleep(POLL_SECONDS)
+    finally:
+        stop(chromium, "Chromium")
+        stop(airshow, "AirShow")
+        casting_flag().unlink(missing_ok=True)
+    return status
+
+
+# --- hooks and helpers ------------------------------------------------------
+
+def hook() -> int:
+    state = os.environ.get("AIRSHOW_SESSION", "")
+    if state not in ("start", "end"):
+        log(f"hook: unexpected AIRSHOW_SESSION {state!r}")
+        return 2
+    flag = casting_flag()
+    tmp = flag.with_name(flag.name + ".tmp")
+    tmp.write_text(state + "\n")
+    tmp.replace(flag)
+    # AIRSHOW_DEVICE is chosen by the sender: logged via repr, never evaluated.
+    log(f"session {state}: {os.environ.get('AIRSHOW_PROTOCOL', '?')} {os.environ.get('AIRSHOW_DEVICE', '')!r}")
+    return 0
+
+
+def return_to_kiosk() -> int:
+    if SLEEP_MARKER.exists():
+        log("display is asleep; not starting the slideshow")
+        return 0
+    state = subprocess.run(["systemctl", "is-system-running"], capture_output=True, text=True).stdout.strip()
+    if state == "stopping":
+        return 0
+    subprocess.run(["systemctl", "start", "--no-block", KIOSK_UNIT], check=False)
+    return 0
+
+
+def remembered(args: list[str]) -> int:
+    argv = [AIRSHOW, *args]
+    if os.geteuid() == 0:
+        argv = ["runuser", "-u", KIOSK_USER, "--", "env", f"XDG_CONFIG_HOME={CONFIG_HOME}", *argv]
+        return subprocess.run(argv).returncode
+    return subprocess.run(argv, env=airshow_env()).returncode
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) >= 2 and argv[0] == "session" and argv[1] == "attended":
+        return attended()
+    if len(argv) >= 2 and argv[0] == "session" and argv[1] == "background":
+        return background(argv[2:])
+    if argv == ["hook"]:
+        return hook()
+    if argv == ["return-to-kiosk"]:
+        return return_to_kiosk()
+    if argv == ["list"]:
+        return remembered(["--list-remembered"])
+    if len(argv) == 2 and argv[0] == "forget":
+        return remembered(["--forget-remembered", argv[1]])
+    print(__doc__, file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

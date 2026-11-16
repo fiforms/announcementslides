@@ -7,6 +7,7 @@ import Slideshow from './views/Slideshow.vue'
 import MenuOverlay from './views/MenuOverlay.vue'
 import SrtSink from './views/settings/SrtSink.vue'
 import RevelationPeering from './views/settings/RevelationPeering.vue'
+import ScreenMirroring from './views/settings/ScreenMirroring.vue'
 import AdvancedFeatures from './views/settings/AdvancedFeatures.vue'
 import en from './locales/en.json'
 import es from './locales/es.json'
@@ -22,12 +23,15 @@ export default {
   // Children of /settings, beyond the core ones.
   settingsRoutes: [
     { path: 'srt-sink', component: SrtSink, meta: { railPath: '/settings/srt-sink' } },
+    { path: 'airshow', component: ScreenMirroring, meta: { railPath: '/settings/airshow' } },
     { path: 'revelation', component: RevelationPeering, meta: { railPath: '/settings/revelation' } },
   ],
   // Extra rail entries (after Advanced); `t` is vue-i18n's translate.
   railCategories: (t) => [
     features.revelation && { path: '/settings/revelation', label: t('settingsLayout.revelationPeering'), sub: true },
     features.srtSink && { path: '/settings/srt-sink', label: t('settingsLayout.videoReceiver'), sub: true },
+    // Last: a top-level entry here would otherwise adopt Advanced's sub-entries.
+    features.airshow && { path: '/settings/airshow', label: t('settingsLayout.screenMirroring') },
   ],
   // Rendered at the bottom of Settings > Advanced.
   advancedSection: AdvancedFeatures,

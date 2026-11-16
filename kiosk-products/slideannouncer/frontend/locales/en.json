@@ -2,7 +2,8 @@
     "menu": {
         "mainShow": "Main Show",
         "playing": "Playing",
-        "settings": "Settings…"
+        "settings": "Settings…",
+        "screenMirroring": "Screen Mirroring…"
     },
     "slideshow": {
         "notPaired": "Not yet paired. Use Menu or Escape key to open Settings.",
@@ -13,7 +14,8 @@
     },
     "settingsLayout": {
         "videoReceiver": "LAN Video Receiver",
-        "revelationPeering": "Revelation Peering"
+        "revelationPeering": "Revelation Peering",
+        "screenMirroring": "Screen Mirroring"
     },
     "settings": {
         "srtSink": {
@@ -84,6 +86,19 @@
             "featureOffHint": "This feature is turned off — switch it on in Settings > Advanced.",
             "revelationHint": "Let a Revelation presenter on your network take over this display for a live presentation.",
             "srtSinkHint": "Receive a live video feed (OBS, vMix, etc.) from your church network over SRT."
+        },
+        "airshow": {
+            "intro": "Show a phone, tablet or computer on this screen with AirShow: AirPlay (iPhone, iPad, Mac), Miracast (Windows Win+K, Android Smart View), Google Cast and DLNA.",
+            "notInstalled": "AirShow is not installed in this device's software.",
+            "start": "Start AirShow",
+            "starting": "Starting…",
+            "startHint": "The slideshow stops while AirShow is open. Connect from your device; a new device asks for approval here (OK to allow). Press Home or Back on the remote to return to the slideshow.",
+            "backgroundTitle": "Allow mirroring during the slideshow",
+            "backgroundHint": "Remembered devices can cast at any time and take over the screen; the slideshow returns when they disconnect. New devices are never asked; approve them in AirShow first. Changing this restarts the slideshow.",
+            "restarting": "Restarting the slideshow…",
+            "rememberedTitle": "Remembered devices",
+            "noneRemembered": "No devices yet. Start AirShow and approve a device to remember it.",
+            "forget": "Forget"
         }
     }
 }
