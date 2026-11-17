@@ -4,7 +4,6 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import ToggleSwitch from '@core/components/ToggleSwitch.vue'
 import { api } from '../../api.js'
 
 const { t } = useI18n()
@@ -58,7 +57,7 @@ async function start() {
 }
 
 async function setBackground(enabled) {
-  if (savingBackground.value) return
+  if (savingBackground.value || enabled === status.value?.background) return
   savingBackground.value = true
   backgroundError.value = null
   try {
@@ -110,7 +109,7 @@ onUnmounted(() => clearInterval(refresh))
 <template>
   <div class="settings-page">
     <section class="tile panel">
-      <div class="panel-title"><h2>{{ t('settingsLayout.screenMirroring') }}</h2></div>
+      <div class="panel-title"><h2>{{ t('settings.airshow.title') }}</h2></div>
       <p class="hint">{{ t('settings.airshow.intro') }}</p>
       <p v-if="statusError" class="pill warn note">{{ statusError }}</p>
       <p v-else-if="status && !status.installed" class="pill warn note">{{ t('settings.airshow.notInstalled') }}</p>
@@ -127,17 +126,32 @@ onUnmounted(() => clearInterval(refresh))
     </section>
 
     <section v-if="status?.installed && status.enabled" class="tile panel">
-      <div class="feature">
-        <div class="feature-text">
-          <span class="feature-name">{{ t('settings.airshow.backgroundTitle') }}</span>
-          <span class="hint">{{ t('settings.airshow.backgroundHint') }}</span>
-          <span class="hint warn-text">{{ t('settings.airshow.backgroundWifiWarning') }}</span>
+      <div class="panel-title"><h2>{{ t('settings.airshow.modeTitle') }}</h2></div>
+      <div class="modes">
+        <div class="mode">
+          <button
+            type="button"
+            class="tile action"
+            :class="{ active: !status.background }"
+            :disabled="savingBackground || restarting"
+            @click="setBackground(false)"
+          >
+            {{ t('settings.airshow.modeManual') }}
+          </button>
+          <p class="hint">{{ t('settings.airshow.modeManualHint') }}</p>
         </div>
-        <ToggleSwitch
-          :model-value="status.background"
-          :disabled="savingBackground || restarting"
-          @update:model-value="setBackground"
-        />
+        <div class="mode">
+          <button
+            type="button"
+            class="tile action"
+            :class="{ active: status.background }"
+            :disabled="savingBackground || restarting"
+            @click="setBackground(true)"
+          >
+            {{ t('settings.airshow.modeAlwaysOn') }}
+          </button>
+          <p class="hint">{{ t('settings.airshow.modeAlwaysOnHint') }}</p>
+        </div>
       </div>
       <p v-if="status.background && pausedFor" class="pill note">{{ t('settings.airshow.paused', { reason: pausedFor }) }}</p>
       <p v-if="restarting" class="pill note">{{ t('settings.airshow.restarting') }}</p>
@@ -172,24 +186,26 @@ onUnmounted(() => clearInterval(refresh))
 
 <style scoped>
 .hint { color: var(--text-dim); margin: 0; }
-.warn-text { color: var(--danger); }
 .note { margin: 0.6rem 0 0; }
 .start-row { margin: 0.9rem 0 0.6rem; }
 .action { padding: 0.45rem 1rem; font-size: 0.9rem; }
 .primary { font-size: 1.05rem; padding: 0.7rem 1.4rem; font-weight: 600; }
-.feature {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
+.action.active {
+  border-color: var(--accent);
+  color: var(--accent);
 }
-.feature-text {
-  flex: 1;
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 0.35rem;
+}
+.mode {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  gap: 0.2rem;
+  gap: 0.5rem;
 }
-.feature-name { font-weight: 600; }
+.mode .action { padding: 0.7rem 1rem; font-size: 1rem; font-weight: 600; }
 .device-list {
   list-style: none;
   margin: 0;

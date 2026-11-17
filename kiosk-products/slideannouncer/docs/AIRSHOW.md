@@ -46,8 +46,9 @@ rail. With Screen Mirroring on:
   router's existing Settings PIN gate applies. The page starts AirShow when it
   opens, and leaving Settings locks it again as usual. Remembered senders
   casting in background mode never involve the PIN;
-- Settings → Features → Screen Mirroring has **Start AirShow**, the background
-  switch, and the remembered senders.
+- Settings → Features → Screen Mirroring (titled "Screen Mirroring (AirShow)")
+  has **Open Screen Mirroring & Pair Devices**, the **Mirroring Mode** choice
+  (**Manual** or **Always On**), and the remembered senders.
 
 Turning the feature off hides both, stops background mirroring, and makes the
 backend refuse to start AirShow mode. The settings are kept for when it's turned
@@ -57,7 +58,7 @@ back on.
 
 | | AirShow mode (attended) | Background mode (unattended) |
 |---|---|---|
-| Started by | Menu → **Screen Mirroring**, or Settings → Features → Screen Mirroring → **Start AirShow** | Settings → Features → Screen Mirroring → *Allow mirroring during the slideshow* |
+| Started by | Menu → **Screen Mirroring**, or Settings → Features → Screen Mirroring → **Open Screen Mirroring & Pair Devices** | Settings → Features → Screen Mirroring → Mirroring Mode → **Always On** (**Manual** is AirShow mode only) |
 | Unit | `slide-announcer-airshow.service` (`Conflicts=` the kiosk) | inside `slide-announcer-kiosk.service` |
 | New senders | Allow/Deny prompt, answered with the remote (Enter allows) | rejected silently (`--approval known-only`) |
 | Leaves by | Home or Back on the remote (`--quit-keys 172,158`) | the sender disconnecting (≈5 s later) |
@@ -100,7 +101,7 @@ execs Chromium, exactly as before. With the switch on, it:
 
 After a session, Chromium restarts on `/kiosk`. Its state and CDP connection
 start over, which takes a few seconds; that's the price of the stop/start design.
-Turning background mirroring on or off (either switch) restarts the kiosk unit
+Turning background mirroring on or off (Always On/Manual, or the feature switch) restarts the kiosk unit
 to apply it.
 
 ### Pausing for streams and presentations
