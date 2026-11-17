@@ -15,6 +15,10 @@ return [
 
     'name' => env('APP_NAME', 'AnnouncementSlides'),
 
+    // The release this build was published as (set by the Docker image build:
+    // a tag such as 1.4.0, or edge-<sha>). Null on a plain checkout.
+    'version' => env('APP_VERSION') ?: null,
+
     /*
     |--------------------------------------------------------------------------
     | Localized Application Name
