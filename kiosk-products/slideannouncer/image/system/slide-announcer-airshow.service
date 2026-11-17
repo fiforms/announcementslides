@@ -27,6 +27,9 @@ TTYVTDisallocate=yes
 # kiosk-start.sh sets up labwc (cursor, HDMI audio, screen resolution) exactly
 # as for the slideshow, then runs this wrapper instead of Chromium.
 Environment="KIOSK_SESSION_WRAPPER=/usr/local/sbin/slide-announcer-airshow session attended"
+# Build the GStreamer registry before labwc starts: AirShow's own first scan
+# inside the labwc session leaves a broken one (see the script's docstring).
+ExecStartPre=-/usr/local/sbin/slide-announcer-airshow prepare-registry
 ExecStart=/usr/local/bin/slide-announcer-kiosk-start.sh
 # AirShow exits on the remote's Home/Back (labwc -S follows it out), or the
 # unit is stopped: either way go back to the slideshow, unless asleep or

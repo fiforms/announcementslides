@@ -7,9 +7,9 @@ Miracast (Windows Win+K, Android Smart View over Wi-Fi Direct), Google Cast
 reference is `docs/session-hooks.md` in that repo, installed on the device as
 `/usr/share/doc/airshow/session-hooks.md`.
 
-**Status:** built and unit-tested on a workstation, using stubs for AirShow and
-Chromium. Not yet tried on a Pi image built this way. See *To verify on
-hardware* below.
+**Status:** running on a Pi (`0.4.7_0.3.0` plus the registry fix below): AirShow
+mode and background mode start. Casting, approvals and quit keys have not been
+tested end to end yet; see *To verify on hardware* below.
 
 ## The two modes
 
@@ -67,10 +67,12 @@ Changing the switch restarts the kiosk unit to apply it.
 | `packages` | AirShow's Recommends, listed explicitly: `qt6-wayland` (without it there is no window under labwc), `iw`, `gstreamer1.0-pipewire` |
 | `rootfs/etc/NetworkManager/conf.d/90-wifi-powersave-off.conf` | Wi-Fi power saving off for the station connection (bursts, "connection unstable", and half the Wi-Fi Direct link rate with it on) |
 | `system/slide-announcer-airshow.service` | AirShow mode |
+| `rootfs/etc/systemd/system/slide-announcer-kiosk.service.d/50-airshow.conf` | kiosk `ExecStartPre`: GStreamer registry for background mode (below) |
 | `system/scripts/slide-announcer-airshow` | session wrapper (both modes), hook, return-to-kiosk, `list`/`forget` |
 | `product.env` | `KIOSK_SESSION_WRAPPER`, `KIOSK_SCREEN_UNITS` (platform seams, `slideannouncer/docs/PRODUCTS.md`) |
 
-Needs a full image or RAUC bundle, not a hotfix (new apt packages).
+Installing AirShow needs a full image or RAUC bundle (new apt packages). Later
+changes to the units, script and drop-in can go out as hotfixes.
 
 Permissions are already in place on the platform. `slideannouncer` is in
 `netdev` (wpa_supplicant D-Bus), polkit grants it every
@@ -78,6 +80,28 @@ Permissions are already in place on the platform. `slideannouncer` is in
 `wifi-p2p` connection) and start/stop of `slide-announcer-*.service`, and both
 units have `PAMName=login` (an active local session). NetworkManager keeps
 managing `p2p-dev-wlan0`; don't mark it unmanaged.
+
+## GStreamer registry (found on hardware)
+
+If AirShow does its own first GStreamer plugin scan inside the labwc session,
+`gst-plugin-scanner` dies after a plugin or two. The half-built registry
+(about 15 of 272 plugins, in the kiosk user's tmpfs `~/.cache/gstreamer-1.0`)
+is saved, and every start until reboot aborts with
+`Missing GStreamer plugin 'appsink'`. That's the "flickers, then the slideshow
+comes back" symptom. The same scan from a plain unit, SSH or `systemd-run`
+works; the trigger inside labwc isn't pinned down. With a complete registry,
+AirShow under labwc only validates it and starts fine.
+
+So both units run `slide-announcer-airshow prepare-registry` as
+`ExecStartPre`, outside labwc. It runs `airshow --help` with
+`QT_QPA_PLATFORM=offscreen`, which does `gst_init` and AirShow's plugin check
+and exits (about 1.7 s on the first start of a boot, 0.2 s after). For the
+kiosk it does nothing unless background mirroring is on. Verified on
+`0.4.7_0.3.0`: 3 of 3 cold AirShow-mode starts, plus a cold background start.
+
+Separately, labwc starts the session command with stdin closed, and AirShow
+started with fd 0 closed fails the same way (`airshow 0<&-`). The session
+wrapper reopens `/dev/null` on fds 0 to 2.
 
 ## Interactions
 

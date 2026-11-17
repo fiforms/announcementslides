@@ -21,6 +21,11 @@ Subcommands:
       ends Chromium is started again. If Chromium exits on its own, this exits
       too, so labwc exits and the unit's Restart=always recovers it as before.
 
+  prepare-registry [background]
+      ExecStartPre of the AirShow unit (and, with "background", of the kiosk
+      unit when background mirroring is on): builds the GStreamer registry
+      outside labwc, where AirShow's own first scan fails. See below.
+
   hook
       AirShow's --on-session-start/--on-session-end command (reads
       AIRSHOW_SESSION). Only records the state; the session supervisor acts.
@@ -95,6 +100,37 @@ def runtime_dir() -> Path:
 
 def casting_flag() -> Path:
     return runtime_dir() / "airshow-casting"
+
+
+# --- GStreamer registry -----------------------------------------------------
+
+def prepare_registry(mode: str) -> int:
+    """ExecStartPre of both units, so outside labwc: build or refresh the kiosk
+    user's GStreamer registry (~/.cache/gstreamer-1.0, tmpfs, so once per boot).
+
+    Found on hardware: when AirShow itself does the first scan inside the labwc
+    session, gst-plugin-scanner dies after a plugin or two (cause not pinned
+    down; the same scan from a plain unit, SSH or systemd-run is fine), the
+    half-built registry (~15 of 272 plugins) is saved, and AirShow aborts with
+    "Missing GStreamer plugin 'appsink'" on every start until reboot. With a
+    complete registry, AirShow under labwc only validates it and starts fine.
+    `airshow --help` runs gst_init and AirShow's plugin check before printing
+    help; offscreen Qt so it needs no display. ~1.7 s cold, ~0.2 s warm."""
+    if mode == "background" and not read_settings()["background"]:
+        return 0
+    if not os.access(AIRSHOW, os.X_OK):
+        return 0
+    env = airshow_env()
+    env["QT_QPA_PLATFORM"] = "offscreen"
+    try:
+        result = subprocess.run([AIRSHOW, "--help"], env=env, stdin=subprocess.DEVNULL,
+                                stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        log("GStreamer registry: airshow --help timed out")
+        return 0
+    if result.returncode != 0:
+        log(f"GStreamer registry: airshow --help failed (status {result.returncode}): {result.stderr.strip()[-500:]}")
+    return 0  # never block the unit: AirShow reports a broken registry itself
 
 
 # --- AirShow mode -----------------------------------------------------------
@@ -263,11 +299,33 @@ def remembered(args: list[str]) -> int:
     return subprocess.run(argv, env=airshow_env()).returncode
 
 
+def ensure_stdio() -> None:
+    """Open /dev/null on any of fds 0-2 that are closed. labwc starts its -S
+    session command with stdin closed, and AirShow inherits that. With fd 0
+    closed, GStreamer's plugin scan breaks (gst-plugin-scanner's pipes land
+    on fd 0) and AirShow aborts with "Missing GStreamer plugin 'appsink'";
+    reproduced on hardware with `airshow 0<&-`."""
+    for fd in (0, 1, 2):
+        try:
+            os.fstat(fd)
+        except OSError:
+            null = os.open(os.devnull, os.O_RDWR)
+            if null != fd:
+                os.dup2(null, fd)
+                os.close(null)
+
+
 def main(argv: list[str]) -> int:
+    if argv[:1] == ["session"]:
+        ensure_stdio()
     if len(argv) >= 2 and argv[0] == "session" and argv[1] == "attended":
         return attended()
     if len(argv) >= 2 and argv[0] == "session" and argv[1] == "background":
         return background(argv[2:])
+    if argv == ["prepare-registry"]:
+        return prepare_registry("attended")
+    if argv == ["prepare-registry", "background"]:
+        return prepare_registry("background")
     if argv == ["hook"]:
         return hook()
     if argv == ["return-to-kiosk"]:

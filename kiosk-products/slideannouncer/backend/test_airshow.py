@@ -103,3 +103,39 @@ def test_script_background_hooks_point_back_at_itself():
     assert argv[:3] == [script.AIRSHOW, "--approval", "known-only"]
     assert argv[argv.index("--on-session-start") + 1] == "/usr/local/sbin/slide-announcer-airshow hook"
     assert argv[argv.index("--on-session-end") + 1] == "/usr/local/sbin/slide-announcer-airshow hook"
+
+
+def test_script_session_reopens_closed_stdin():
+    """labwc starts the session with fd 0 closed; GStreamer's plugin scan breaks without it."""
+    import subprocess
+    import sys
+
+    _load_script()  # skips when the image tree isn't available
+    code = (
+        "import importlib.machinery, importlib.util, os\n"
+        f"loader = importlib.machinery.SourceFileLoader('m', {str(SCRIPT)!r})\n"
+        "spec = importlib.util.spec_from_loader('m', loader)\n"
+        "m = importlib.util.module_from_spec(spec); loader.exec_module(m)\n"
+        "m.ensure_stdio()\n"
+        "print(os.readlink('/proc/self/fd/0'))\n"
+    )
+    out = subprocess.run([sys.executable, "-c", code], stdin=subprocess.DEVNULL, capture_output=True, text=True,
+                         preexec_fn=lambda: os.close(0), check=True).stdout.strip()
+    assert out == os.devnull
+
+
+def test_script_prepare_registry_skips_background_when_off(tmp_path, monkeypatch):
+    script = _load_script()
+    calls = []
+    monkeypatch.setattr(script, "SETTINGS_FILE", tmp_path / "airshow.json")
+    monkeypatch.setattr(script.os, "access", lambda *_: True)
+    monkeypatch.setattr(script.subprocess, "run", lambda argv, **kw: calls.append((argv, kw)) or
+                        script.subprocess.CompletedProcess(argv, 0, "", ""))
+    assert script.prepare_registry("background") == 0
+    assert calls == []
+    script.SETTINGS_FILE.write_text('{"background": true}')
+    assert script.prepare_registry("background") == 0
+    argv, kw = calls[0]
+    assert argv == [script.AIRSHOW, "--help"]
+    assert kw["env"]["QT_QPA_PLATFORM"] == "offscreen"
+    assert kw["env"]["XDG_CONFIG_HOME"] == str(script.CONFIG_HOME)
