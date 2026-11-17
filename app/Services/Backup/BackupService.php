@@ -3,6 +3,7 @@
 namespace App\Services\Backup;
 
 use App\Models\Backup;
+use App\Support\MediaInventory;
 use Illuminate\Contracts\Filesystem\Filesystem;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -288,6 +289,10 @@ class BackupService
             // Files on an offload disk (e.g. R2) are not in the archive; the
             // database still points at them, so they must be kept there.
             'offloaded_files'  => $backup->mode === Backup::MODE_FULL ? $this->offloadedSummary() : null,
+            // Every offloaded object this database refers to ({disk, key,
+            // size}), so a restore can be checked against the bucket or a
+            // mirror of it (see "Backing up and restoring with R2").
+            'offloaded_objects' => $this->offloadedObjects(),
             'app_key_included' => false,
             'app_key_fingerprint' => $this->keyFingerprint(),
         ];
@@ -319,6 +324,16 @@ class BackupService
         }
 
         return $summary;
+    }
+
+    /** @return list<array{disk: string, key: string, size: ?int}> */
+    private function offloadedObjects(): array
+    {
+        try {
+            return app(MediaInventory::class)->offloadedObjects();
+        } catch (Throwable) {
+            return []; // informational only: never fail a backup over it
+        }
     }
 
     /** Add a directory tree uncompressed; returns the file count. */

@@ -73,6 +73,7 @@ x-settings: &settings
   # MEDIA_RELEASES_WAIT_FOR_OFFLOAD: "true"    # hold releases back from devices until on R2
   # MEDIA_CACHE_MAX_BYTES: 2147483648          # local cache of files pulled back for exports
   # MEDIA_CACHE_MIN_AGE: 60                    # minutes a cached file is kept after use
+  # MEDIA_TRASH_PREFIX: trash/                 # deleted R2 files move here (add an R2 lifecycle rule)
 
   # Slides with files larger than this (bytes, typically videos) are left out of
   # "Download (.zip)" and listed in the archive instead. 0 = no limit.

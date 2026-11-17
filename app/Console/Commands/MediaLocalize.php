@@ -12,18 +12,27 @@ use Illuminate\Console\Command;
  * files back to the local `public` disk and points their rows at it, e.g.
  * before moving an install to a single host. Turn MEDIA_OFFLOAD_DISK off
  * first, or new uploads will keep being offloaded.
+ *
+ * With --relink, nothing is downloaded: rows are pointed at the local disk
+ * wherever their file is already there, e.g. after copying a bucket mirror
+ * (rclone backup) into storage/app/public during a restore without R2.
  */
 class MediaLocalize extends Command
 {
     protected $signature = 'media:localize
                             {--limit=0 : Stop after this many media rows / releases (0 = no limit)}
                             {--only= : "media" or "releases" (default: both)}
-                            {--keep-remote : Leave the offloaded copies in place}';
+                            {--keep-remote : Leave the offloaded copies in place}
+                            {--relink : Do not download; point rows at local files already in storage/app/public (e.g. a restored bucket mirror)}';
 
     protected $description = 'Copy offloaded media and release files back to local storage';
 
     public function handle(MediaStore $store): int
     {
+        if ($this->option('relink')) {
+            $this->line('Relinking rows to files already on the local disk (nothing is downloaded or deleted).');
+        }
+
         if ($store->offloadEnabled()) {
             $this->warn('Offloading is still on (MEDIA_OFFLOAD_DISK): new uploads will keep being moved off this host.');
         }
@@ -55,7 +64,7 @@ class MediaLocalize extends Command
             $failed = false;
 
             if (!$store->isLocal($media->disk)) {
-                if ($store->copyToLocal($media->disk, $media->disk_path)) {
+                if ($this->bringBack($store, $media->disk, $media->disk_path, $media->file_size)) {
                     $remote[$media->disk][] = $media->disk_path;
                     $media->disk = MediaStore::LOCAL;
                 } else {
@@ -71,7 +80,7 @@ class MediaLocalize extends Command
                 if ($store->isLocal($disk) || empty($v['disk_path'])) {
                     continue;
                 }
-                if ($store->copyToLocal($disk, $v['disk_path'])) {
+                if ($this->bringBack($store, $disk, $v['disk_path'], $v['file_size'] ?? null)) {
                     $remote[$disk][] = $v['disk_path'];
                     $variants[$name]['disk'] = MediaStore::LOCAL;
                 } else {
@@ -80,7 +89,7 @@ class MediaLocalize extends Command
             }
 
             if ($failed) {
-                $this->warn("  #{$media->id}: some files could not be copied back (left where they are).");
+                $this->warn("  #{$media->id}: some files could not be brought back (not copied, or not found locally with --relink); left where they are.");
             }
             if (!$remote) {
                 continue;
@@ -90,7 +99,7 @@ class MediaLocalize extends Command
             $media->save();
             $count++;
 
-            if (!$this->option('keep-remote')) {
+            if (!$this->option('keep-remote') && !$this->option('relink')) {
                 foreach ($remote as $disk => $paths) {
                     $store->delete($disk, $paths);
                 }
@@ -109,19 +118,34 @@ class MediaLocalize extends Command
                 break;
             }
             $disk = $release->disk;
-            if (!$store->copyToLocal($disk, $release->disk_path)) {
-                $this->warn("  {$release->kind} {$release->version}: could not be copied back.");
+            if (!$this->bringBack($store, $disk, $release->disk_path, null)) {
+                $this->warn("  {$release->kind} {$release->version}: could not be brought back (not copied, or not found locally with --relink).");
                 continue;
             }
 
             $release->forceFill(['disk' => MediaStore::LOCAL])->save();
             $count++;
 
-            if (!$this->option('keep-remote')) {
+            if (!$this->option('keep-remote') && !$this->option('relink')) {
                 $store->delete($disk, $release->disk_path);
             }
         }
 
         return $count;
+    }
+
+    /**
+     * Gets $path onto the local disk: downloaded from $disk, or with --relink
+     * only confirmed to be there already (and the expected size, if known).
+     */
+    private function bringBack(MediaStore $store, string $disk, string $path, ?int $size): bool
+    {
+        if (!$this->option('relink')) {
+            return $store->copyToLocal($disk, $path);
+        }
+
+        $local = $store->disk(MediaStore::LOCAL);
+
+        return $local->exists($path) && ($size === null || $local->size($path) === (int) $size);
     }
 }

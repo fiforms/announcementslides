@@ -156,7 +156,8 @@ Users can then sign in with their Google account from the login page.
 | `widget:install` | Install or upgrade overlay widgets from a directory or zip |
 | `backup:create` / `backup:list` / `backup:restore` | Create, list and restore backups |
 | `slide:resync-thumbnails` | Rebuild slide and overlay composite thumbnails (`--posters`: store missing video poster frames) |
-| `media:offload` / `media:localize` | Move large files to the offload disk (R2) / bring them back (see [below](#offloading-large-files-to-cloudflare-r2-optional)) |
+| `media:offload` / `media:localize` | Move large files to the offload disk (R2) / bring them back, or `--relink` to restored local files (see [below](#offloading-large-files-to-cloudflare-r2-optional)) |
+| `media:verify` | Check every media and release file the database refers to exists (`--restore-trash`, `--mirror=<folder>`) |
 | `media:prune-cache` | Trim the local cache of offloaded files (scheduled every 15 minutes) |
 
 Run `php artisan list` for the complete set, including the Slide Announcer commands.
@@ -414,14 +415,95 @@ they are held back until step 6 moves them. Set `MEDIA_RELEASES_WAIT_FOR_OFFLOAD
 to offer releases from this server while they upload.
 
 The queue worker and the scheduler (`schedule:run`, which trims the cache) must
-be running. Full backups don't include offloaded files. The database still points
-at them, so keep the bucket safe (consider R2 bucket versioning or a lifecycle
-copy). The backup manifest's `offloaded_files` shows how much lives there.
+be running. **Restart the queue worker after changing any of these settings**
+(`systemctl restart …` or `php artisan queue:restart`): it keeps the configuration
+it started with, and with offloading off in its copy the offload jobs finish
+instantly without moving anything. Backups don't include offloaded files; see
+[Backing up and restoring with R2](#backing-up-and-restoring-with-r2) below.
 
 **Switching back** to a single host: remove `MEDIA_OFFLOAD_DISK`, keep the `R2_*`
 settings, and run `php artisan media:localize`. This copies everything back,
 points the rows here, and deletes the R2 copies (`--keep-remote` keeps them).
 Until then, files already in R2 keep being served from there.
+
+#### Backing up and restoring with R2
+
+With offloading on, a backup comes from two places:
+
+- **The app's backups** (`backup:create`, Admin → Backups): the database plus, for a full
+  backup, the files still on this server (thumbnails, posters, SVG overlays, small images,
+  widgets). They are small now that large files live in R2. Every backup's `manifest.json`
+  lists the R2 objects its database refers to (`offloaded_objects`: `disk`, `key`, `size`).
+- **The bucket**: large media and Slide Announcer releases. Downloading from R2 is free, so
+  copy it to a desktop or NAS with [rclone](https://rclone.org/) rather than through this
+  server.
+
+**Protecting the bucket.** Deleted offloaded files are not deleted right away. They are
+moved under `trash/` in the bucket (`MEDIA_TRASH_PREFIX`), so restoring an older backup
+still finds them. In the bucket's settings, add an **object lifecycle rule** that deletes
+objects with prefix `trash/` after longer than you keep backups (e.g. 60 days). R2 has no
+object versioning. A **bucket lock** rule (e.g. prefix `slides/`, a few days) also
+guards against a mass deletion. While a file is locked it can't be moved to the trash
+either: deleting it leaves the original in the bucket (a warning in `laravel.log`), unused.
+
+**Desktop mirror.** Create an R2 API token with *Object Read only* for the bucket, set up
+an rclone remote for it (`rclone config`, provider *Cloudflare R2*), and run on a schedule:
+
+```bash
+rclone copy r2:announcementslides-media /backups/r2-mirror --exclude "trash/**"
+```
+
+Use `copy`, not `sync`: files deleted on the server stay in the mirror, so older backups
+can still be restored from it. Each run only downloads new objects, because offloaded
+objects are never rewritten. Keep the app's backup ZIPs next to it: download them from
+Admin → Backups, or copy them from `storage/app/private/backups/` with `scp`/`rsync`.
+
+To check that the mirror holds everything a backup needs (on the desktop; needs `unzip`
+and `jq`):
+
+```bash
+unzip -p backup-….zip manifest.json | jq -r '.offloaded_objects[].key' |
+  while read -r key; do [ -f "/backups/r2-mirror/$key" ] || echo "missing: $key"; done
+```
+
+On the server, `php artisan media:verify` checks every file the database refers to:
+local files, and offloaded files in the bucket. Offloaded files found in the bucket trash
+can be moved back with `--restore-trash`. `--mirror=<folder>` also checks a mirror on
+the server, by name and size. It exits non-zero if anything is missing.
+
+**Restoring.** Start every restore the same way: a working install, then
+`php artisan backup:restore <backup.zip>` (see [docker/README.md](docker/README.md#restoring)),
+then restart the queue worker. Then pick the case that applies:
+
+1. **The server was lost, the bucket is intact** (the usual case). Use the same `R2_*` and
+   `MEDIA_*` settings (and ideally the same `APP_KEY`) on the new server. After the
+   restore, run `php artisan media:verify --restore-trash`. That brings back any file
+   deleted after the backup was taken, as long as it is still in the trash. Nothing else
+   to do: URLs are unchanged, so devices notice nothing.
+2. **The bucket lost objects** (deleted bucket, deleted files, account problem). Point the
+   `R2_*` settings at the bucket (or a new one, with its custom domain in `R2_PUBLIC_URL`),
+   upload the mirror, then verify:
+   ```bash
+   rclone copy /backups/r2-mirror r2:announcementslides-media \
+     --header-upload "Cache-Control: public, max-age=31536000, immutable"
+   php artisan media:verify
+   ```
+   Uploading to R2 is free. The mirror may hold more than the backup needs; extra
+   objects are harmless.
+3. **Restoring onto a single host without R2.** Leave `MEDIA_OFFLOAD_DISK` unset. Copy the
+   mirror into the local disk (its folders match the storage paths), point the rows at
+   it, then verify:
+   ```bash
+   rsync -a --exclude 'trash/' /backups/r2-mirror/ storage/app/public/
+   chown -R www-data:www-data storage/app/public
+   php artisan media:localize --relink     # only rows whose file is now here (right size)
+   php artisan media:verify
+   ```
+   `--relink` downloads and deletes nothing. Rows whose file is missing locally keep
+   pointing at R2 and are listed by `media:verify`.
+
+Missing thumbnails, posters and composites can be rebuilt with
+`php artisan slide:resync-thumbnails --all --posters --now`.
 
 #### Other S3-compatible providers (e.g. Backblaze B2): not yet supported
 
