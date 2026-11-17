@@ -107,6 +107,7 @@
         "clear": "Limpiar",
         "download_selected": "Descargar seleccionadas",
         "select_all": "Seleccionar todo",
+        "media_purged_note": "El archivo a tamaño completo se movió al almacenamiento sin conexión después de archivar esta diapositiva; solo se muestra una vista previa. Al desarchivarla se recupera si aún está disponible.",
         "zip_large_media": "{count} archivo multimedia grande no se incluye en el ZIP (más de {size}):|{count} archivos multimedia grandes no se incluyen en el ZIP (más de {size} cada uno):",
         "zip_large_media_hint": "El ZIP los enumera con enlaces. Abra una diapositiva para descargar su archivo por separado.",
         "revel_large_media": "{count} archivo multimedia grande se enlaza, no se incluye, en el archivo de REVELation (más de {size}):|{count} archivos multimedia grandes se enlazan, no se incluyen, en el archivo de REVELation (más de {size} cada uno):",

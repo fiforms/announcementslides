@@ -108,6 +108,7 @@
         "download_selected": "Download Selected",
         "select_all": "Select All",
         "download_all": "Download All (.zip)",
+        "media_purged_note": "The full-size file was moved to offline storage after this slide was archived; only a preview is shown. Un-archiving brings it back if it is still available.",
         "zip_large_media": "{count} large media file is not included in the ZIP (over {size}):|{count} large media files are not included in the ZIP (over {size} each):",
         "zip_large_media_hint": "The ZIP lists them with links. Open a slide to download its file on its own.",
         "revel_large_media": "{count} large media file is linked, not included, in the REVELation file (over {size}):|{count} large media files are linked, not included, in the REVELation file (over {size} each):",

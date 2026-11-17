@@ -16,7 +16,7 @@ class SlideMedia extends Model
         'slide_id', 'show_id', 'media_type', 'filename', 'original_filename', 'disk_path', 'disk',
         'file_size', 'mime_type', 'thumbnail_path', 'poster_path', 'image_width', 'image_height',
         'validation_issues', 'validation_status', 'overlay_settings', 'sort_order',
-        'variants', 'active_variant',
+        'variants', 'active_variant', 'purged_at',
     ];
 
     /** New rows start local; OffloadMedia moves them (mirrors the column default). */
@@ -34,6 +34,7 @@ class SlideMedia extends Model
             'validation_issues' => 'array',
             'overlay_settings'  => 'array',
             'variants'          => 'array',
+            'purged_at'         => 'datetime',
         ];
     }
 
@@ -90,6 +91,65 @@ class SlideMedia extends Model
     public function downloadResponse(string $name, array $headers = []): Response
     {
         return app(MediaStore::class)->download($this->disk, $this->disk_path, $name, $headers);
+    }
+
+    /** Whether this row's offloaded files were removed from the bucket (see media:purge-archived). */
+    public function isPurged(): bool
+    {
+        return $this->purged_at !== null;
+    }
+
+    /**
+     * Removes this row's offloaded files (every version on a remote disk) from
+     * the bucket, moving them to its trash, and marks the row purged. Local
+     * files, thumbnails and posters stay. Returns false if there was nothing
+     * offloaded to purge.
+     */
+    public function purgeFromBucket(): bool
+    {
+        if ($this->isPurged()) {
+            return false;
+        }
+
+        $store  = app(MediaStore::class);
+        $remote = array_filter($this->versions(), fn ($v) => !empty($v['disk_path']) && !$store->isLocal($v['disk'] ?? null));
+        if (!$remote) {
+            return false;
+        }
+
+        foreach ($remote as $version) {
+            $store->delete($version['disk'], $version['disk_path']);
+        }
+        $this->forceFill(['purged_at' => now()])->save();
+
+        return true;
+    }
+
+    /**
+     * Brings purged files back: each one already in the bucket again (e.g.
+     * uploaded from a backup mirror) or still in its trash. Clears the purged
+     * mark only when every file is back. Returns whether the row is whole.
+     */
+    public function restorePurged(): bool
+    {
+        if (!$this->isPurged()) {
+            return true;
+        }
+
+        $store = app(MediaStore::class);
+        foreach ($this->versions() as $version) {
+            $disk = $version['disk'] ?? MediaStore::LOCAL;
+            if (empty($version['disk_path']) || $store->isLocal($disk)) {
+                continue;
+            }
+            if (!$store->exists($disk, $version['disk_path']) && !$store->restoreFromTrash($disk, $version['disk_path'])) {
+                return false;
+            }
+        }
+
+        $this->forceFill(['purged_at' => null])->save();
+
+        return true;
     }
 
     /** Deletes every file this row owns (all versions, thumbnails, posters) from wherever each lives. */

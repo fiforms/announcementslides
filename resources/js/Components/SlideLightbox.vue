@@ -40,7 +40,8 @@ function mediaLabel(media) {
 // are flagged `special`: they're raw parts that are easy to send out by mistake
 // (the background alone can carry stale content), so they sit behind a menu.
 const downloads = computed(() => {
-    const media = props.slide?.media ?? [];
+    // Purged files (moved to offline storage after archiving) can't be downloaded.
+    const media = (props.slide?.media ?? []).filter(m => !m.purged);
     const hasOverlay = media.some(m => m.media_type === 'slide-overlay');
 
     return media.flatMap(m => {
@@ -142,7 +143,12 @@ async function copy(text, field) {
                     :class="isExpanded ? 'max-w-[95vw]' : 'max-w-4xl'"
                     @click.self="$emit('close')"
                     @contextmenu="openContextMenu">
-                    <video v-if="slide.mime_type?.startsWith('video/')"
+                    <!-- Purged after archiving: only the thumbnail is still here. -->
+                    <img v-if="slide.media_purged && slide.thumbnail_url" :src="slide.thumbnail_url"
+                        :alt="slide.title" draggable="false"
+                        class="w-full rounded-lg object-contain shadow-2xl"
+                        :class="previewMaxH" />
+                    <video v-else-if="slide.mime_type?.startsWith('video/')"
                         :src="slide.file_url"
                         controls controlslist="nodownload" autoplay loop
                         class="w-full rounded-lg object-contain shadow-2xl"
@@ -188,6 +194,10 @@ async function copy(text, field) {
                             </button>
                         </div>
                     </div>
+
+                    <p v-if="slide.media_purged" class="flex-shrink-0 rounded-lg bg-amber-500/20 px-3 py-2 text-sm text-amber-100">
+                        {{ $t('slides.media_purged_note') }}
+                    </p>
 
                     <div v-if="slide.text_description" class="flex min-h-0 items-start gap-2 overflow-y-auto">
                         <p class="flex-1 text-sm text-white/80 whitespace-pre-line">{{ slide.text_description }}</p>

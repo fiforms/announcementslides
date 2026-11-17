@@ -158,6 +158,7 @@ Users can then sign in with their Google account from the login page.
 | `slide:resync-thumbnails` | Rebuild slide and overlay composite thumbnails (`--posters`: store missing video poster frames) |
 | `media:offload` / `media:localize` | Move large files to the offload disk (R2) / bring them back, or `--relink` to restored local files (see [below](#offloading-large-files-to-cloudflare-r2-optional)) |
 | `media:verify` | Check every media and release file the database refers to exists (`--restore-trash`, `--mirror=<folder>`) |
+| `media:purge-archived` | Remove long-archived slides' offloaded files from the bucket, keeping their records (`--days`, `--dry-run`, `--restore`) |
 | `media:prune-cache` | Trim the local cache of offloaded files (scheduled every 15 minutes) |
 
 Run `php artisan list` for the complete set, including the Slide Announcer commands.
@@ -504,6 +505,26 @@ then restart the queue worker. Then pick the case that applies:
 
 Missing thumbnails, posters and composites can be rebuilt with
 `php artisan slide:resync-thumbnails --all --posters --now`.
+
+**Purging archived media (optional).** To keep the bucket from growing forever, the
+offloaded files of slides that expired or were deleted more than 180 days ago
+(`MEDIA_PURGE_ARCHIVED_DAYS`) can be removed from the bucket, while their records,
+thumbnails and posters stay. Archived slides still appear in the church's archive with a
+preview and a note that the full file is in offline storage. Only files in R2 are purged;
+files on this server are left alone.
+
+- **Back the bucket up first.** Run `rclone copy` before purging: once the trash lifecycle
+  rule has run, the mirror holds the only copy.
+- **Try it by hand:** `php artisan media:purge-archived --dry-run -v` lists what would go.
+  Then run `php artisan media:purge-archived` (`--days=N` overrides the age).
+  `MEDIA_PURGE_ARCHIVED=true` runs it daily.
+- **Purged files go to the bucket trash** like any deleted file. Un-archiving a slide
+  brings its files back automatically while they are still in the bucket or its trash.
+  After that, un-archiving says the media is missing. Upload the mirror to the bucket
+  (`rclone copy /backups/r2-mirror r2:<bucket> …`, as in case 2 above), then run
+  `php artisan media:purge-archived --restore`.
+- **`media:verify`** skips purged files on archived slides, but flags purged media on a
+  slide that is back in use.
 
 #### Other S3-compatible providers (e.g. Backblaze B2): not yet supported
 

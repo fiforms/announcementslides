@@ -74,6 +74,8 @@ x-settings: &settings
   # MEDIA_CACHE_MAX_BYTES: 2147483648          # local cache of files pulled back for exports
   # MEDIA_CACHE_MIN_AGE: 60                    # minutes a cached file is kept after use
   # MEDIA_TRASH_PREFIX: trash/                 # deleted R2 files move here (add an R2 lifecycle rule)
+  # MEDIA_PURGE_ARCHIVED: "false"              # daily: remove long-archived slides' media from R2
+  # MEDIA_PURGE_ARCHIVED_DAYS: 180             #   (records and thumbnails kept; back up with rclone first)
 
   # Slides with files larger than this (bytes, typically videos) are left out of
   # "Download (.zip)" and listed in the archive instead. 0 = no limit.

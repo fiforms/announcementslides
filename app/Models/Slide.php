@@ -37,6 +37,47 @@ class Slide extends Model
         ];
     }
 
+    /**
+     * A slide brought back from the archive (expiry cleared or moved into
+     * the future, or un-deleted) gets any media purged from the bucket back
+     * while it is still there or in the bucket trash. Controllers check
+     * hasPurgedMedia() afterwards to warn when it is not.
+     */
+    protected static function booted(): void
+    {
+        static::saved(function (Slide $slide) {
+            if ($slide->wasChanged(['expires_at', 'status']) && !$slide->isArchivedOrDeleted()) {
+                $slide->restorePurgedMedia();
+            }
+        });
+        static::restored(function (Slide $slide) {
+            if (!$slide->isArchivedOrDeleted()) {
+                $slide->restorePurgedMedia();
+            }
+        });
+    }
+
+    public function isArchivedOrDeleted(): bool
+    {
+        return $this->trashed() || ($this->expires_at !== null && $this->expires_at->lte(now()));
+    }
+
+    public function hasPurgedMedia(): bool
+    {
+        return $this->media()->whereNotNull('purged_at')->exists();
+    }
+
+    /** Restores purged media where possible (see SlideMedia::restorePurged); true when none is left purged. */
+    public function restorePurgedMedia(): bool
+    {
+        $whole = true;
+        foreach ($this->media()->whereNotNull('purged_at')->get() as $media) {
+            $whole = $media->restorePurged() && $whole;
+        }
+
+        return $whole;
+    }
+
     // ── Relationships ─────────────────────────────────────────────────────────
 
     public function uploader(): BelongsTo

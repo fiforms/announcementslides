@@ -217,6 +217,11 @@ class SlideController extends Controller
 
         $slide->update(['expires_at' => null]);
 
+        // The saved hook brings back purged media still in the bucket or its trash.
+        if ($slide->hasPurgedMedia()) {
+            return back()->with('error', 'Slide restored, but some of its media was purged from storage after archiving and is still missing. Restore it from the backup (media:purge-archived --restore after uploading the backup to the bucket).');
+        }
+
         return back()->with('success', 'Slide restored.');
     }
 
@@ -231,6 +236,7 @@ class SlideController extends Controller
 
         $media = $slide->primaryMedia;
         abort_unless($media, 404);
+        abort_if($media->isPurged(), 410, 'This file was moved to offline storage after the slide was archived.');
 
         $composite = $this->flattenSlide($slide, $media, $compositor);
         if ($composite) {
@@ -252,6 +258,7 @@ class SlideController extends Controller
     {
         abort_unless($media->slide_id === $slide->id, 404);
         abort_unless($this->canDownload($request, Slide::current(), $slide), 404);
+        abort_if($media->isPurged(), 410, 'This file was moved to offline storage after the slide was archived.');
 
         // The bare base image of an overlaid slide is the 'Background' (the
         // composited slide is the plain download); other types name themselves.
@@ -660,6 +667,8 @@ class SlideController extends Controller
             'original_filename' => $slide->original_filename,
             // Lets the page warn which slides a ZIP download will leave out.
             'file_size'         => $slide->primaryMedia?->file_size,
+            // The full-size file was purged from storage (archive: thumbnail only).
+            'media_purged'      => (bool) $slide->primaryMedia?->isPurged(),
             'validation_issues' => $slide->validation_issues,
             'validation_status' => $slide->validation_status,
             'entity_id'         => $slide->entity_id,

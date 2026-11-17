@@ -54,7 +54,8 @@ class MediaLocalize extends Command
     {
         $count = 0;
 
-        foreach (SlideMedia::query()->orderBy('id')->lazyById(200) as $media) {
+        // Purged media isn't in the bucket to bring back (restore it first with media:purge-archived --restore).
+        foreach (SlideMedia::query()->whereNull('purged_at')->orderBy('id')->lazyById(200) as $media) {
             if ($limit && $count >= $limit) {
                 break;
             }
