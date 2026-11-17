@@ -71,6 +71,27 @@ docker run -d -p 8080:80 -v announcementslides:/var/www/html/storage \
   ghcr.io/fiforms/announcementslides
 ```
 
+## Branding (optional)
+
+Besides `APP_NAME`, a site can have its own images. Put them in `storage/app/public/brand/`
+(inside the storage volume, so upgrades keep them; no rebuild or restart needed):
+
+| File | Used for |
+|---|---|
+| `logo.png` | large logo on the login and other signed-out pages (about 800 px wide, transparent background) |
+| `mark.png` | square emblem: top-bar mark (on a white chip) and browser favicon |
+
+Either file may be omitted; the stock icon or site name is used instead.
+
+```bash
+docker compose exec app mkdir -p storage/app/public/brand
+docker compose cp logo.png app:/var/www/html/storage/app/public/brand/logo.png
+docker compose cp mark.png app:/var/www/html/storage/app/public/brand/mark.png
+docker compose exec app chown -R www-data:www-data storage/app/public/brand
+```
+
+Replacing a file updates its URL automatically, so browsers pick up the new image.
+
 ## Where state lives
 
 | What | Where |
