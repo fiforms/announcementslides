@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Widget;
+use App\Support\Brand;
 use App\Support\UpscalerSettings;
 use App\Support\WidgetLocation;
 use Illuminate\Http\Request;
@@ -36,6 +37,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'appName' => config('app.name'),
             'appNameLocalized' => config('app.name_localized'),
+            'brand' => Brand::forClient(),
             'isDev'   => app()->environment('local'),
             'passwordLogin' => (bool) config('auth.password_login'),
             'auth' => [
