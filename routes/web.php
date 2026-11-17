@@ -38,6 +38,9 @@ Route::middleware(\App\Http\Middleware\EnsureSetupIsOpen::class)->group(function
         ->middleware('throttle:10,1')->name('setup.store');
 });
 
+// Public: what this software is, its licence and where the source lives.
+Route::get('/about', [\App\Http\Controllers\AboutController::class, 'show'])->name('about');
+
 Route::get('/', [SlideController::class, 'index'])->name('slides.index');
 Route::get('/archive', [SlideController::class, 'archive'])->name('slides.archive');
 Route::get('/slides/{slide:token}/download', [SlideController::class, 'download'])->name('slides.download');
@@ -243,6 +246,8 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/widgets', [AdminWidgetController::class, 'store'])->name('widgets.store');
     Route::patch('/widgets/{widget}', [AdminWidgetController::class, 'update'])->name('widgets.update');
     Route::delete('/widgets/{widget}', [AdminWidgetController::class, 'destroy'])->name('widgets.destroy');
+
+    Route::get('/about', [\App\Http\Controllers\Admin\AboutController::class, 'show'])->name('about');
 
     // ── Backups (database-only or full; restore is CLI-only) ──────────────
     Route::get('/backups', [AdminBackupController::class, 'index'])->name('backups.index');

@@ -50,6 +50,12 @@ function getInitials(name) {
             {{ $t('nav.qr_code') }}
         </Link>
 
+        <!-- About Link -->
+        <Link :href="route('about')"
+            class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-center">
+            {{ $t('nav.about') }}
+        </Link>
+
         <!-- Logout Link -->
         <Link :href="route('logout')" method="post" as="button"
             class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-red-900/20 hover:text-red-200 transition-colors text-center">
