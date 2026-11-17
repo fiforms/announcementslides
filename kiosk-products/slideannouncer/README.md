@@ -22,6 +22,19 @@ slideannouncer/local-app/dev-deploy.sh user@host
 slideannouncer/local-app/run-tests.sh          # needs the backend's requirements + pytest
 ```
 
+Per-customer branding (hostname prefix, splash/About graphic, "based on SlideAnnouncer" credit)
+overlays a gitignored `kiosk-products/brands/<name>/` (copy `brands/example/`) onto a staged
+copy of this product, with no change here:
+
+```bash
+npm run package:slideannouncer -- --branding[=name]   # local-app tarball
+npm run build:slideannouncer -- --branding[=name]     # tests + OS image + bundle + virt
+```
+
+One of `--branding` (bare = the only brand present) or `--no-branding` (the stock
+product) is required; without either the command fails. `kiosk-products/build-branded.sh <name>` is the
+image build alone.
+
 How the pieces fit, and what a product may supply:
 [`slideannouncer/docs/PRODUCTS.md`](../../slideannouncer/docs/PRODUCTS.md).
 The server half is this app's `SlideAnnouncer*Controller`s, which implement
