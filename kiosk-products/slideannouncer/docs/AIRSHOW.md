@@ -7,9 +7,30 @@ Miracast (Windows Win+K, Android Smart View over Wi-Fi Direct), Google Cast
 reference is `docs/session-hooks.md` in that repo, installed on the device as
 `/usr/share/doc/airshow/session-hooks.md`.
 
-**Status:** running on a Pi (`0.4.7_0.3.0` plus the registry fix below): AirShow
-mode and background mode start. Casting, approvals and quit keys have not been
-tested end to end yet; see *To verify on hardware* below.
+**Status:** tested on a Raspberry Pi 4B and working: AirShow mode, background
+mode, casting, approvals and quit keys. (`0.4.7_0.3.0` is the image version,
+platform_product. The AirShow release itself is whatever `image/debs.lock` pins,
+currently `v0.1.0+fiforms1`.) AirShow was also tested earlier on a separate
+throwaway Pi image: see *What the handoff tested* below. *To verify on hardware*
+is the checklist to rerun after changes to the units, wrapper or AirShow
+version.
+
+## Where state lives
+
+| What | Where | Survives reboot |
+|---|---|---|
+| Remembered senders (AirShow's QSettings) | `/data/airshow/AirShow/AirShow.conf` | yes |
+| Feature and background switches | `/data/status/airshow.json` | yes |
+| Pause for streams/presentations | `/run/slide-announcer/airshow-hold` (JSON, written by the backend) | no |
+| Revelation presenting flag | `/run/slide-announcer/revelation-presenting` (written by the peer daemon) | no |
+| "A sender is casting" flag | `$XDG_RUNTIME_DIR/airshow-casting` (`start`/`end`, written by the hook) | no |
+| Display-sleep marker | `/run/slide-announcer/kiosk-sleeping` | no |
+| GStreamer registry | `~slideannouncer/.cache/gstreamer-1.0` (tmpfs) | no, rebuilt by `prepare-registry` |
+
+Don't point `XDG_CONFIG_HOME` anywhere else for `airshow` by hand: running it
+as the kiosk user without `XDG_CONFIG_HOME=/data/airshow` reads or writes a
+different (volatile) list. Use `slide-announcer-airshow list`/`forget`, which set
+it.
 
 ## Switching it on
 
@@ -110,6 +131,60 @@ stops AirShow while either one is on screen:
   the reason. AirShow mode (attended) isn't affected: starting it is a
   deliberate choice.
 
+## What to expect when casting
+
+Behaviour of AirShow itself (from the handoff), worth knowing before calling
+something a bug:
+
+- **Discovery is slow.** Windows lists the Pi in Win+K about 20 s after Win+K
+  opens. The Wi-Fi Direct beacon listens 200 ms of every 2 s, because longer
+  listening made mDNS unreliable on the Pi's single radio. While a session is on
+  screen the beacon pauses (the receiver can't be discovered then) and resumes
+  5 s after.
+- **Resolution and rate.** Miracast is offered at 720p at most (software
+  decoding; the Pi can't keep up with 1080p). Expect about 30 fps from phones and
+  Windows.
+- **Windows' approval window is short.** Windows gives up within a few seconds,
+  so a slow first approval fails and the sender has to try again. Once
+  remembered, later connections don't prompt. Approve new Windows senders
+  promptly, with the remote in keyboard mode.
+- **The approval dialog and the remote.** With the remote in keyboard mode,
+  Enter picks the highlighted button (Allow is first), Left/Right/Tab switch,
+  Esc denies. In mouse mode the OK button is a mouse click instead.
+- **No PIN for Windows or Android.** A Windows PIN needs MS-MICE DTLS
+  encryption; an Android PIN needs NetworkManager 1.60 (Debian 13 has 1.52).
+  AirPlay has its own PIN option, which this integration doesn't set. The
+  Settings PIN only gates *approving* (AirShow mode). Once a sender is
+  remembered, anyone with that device in range can cast in background mode, so
+  *Forget* senders you no longer trust.
+- **Rejected senders** (background mode, unknown device): only logged. No hook
+  runs and the screen isn't touched. Windows shows "Connecting…" until it times
+  out.
+- **`AIRSHOW_DEVICE` is sender-chosen text.** The hook only logs it (as a quoted
+  repr). Anything else that uses the hook's environment must never evaluate it.
+
+## What the handoff tested
+
+On a throwaway Pi 4 image (Debian 13, labwc, NetworkManager, built-in Wi-Fi),
+with AirShow run directly, not through these units:
+
+- Samsung S23 Ultra (Smart View): approve, stream, disconnect, reconnect with no
+  prompt.
+- Windows 11 Win+K: approve, stream, video with no tearing, disconnect, reconnect
+  with no prompt.
+- GNOME Network Displays: the `slideannouncer-… (network)` entry.
+- Remote Home/Back with `--quit-keys 172,158` exits AirShow.
+- `--approval known-only`: a forgotten Windows laptop is rejected with no
+  prompt; a remembered phone connects directly.
+- The next session doesn't show the previous session's last frame.
+
+iPhone/AirPlay and DLNA were not part of that run.
+
+**On this image** (Pi 4B, `image/debs.lock`'s AirShow): Windows 11, Samsung
+Android and GNOME Network Displays (the Network Displays client) are tested and
+work. iPhone (AirPlay) worked on an older AirShow release but hasn't been
+retested with the current one. DLNA is untested.
+
 ## Image pieces
 
 | Path (`image/`) | What |
@@ -124,6 +199,11 @@ stops AirShow while either one is on screen:
 
 Installing AirShow needs a full image or RAUC bundle (new apt packages). Later
 changes to the units, script and drop-in can go out as hotfixes.
+
+The `.deb` also installs a udev rule
+(`/usr/lib/udev/rules.d/60-airshow-wifi-direct.rules`) that turns off Wi-Fi power
+saving on the Wi-Fi Direct interfaces only. The NetworkManager drop-in above
+covers the station connection, so both are needed.
 
 Permissions are already in place on the platform. `slideannouncer` is in
 `netdev` (wpa_supplicant D-Bus), polkit grants it every
@@ -161,14 +241,35 @@ wrapper reopens `/dev/null` on fds 0 to 2.
 - **Remote keys:** Power (116) stays with logind/the power-button service and is
   never a quit key. `volume-key-monitor.py` must keep not grabbing
   (`EVIOCGRAB`) the remote, or AirShow stops getting Home/Back.
-- **Escape hatch / kiosk guard:** both talk to Chromium over CDP. With Chromium
-  stopped (AirShow mode, or casting in background mode), the guard just
-  retries. An escape-hatch trigger fails to navigate, so it restarts the kiosk
-  unit, which ends AirShow mode or the cast. That's the intended way out.
+- **Escape hatch / kiosk guard:** both talk to Chromium over CDP. The guard
+  (`slide-announcer-kiosk-guard`) is *not* enabled for this product (`image/enable`
+  lists only the Revelation peer), so today only the escape hatch matters. With
+  Chromium stopped (AirShow mode, or casting in background mode), an
+  escape-hatch trigger fails to navigate, so it restarts the kiosk unit. Starting
+  the kiosk stops the AirShow-mode unit (`Conflicts=`), which ends AirShow mode
+  or, in background mode, restarts the whole session and so ends the cast. That's
+  the intended way out. If the guard is ever enabled for this product, it has to
+  stay quiet while Chromium is down: its rescue path restarts the kiosk unit,
+  which would end AirShow mode.
+- **Unit stops and `ExecStopPost`:** `return-to-kiosk` runs on every stop of the
+  AirShow-mode unit, including the one caused by an escape-hatch restart of the
+  kiosk. Starting a unit that is already starting is harmless.
+- **Stop timeouts.** AirShow restores wpa_supplicant's Wi-Fi Direct settings on
+  SIGTERM, which takes a moment. The AirShow-mode unit has `TimeoutStopSec=15`.
+  The kiosk unit's is 10 (the handoff's minimum). systemd signals Chromium and
+  AirShow together, so the wrapper's own 8 s waits don't add up, but don't lower
+  the kiosk's timeout. A kill shows as "a previous run did not exit cleanly" in
+  AirShow's log on the next start. That's harmless (it recovers the settings),
+  but it means the stop wasn't graceful.
 - **Revelation peer:** a master's navigation commands fail while Chromium is
   stopped. The next one after the slideshow returns works.
 - **Windows rejected in background mode** shows "Connecting…" until it times
   out (MS-MICE has no rejection message).
+- **Switching the feature off while AirShow mode is running** doesn't stop it
+  (only background mirroring is restarted away). Leave with Home/Back.
+- **Session wrapper env.** The AirShow-mode unit sets `KIOSK_SESSION_WRAPPER`
+  with `Environment=`, which `kiosk-start.sh` lets win over `product.env`'s
+  background wrapper. That's why the same script serves both units.
 
 ## Managing remembered senders
 
@@ -179,6 +280,31 @@ sudo slide-announcer-airshow list
 sudo slide-announcer-airshow forget "Jane's iPhone"   # or an identifier, or all
 journalctl _UID=$(id -u slideannouncer) | grep -i airshow
 ```
+
+`forget` takes the identifier or name that `list` prints. Quote names with
+spaces. Names and identifiers come from the senders, so treat them as untrusted.
+
+## Troubleshooting
+
+- **Logs.** `journalctl _UID=$(id -u slideannouncer)` has AirShow's output, with
+  frame rate and buffer levels every 5 s while streaming. The wrapper's lines are
+  prefixed `slide-announcer-airshow:`, the backend's `[airshow]`.
+- **Flickers, then the slideshow comes back:** the GStreamer registry problem
+  above (`Missing GStreamer plugin 'appsink'`). `slide-announcer-airshow
+  prepare-registry` output is in the unit's journal.
+- **Streams arrive in bursts, "connection unstable":** Wi-Fi power saving is on.
+  Check `/etc/NetworkManager/conf.d/90-wifi-powersave-off.conf` exists.
+- **Android connects, then fails with a permission error:** polkit's
+  `org.freedesktop.NetworkManager.*` rule for `slideannouncer`, and the unit's
+  `PAMName=login` (active local session).
+- **Android drops the link:** NetworkManager removes Wi-Fi Direct groups it didn't
+  create, so don't mark `p2p-dev-wlan0` unmanaged.
+- **Wi-Fi Direct (Win+K, Android) causes trouble generally:** AirShow's
+  `--no-beacon` turns both off. Nothing here passes it; add it to
+  `attended()` and `background_argv()` in `system/scripts/slide-announcer-airshow`
+  to try it.
+- **Out of disk:** the runtime packages are small next to AirShow's build
+  dependencies, but the rootfs growth hasn't been measured (below).
 
 ## To verify on hardware
 
@@ -196,6 +322,15 @@ journalctl _UID=$(id -u slideannouncer) | grep -i airshow
 - Pausing: with background on, start an SRT/RIST stream or a Revelation
   presentation (AirShow stops, and the stream has no drops from Wi-Fi Direct);
   end it (about 30 s later AirShow starts again and the slideshow reloads).
-- AirShow stops cleanly on a unit stop: no "previous run did not exit cleanly"
-  on the next start.
+- Remembered senders survive a reboot (`/data/airshow`), and
+  `slide-announcer-airshow list` shows the same ones the Settings page does.
+- An iPhone (AirPlay) on the current AirShow release (only an older one was
+  tested) and DLNA (untested).
+- Casting during AirShow mode's own screen: the next session doesn't show the
+  previous one's last frame.
+- AirShow stops cleanly on a unit stop (both units): no "previous run did not
+  exit cleanly" on the next start. Check the kiosk unit's 10 s timeout
+  especially.
+- Approving a new Windows sender in AirShow mode with the remote fits inside
+  Windows' short approval window.
 - The hook's casting flag survives AirShow's 5 s `end` delay without flicker.
