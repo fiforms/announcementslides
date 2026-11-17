@@ -280,7 +280,7 @@ onMounted(() => {
       <!-- On/off lives in Settings > Advanced (this page is only in the
            rail while it's on) — this is just a fallback if someone lands
            here with it off. -->
-      <p v-if="!localEnabled" class="hint note">{{ t('settings.advanced.featureOffHint') }}</p>
+      <p v-if="!localEnabled" class="hint note">{{ t('settings.features.featureOffHint') }}</p>
       <template v-else>
         <p v-if="!serverAllows" class="pill warn note">{{ t('settings.srtSink.serverDisabled') }}</p>
 

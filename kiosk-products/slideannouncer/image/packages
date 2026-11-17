@@ -2,3 +2,9 @@
 # LAN video receiver (backend/products/slideannouncer/srt_*.py)
 mpv
 ffmpeg
+# AirShow (debs.lock) Recommends, listed so they're installed whatever apt's
+# Install-Recommends setting: Wayland platform plugin (without it AirShow can't
+# open a window under labwc), iw (Wi-Fi Direct), PipeWire audio output.
+qt6-wayland
+iw
+gstreamer1.0-pipewire

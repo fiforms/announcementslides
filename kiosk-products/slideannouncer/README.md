@@ -6,7 +6,8 @@ app's `/api/slide-announcers/*` API, the full-screen slideshow, the Menu
 overlay, the LAN video receiver (SRT/RIST) and Revelation peering.
 
 ```
-image/      product.env, packages (mpv, ffmpeg), enable + units for the Revelation peer daemon
+image/      product.env, packages (mpv, ffmpeg), enable + units for the Revelation peer daemon,
+            AirShow (debs.lock, slide-announcer-airshow unit + script, Wi-Fi power-save drop-in)
 backend/    sync, widgets, pinning, srt_*, revelation, routes — the `products.slideannouncer` package
 frontend/   Slideshow, MenuOverlay, SlideStage/Widget*, SRT + Revelation settings pages
 ```
@@ -27,7 +28,8 @@ The server half is this app's `SlideAnnouncer*Controller`s, which implement
 [`DEVICE_CONTRACT.md`](../../slideannouncer/docs/DEVICE_CONTRACT.md).
 
 Product docs: [`docs/MULTI_SHOW_IMPLEMENTATION.md`](docs/MULTI_SHOW_IMPLEMENTATION.md)
-(the multi-show kiosk spec).
+(the multi-show kiosk spec), [`docs/AIRSHOW.md`](docs/AIRSHOW.md) (screen
+mirroring: AirShow mode and background mode).
 
 ## LAN video receiver (SRT/RIST)
 

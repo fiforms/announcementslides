@@ -40,6 +40,27 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
     }),
+  airshowStatus: () => request('/api/local/airshow'),
+  airshowStart: () => request('/api/local/airshow/start', { method: 'POST' }),
+  setAirshowEnabled: (enabled) =>
+    request('/api/local/airshow/enabled', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }),
+  setAirshowBackground: (enabled) =>
+    request('/api/local/airshow/background', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }),
+  airshowRemembered: () => request('/api/local/airshow/remembered'),
+  airshowForget: (id) =>
+    request('/api/local/airshow/forget', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }),
   revelationEnabled: () => request('/api/local/revelation/enabled'),
   setRevelationEnabled: (enabled) =>
     request('/api/local/revelation/enabled', {

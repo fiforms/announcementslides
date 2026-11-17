@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 import pairing
 
-from . import pinning, revelation, srt_sink, srt_stream_bridge, sync, widgets
+from . import airshow, pinning, revelation, srt_sink, srt_stream_bridge, sync, widgets
 
 router = APIRouter()
 
@@ -257,3 +257,70 @@ def revelation_set_display_settings(body: RevelationDisplaySettingsRequest):
         return revelation.write_display_settings(body.variant, body.lang)
     except revelation.RevelationPeerError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+# --- AirShow screen mirroring (airshow.py, docs/AIRSHOW.md) ---
+
+def _airshow_call_failed(exc: Exception) -> HTTPException:
+    return HTTPException(status_code=500, detail=str(exc))
+
+
+@router.get("/api/local/airshow")
+async def airshow_status():
+    return await airshow.status()
+
+
+@router.post("/api/local/airshow/start")
+async def airshow_start():
+    try:
+        await airshow.start_mode()
+    except airshow.AirShowError as exc:
+        raise _airshow_call_failed(exc) from exc
+    return {"started": True}
+
+
+class AirShowEnabledRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/api/local/airshow/enabled")
+async def airshow_set_enabled(body: AirShowEnabledRequest):
+    try:
+        await airshow.set_enabled(body.enabled)
+    except airshow.AirShowError as exc:
+        raise _airshow_call_failed(exc) from exc
+    return await airshow.status()
+
+
+class AirShowBackgroundRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/api/local/airshow/background")
+async def airshow_set_background(body: AirShowBackgroundRequest):
+    try:
+        await airshow.set_background(body.enabled)
+    except airshow.AirShowError as exc:
+        raise _airshow_call_failed(exc) from exc
+    return await airshow.status()
+
+
+@router.get("/api/local/airshow/remembered")
+async def airshow_remembered():
+    try:
+        return {"devices": await airshow.list_remembered()}
+    except airshow.AirShowError as exc:
+        raise _airshow_call_failed(exc) from exc
+
+
+class AirShowForgetRequest(BaseModel):
+    id: str
+
+
+@router.post("/api/local/airshow/forget")
+async def airshow_forget(body: AirShowForgetRequest):
+    try:
+        await airshow.forget(body.id)
+        return {"devices": await airshow.list_remembered()}
+    except airshow.AirShowError as exc:
+        raise _airshow_call_failed(exc) from exc

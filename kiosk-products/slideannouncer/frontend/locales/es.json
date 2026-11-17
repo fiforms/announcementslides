@@ -2,7 +2,8 @@
     "menu": {
         "mainShow": "Programa Principal",
         "playing": "Reproduciendo",
-        "settings": "Configuración…"
+        "settings": "Configuración…",
+        "screenMirroring": "Duplicar pantalla"
     },
     "slideshow": {
         "notPaired": "Aún no emparejado. Use Menú o la tecla Escape para abrir Configuración.",
@@ -13,7 +14,9 @@
     },
     "settingsLayout": {
         "videoReceiver": "Receptor de Video LAN",
-        "revelationPeering": "Emparejamiento Revelation"
+        "revelationPeering": "Emparejamiento Revelation",
+        "screenMirroring": "Duplicar pantalla",
+        "features": "Funciones"
     },
     "settings": {
         "srtSink": {
@@ -79,9 +82,30 @@
             "variantLabel": "Variante de Pantalla de Revelation",
             "languageLabel": "Variante de Idioma"
         },
-        "advanced": {
-            "featuresTitle": "Funciones Opcionales",
-            "featureOffHint": "Esta función está desactivada — actívela en Configuración > Avanzado.",
+        "airshow": {
+            "title": "Duplicar pantalla (AirShow)",
+            "modeTitle": "Modo de duplicación",
+            "modeManual": "Manual",
+            "modeAlwaysOn": "Siempre activado",
+            "modeManualHint": "Seleccione 'Duplicar pantalla' para duplicar",
+            "modeAlwaysOnHint": "Los dispositivos recordados pueden interrumpir la presentación. Esto hará más lento el Wi-Fi del dispositivo.",
+            "intro": "Muestre un teléfono, tableta o computadora en esta pantalla con AirShow: AirPlay, Miracast, Google Cast y DLNA.",
+            "notInstalled": "AirShow no está instalado en el software de este dispositivo.",
+            "start": "Abrir Duplicar pantalla y vincular dispositivos",
+            "starting": "Iniciando…",
+            "startHint": "La presentación se detiene mientras AirShow está abierto. Conéctese desde su dispositivo; un dispositivo nuevo pide aprobación aquí (OK para permitir). Pulse Inicio o Atrás en el control remoto para volver a la presentación.",
+            "restarting": "Reiniciando la presentación…",
+            "rememberedTitle": "Dispositivos recordados",
+            "noneRemembered": "Aún no hay dispositivos. Inicie AirShow y apruebe un dispositivo para recordarlo.",
+            "forget": "Olvidar",
+            "paused": "En pausa: {reason}.",
+            "pausedFor_video_stream": "se está reproduciendo una transmisión de video LAN",
+            "pausedFor_revelation": "hay una presentación de Revelation abierta"
+        },
+        "features": {
+            "title": "Funciones opcionales",
+            "featureOffHint": "Esta función está desactivada — actívela en Configuración > Funciones.",
+            "screenMirroringHint": "Muestre un teléfono, tableta o computadora en esta pantalla (AirPlay, Miracast, Google Cast). Agrega Duplicar pantalla al Menú.",
             "revelationHint": "Permite que un presentador de Revelation en su red tome esta pantalla para una presentación en vivo.",
             "srtSinkHint": "Recibe una transmisión de video en vivo (OBS, vMix, etc.) desde la red de su iglesia mediante SRT."
         }

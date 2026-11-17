@@ -1,0 +1,39 @@
+[Unit]
+Description=Slide Announcer screen mirroring (AirShow mode: labwc + AirShow)
+Documentation=file:///usr/share/doc/airshow/session-hooks.md
+# Takes the screen from the slideshow. Ordering against the kiosk unit makes
+# systemd finish stopping it (releasing tty1 and the display) before this
+# starts; a stop is always ordered before a start, whichever way After= points.
+Conflicts=slide-announcer-kiosk.service
+After=slide-announcer-kiosk.service slide-announcer-firstboot.service seatd.service
+Requires=seatd.service
+
+[Service]
+Type=simple
+# Same session setup as slide-announcer-kiosk.service: PAMName=login gives the
+# active local session that NetworkManager's polkit check wants for the
+# temporary Wi-Fi Direct connections Android Miracast needs; netdev (already
+# one of this user's groups) covers wpa_supplicant's D-Bus API.
+User=slideannouncer
+Group=slideannouncer
+SupplementaryGroups=video render input netdev
+PAMName=login
+TTYPath=/dev/tty1
+StandardInput=tty
+StandardOutput=journal
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+# kiosk-start.sh sets up labwc (cursor, HDMI audio, screen resolution) exactly
+# as for the slideshow, then runs this wrapper instead of Chromium.
+Environment="KIOSK_SESSION_WRAPPER=/usr/local/sbin/slide-announcer-airshow session attended"
+# Build the GStreamer registry before labwc starts: AirShow's own first scan
+# inside the labwc session leaves a broken one (see the script's docstring).
+ExecStartPre=-/usr/local/sbin/slide-announcer-airshow prepare-registry
+ExecStart=/usr/local/bin/slide-announcer-kiosk-start.sh
+# AirShow exits on the remote's Home/Back (labwc -S follows it out), or the
+# unit is stopped: either way go back to the slideshow, unless asleep or
+# shutting down. No Restart=: a crash also lands back on the slideshow.
+ExecStopPost=/usr/local/sbin/slide-announcer-airshow return-to-kiosk
+# AirShow restores wpa_supplicant's Wi-Fi Direct settings on SIGTERM.
+TimeoutStopSec=15

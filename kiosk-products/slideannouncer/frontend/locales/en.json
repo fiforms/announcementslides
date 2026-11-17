@@ -2,7 +2,8 @@
     "menu": {
         "mainShow": "Main Show",
         "playing": "Playing",
-        "settings": "Settings…"
+        "settings": "Settings…",
+        "screenMirroring": "Screen Mirroring"
     },
     "slideshow": {
         "notPaired": "Not yet paired. Use Menu or Escape key to open Settings.",
@@ -13,7 +14,9 @@
     },
     "settingsLayout": {
         "videoReceiver": "LAN Video Receiver",
-        "revelationPeering": "Revelation Peering"
+        "revelationPeering": "Revelation Peering",
+        "screenMirroring": "Screen Mirroring",
+        "features": "Features"
     },
     "settings": {
         "srtSink": {
@@ -79,9 +82,30 @@
             "variantLabel": "Revelation Screen Variant",
             "languageLabel": "Language Variant"
         },
-        "advanced": {
-            "featuresTitle": "Optional Features",
-            "featureOffHint": "This feature is turned off — switch it on in Settings > Advanced.",
+        "airshow": {
+            "title": "Screen Mirroring (AirShow)",
+            "modeTitle": "Mirroring Mode",
+            "modeManual": "Manual",
+            "modeAlwaysOn": "Always On",
+            "modeManualHint": "Select 'Screen Mirroring' to Mirror",
+            "modeAlwaysOnHint": "Remembered Devices can interrupt slideshow. This will slow the device's Wi-Fi.",
+            "intro": "Show a phone, tablet or computer on this screen with AirShow: AirPlay, Miracast, Google Cast and DLNA.",
+            "notInstalled": "AirShow is not installed in this device's software.",
+            "start": "Open Screen Mirroring & Pair Devices",
+            "starting": "Starting…",
+            "startHint": "The slideshow stops while AirShow is open. Connect from your device; a new device asks for approval here (OK to allow). Press Home or Back on the remote to return to the slideshow.",
+            "restarting": "Restarting the slideshow…",
+            "rememberedTitle": "Remembered devices",
+            "noneRemembered": "No devices yet. Start AirShow and approve a device to remember it.",
+            "forget": "Forget",
+            "paused": "Paused: {reason}.",
+            "pausedFor_video_stream": "a LAN video stream is playing",
+            "pausedFor_revelation": "a Revelation presentation is open"
+        },
+        "features": {
+            "title": "Optional Features",
+            "featureOffHint": "This feature is turned off — switch it on in Settings > Features.",
+            "screenMirroringHint": "Show a phone, tablet or computer on this screen (AirPlay, Miracast, Google Cast). Adds Screen Mirroring to the Menu.",
             "revelationHint": "Let a Revelation presenter on your network take over this display for a live presentation.",
             "srtSinkHint": "Receive a live video feed (OBS, vMix, etc.) from your church network over SRT."
         }
