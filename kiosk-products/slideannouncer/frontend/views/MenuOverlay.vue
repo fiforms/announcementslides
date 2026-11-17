@@ -3,13 +3,12 @@
 // the slideshow keeps running underneath it and Back (remoteNav.js)
 // dismisses without navigating anywhere. Mounted at the top level in
 // App.vue alongside <router-view>, not nested inside it.
-import { nextTick, ref, watch } from 'vue'
+import { nextTick, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { menuOpen, closeMenu } from '@core/menuOverlay.js'
 import { shows, pinnedShowId, pinShow } from '../slideshowState.js'
 import { features, loadFeatures } from '../features.js'
-import { api } from '../api.js'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -22,16 +21,14 @@ async function selectShow(show) {
   closeMenu()
 }
 
-// Opens AirShow mode directly (switched on in Settings > Features). Starting it
-// stops the slideshow, this page included, so there's nothing to do after.
-const mirroringError = ref(null)
-async function openScreenMirroring() {
-  mirroringError.value = null
-  try {
-    await api.airshowStart()
-  } catch (err) {
-    mirroringError.value = err.message
-  }
+// Starts AirShow mode (switched on in Settings > Features). It goes through the
+// Screen Mirroring settings page with ?start=1 so the router's Settings PIN
+// gate (router.js) asks for the PIN first when one is set: AirShow mode is
+// where new senders are approved, and an approved sender can then take over
+// the screen in background mode. Without a PIN it starts straight away.
+function openScreenMirroring() {
+  closeMenu()
+  router.push({ path: '/settings/airshow', query: { start: '1' } })
 }
 
 function openSettings() {
@@ -44,7 +41,6 @@ function openSettings() {
 // first item ourselves whenever it opens.
 watch(menuOpen, (open) => {
   if (!open) return
-  mirroringError.value = null
   if (!features.loaded) loadFeatures().catch(() => {})
   nextTick(() => {
     document.querySelector('.menu-overlay .list-item')?.focus()
@@ -69,7 +65,6 @@ watch(menuOpen, (open) => {
       <button v-if="features.airshow" class="list-item" @click="openScreenMirroring">
         {{ t('menu.screenMirroring') }}
       </button>
-      <p v-if="mirroringError" class="pill warn">{{ mirroringError }}</p>
       <button class="list-item" @click="openSettings">
         {{ t('menu.settings') }}
       </button>

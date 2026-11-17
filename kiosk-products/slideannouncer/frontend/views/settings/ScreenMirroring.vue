@@ -2,11 +2,14 @@
 // Settings > Features > Screen Mirroring (AirShow, docs/AIRSHOW.md). Shown in
 // the rail only while the feature is switched on in Features.vue.
 import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import ToggleSwitch from '@core/components/ToggleSwitch.vue'
 import { api } from '../../api.js'
 
 const { t } = useI18n()
+const route = useRoute()
+const router = useRouter()
 
 const status = ref(null) // { installed, enabled, background, paused_for }
 const statusError = ref(null)
@@ -90,6 +93,12 @@ const pausedFor = computed(() =>
 
 let refresh = null
 onMounted(() => {
+  // Menu > Screen Mirroring lands here with ?start=1, after the PIN gate.
+  // Dropped from the URL first so Back or a reload can't start it again.
+  if (route.query.start === '1') {
+    router.replace({ query: {} })
+    start()
+  }
   loadStatus()
   loadDevices()
   // Pauses come and go with streams and presentations.

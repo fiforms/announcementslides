@@ -18,9 +18,13 @@ Settings → **Features** (after Advanced) has the optional features' switches:
 Receiver. Each switched-on feature gets its own page under Features in the
 rail. With Screen Mirroring on:
 
-- the Menu gets **Screen Mirroring**, which starts AirShow mode directly. It
-  isn't behind the Settings PIN, so anyone with the remote can approve a new
-  sender, and that sender can then cast in background mode;
+- the Menu gets **Screen Mirroring**, which starts AirShow mode. When a
+  Settings PIN is set, it asks for the PIN first: AirShow mode is where new
+  senders are approved, and an approved sender can then cast in background mode
+  with nobody present. The Menu item opens `/settings/airshow?start=1`, so the
+  router's existing Settings PIN gate applies. The page starts AirShow when it
+  opens, and leaving Settings locks it again as usual. Remembered senders
+  casting in background mode never involve the PIN;
 - Settings → Features → Screen Mirroring has **Start AirShow**, the background
   switch, and the remembered senders.
 
