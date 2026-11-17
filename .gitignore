@@ -30,3 +30,7 @@ Thumbs.db
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Customer brands (kiosk-products/build-branded.sh) stay local; only the example is tracked
+kiosk-products/brands/*
+!kiosk-products/brands/example/
