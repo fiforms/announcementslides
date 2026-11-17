@@ -3,12 +3,13 @@
 // the slideshow keeps running underneath it and Back (remoteNav.js)
 // dismisses without navigating anywhere. Mounted at the top level in
 // App.vue alongside <router-view>, not nested inside it.
-import { nextTick, watch } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { menuOpen, closeMenu } from '@core/menuOverlay.js'
 import { shows, pinnedShowId, pinShow } from '../slideshowState.js'
 import { features, loadFeatures } from '../features.js'
+import { api } from '../api.js'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -21,11 +22,16 @@ async function selectShow(show) {
   closeMenu()
 }
 
-// Screen Mirroring goes through its Settings page, so the Settings PIN guards
-// AirShow mode (where new senders are approved) like everything else there.
-function openScreenMirroring() {
-  closeMenu()
-  router.push('/settings/airshow')
+// Opens AirShow mode directly (switched on in Settings > Features). Starting it
+// stops the slideshow, this page included, so there's nothing to do after.
+const mirroringError = ref(null)
+async function openScreenMirroring() {
+  mirroringError.value = null
+  try {
+    await api.airshowStart()
+  } catch (err) {
+    mirroringError.value = err.message
+  }
 }
 
 function openSettings() {
@@ -38,6 +44,7 @@ function openSettings() {
 // first item ourselves whenever it opens.
 watch(menuOpen, (open) => {
   if (!open) return
+  mirroringError.value = null
   if (!features.loaded) loadFeatures().catch(() => {})
   nextTick(() => {
     document.querySelector('.menu-overlay .list-item')?.focus()
@@ -62,6 +69,7 @@ watch(menuOpen, (open) => {
       <button v-if="features.airshow" class="list-item" @click="openScreenMirroring">
         {{ t('menu.screenMirroring') }}
       </button>
+      <p v-if="mirroringError" class="pill warn">{{ mirroringError }}</p>
       <button class="list-item" @click="openSettings">
         {{ t('menu.settings') }}
       </button>

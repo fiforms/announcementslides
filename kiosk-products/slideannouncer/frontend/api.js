@@ -42,6 +42,12 @@ export const api = {
     }),
   airshowStatus: () => request('/api/local/airshow'),
   airshowStart: () => request('/api/local/airshow/start', { method: 'POST' }),
+  setAirshowEnabled: (enabled) =>
+    request('/api/local/airshow/enabled', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled }),
+    }),
   setAirshowBackground: (enabled) =>
     request('/api/local/airshow/background', {
       method: 'POST',

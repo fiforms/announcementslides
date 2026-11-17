@@ -279,6 +279,19 @@ async def airshow_start():
     return {"started": True}
 
 
+class AirShowEnabledRequest(BaseModel):
+    enabled: bool
+
+
+@router.post("/api/local/airshow/enabled")
+async def airshow_set_enabled(body: AirShowEnabledRequest):
+    try:
+        await airshow.set_enabled(body.enabled)
+    except airshow.AirShowError as exc:
+        raise _airshow_call_failed(exc) from exc
+    return await airshow.status()
+
+
 class AirShowBackgroundRequest(BaseModel):
     enabled: bool
 

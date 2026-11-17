@@ -74,6 +74,22 @@ REVELATION_ENABLED_FILE = Path("/data/status/revelation-enabled")
 # config poll. Removing the file is "stop". Holds the passphrase, so 0o640
 # like srt-sink.json. Mirrors srt_sink.py's RIST_PUSH_FILE.
 RIST_PUSH_FILE = Path("/data/status/rist-push.json")
+# Present while a master's presentation is on the kiosk. Background screen
+# mirroring (slide-announcer-airshow) pauses while it exists: AirShow's Wi-Fi
+# Direct listening costs a live presentation packets. tmpfs, so a reboot
+# clears it; the AirShow session wrapper also clears it whenever it starts
+# Chromium, which always opens the kiosk's own page.
+PRESENTING_FLAG = Path("/run/slide-announcer/revelation-presenting")
+
+
+def set_presenting(on: bool) -> None:
+    try:
+        if on:
+            PRESENTING_FLAG.write_text(str(int(time.time())))
+        else:
+            PRESENTING_FLAG.unlink(missing_ok=True)
+    except OSError as exc:
+        log(f"couldn't update {PRESENTING_FLAG}: {exc}")
 RIST_STREAM_ID = re.compile(r"[A-Za-z0-9_-]{8,64}")
 RIST_ENCRYPTION_MODES = ("none", "128", "256")
 
@@ -461,9 +477,11 @@ def handle_peer_command(command: dict, master_host: str | None = None,
         else:
             url = apply_display_settings(url)
             log(f"open-presentation -> {url}")
+            set_presenting(True)
             cdp_navigate(url)
     elif command_type == "close-presentation":
         log("close-presentation -> back to kiosk")
+        set_presenting(False)
         cdp_navigate(KIOSK_URL)
     elif command_type == "rist-screen":
         payload = command.get("payload")
@@ -590,6 +608,7 @@ def peer_worker(peer: dict, own_instance_id: str, discovery: _DiscoveryListener,
 def main() -> None:
     own_instance_id = get_own_instance_id()
     log(f"starting, own instanceId={own_instance_id}")
+    set_presenting(False)
 
     zc = Zeroconf()
     discovery = _DiscoveryListener()

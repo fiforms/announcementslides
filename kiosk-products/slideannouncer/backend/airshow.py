@@ -3,15 +3,21 @@
 The device side lives in image/system/: slide-announcer-airshow.service (AirShow
 mode, attended) and the slide-announcer-airshow script, which also runs the
 kiosk session (background mode). This module only:
+  - stores the feature switch (Settings > Features) and the background-mode
+    switch, restarting the kiosk when background mirroring turns on or off,
   - starts AirShow mode (the unit's Conflicts= stops the slideshow),
-  - stores the background-mode switch and restarts the kiosk to apply it,
+  - keeps HOLD_FILE up to date: background mirroring pauses while an SRT/RIST
+    stream or a Revelation presentation is on screen,
   - lists and forgets remembered senders through AirShow's own CLI.
 """
 import asyncio
 import json
 import os
 import re
+import time
 from pathlib import Path
+
+from . import srt_stream_bridge
 
 AIRSHOW = "/usr/bin/airshow"
 AIRSHOW_UNIT = "slide-announcer-airshow.service"
@@ -19,7 +25,18 @@ KIOSK_UNIT = "slide-announcer-kiosk.service"
 # Must match image/system/scripts/slide-announcer-airshow.
 CONFIG_HOME = "/data/airshow"
 SETTINGS_FILE = Path("/data/status/airshow.json")
+# Read by the session wrapper: present (JSON {"reasons": [...]}) while
+# background mirroring should be paused. /run/slide-announcer is
+# root:slideannouncer 0775 (slide-announcer-power-button-dirs.service).
+HOLD_FILE = Path("/run/slide-announcer/airshow-hold")
+# Written by the Revelation peer daemon while a presentation is on screen.
+REVELATION_PRESENTING_FLAG = Path("/run/slide-announcer/revelation-presenting")
 CLI_TIMEOUT_SECONDS = 10
+HOLD_POLL_SECONDS = 1.0
+# Stay paused this long after the last stream/presentation ends: a pause ends
+# with AirShow and then Chromium restarting, so don't do that between two
+# streams a few seconds apart.
+HOLD_RELEASE_SECONDS = 30.0
 
 # "<identifier>  <name> (<protocol>)" — the description is optional and is
 # separated by two or more spaces (AirShow pads identifiers into a column).
@@ -35,17 +52,26 @@ def installed() -> bool:
     return os.access(AIRSHOW, os.X_OK)
 
 
+def _clean(data: dict) -> dict:
+    return {"enabled": data.get("enabled") is True, "background": data.get("background") is True}
+
+
 def read_settings(path: Path | None = None) -> dict:
     try:
         data = json.loads((path or SETTINGS_FILE).read_text())
     except (OSError, ValueError):
         data = {}
-    return {"background": data.get("background") is True}
+    return _clean(data if isinstance(data, dict) else {})
+
+
+def background_active(settings: dict) -> bool:
+    """Background mirroring runs only while the feature itself is on."""
+    return settings["enabled"] and settings["background"]
 
 
 def write_settings(settings: dict, path: Path | None = None) -> dict:
     path = path or SETTINGS_FILE
-    clean = {"background": settings.get("background") is True}
+    clean = _clean(settings)
     tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(clean) + "\n")
     tmp.replace(path)
@@ -121,17 +147,96 @@ async def start_mode() -> None:
     with it the browser making this request."""
     if not installed():
         raise AirShowError("AirShow is not installed")
+    if not read_settings()["enabled"]:
+        raise AirShowError("Screen Mirroring is turned off (Settings > Features)")
     await _systemctl("start", "--no-block", AIRSHOW_UNIT)
 
 
-async def set_background(enabled: bool) -> dict:
-    """The kiosk session reads the switch when it starts, so restart it."""
+async def _update(**changes) -> dict:
+    """Save, and restart the kiosk if background mirroring turned on or off:
+    the kiosk session reads it when it starts."""
     previous = read_settings()
-    settings = write_settings({**previous, "background": enabled})
-    if settings != previous and installed():
+    settings = write_settings({**previous, **changes})
+    if background_active(settings) != background_active(previous) and installed():
         await _systemctl("restart", "--no-block", KIOSK_UNIT)
     return settings
 
 
+async def set_enabled(enabled: bool) -> dict:
+    return await _update(enabled=enabled)
+
+
+async def set_background(enabled: bool) -> dict:
+    return await _update(background=enabled)
+
+
+def read_hold(path: Path | None = None) -> list[str]:
+    try:
+        reasons = json.loads((path or HOLD_FILE).read_text()).get("reasons", [])
+    except (OSError, ValueError, AttributeError):
+        return []
+    return [r for r in reasons if isinstance(r, str)]
+
+
 async def status() -> dict:
-    return {"installed": installed(), **read_settings()}
+    settings = read_settings()
+    return {
+        "installed": installed(),
+        **settings,
+        "paused_for": read_hold() if background_active(settings) else [],
+    }
+
+
+# --- Pausing background mirroring -------------------------------------------
+
+def current_hold_reasons() -> list[str]:
+    reasons = []
+    if srt_stream_bridge.is_playing():
+        reasons.append("video_stream")
+    if REVELATION_PRESENTING_FLAG.exists():
+        reasons.append("revelation")
+    return reasons
+
+
+class Hold:
+    """Turns a reason list sampled every poll into the hold to publish: on at
+    once, off only after `release_after` seconds with no reason."""
+
+    def __init__(self, release_after: float = HOLD_RELEASE_SECONDS):
+        self.release_after = release_after
+        self._reasons: list[str] = []
+        self._last_seen: float | None = None
+
+    def observe(self, now: float, reasons: list[str]) -> list[str]:
+        if reasons:
+            self._reasons, self._last_seen = reasons, now
+        elif self._last_seen is not None and now - self._last_seen >= self.release_after:
+            self._reasons, self._last_seen = [], None
+        return self._reasons
+
+
+def write_hold(reasons: list[str], path: Path | None = None) -> None:
+    path = path or HOLD_FILE
+    if not reasons:
+        path.unlink(missing_ok=True)
+        return
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps({"reasons": reasons}) + "\n")
+    tmp.replace(path)
+
+
+async def run_hold_monitor() -> None:
+    """Background task (product.background_tasks): keep HOLD_FILE current."""
+    hold, published = Hold(), None
+    while True:
+        try:
+            reasons = hold.observe(time.monotonic(), current_hold_reasons())
+            if reasons != published:
+                write_hold(reasons)
+                if reasons or published:
+                    state = f"paused for {', '.join(reasons)}" if reasons else "resumed"
+                    print(f"[airshow] background screen mirroring {state}", flush=True)
+                published = reasons
+        except OSError as exc:
+            print(f"[airshow] can't update {HOLD_FILE}: {exc}", flush=True)
+        await asyncio.sleep(HOLD_POLL_SECONDS)

@@ -1,5 +1,5 @@
-// On/off state for the optional features Settings > Advanced switches
-// (Revelation Peering, LAN Video Receiver) — shared between Advanced.vue,
+// On/off state for the optional features Settings > Features switches
+// (Screen Mirroring, Revelation Peering, LAN Video Receiver) — shared between Features.vue,
 // which flips them, and SettingsLayout.vue, whose rail only lists a
 // feature's own settings page while it's on. Same tiny reactive-module
 // style as menuOverlay.js.
@@ -13,8 +13,10 @@ export const features = reactive({
   // Admin dashboard's fleet-wide SRT force-disable (see srt_sink.py) —
   // shown as a warning next to the switch, doesn't change what it does.
   srtSinkServerAllows: true,
-  // AirShow screen mirroring is in the image (not a switch: always offered when installed).
+  // Screen Mirroring (AirShow): switched on, and in the image. airshowInstalled
+  // alone decides whether the switch is offered at all.
   airshow: false,
+  airshowInstalled: false,
 })
 
 export async function loadFeatures() {
@@ -28,12 +30,19 @@ export async function loadFeatures() {
     features.srtSink = srt.value.local_enabled
     features.srtSinkServerAllows = srt.value.server_allows
   }
-  if (airshow.status === 'fulfilled') features.airshow = airshow.value.installed
+  if (airshow.status === 'fulfilled') setAirshow(airshow.value)
   features.loaded = true
 }
 
+function setAirshow(status) {
+  features.airshowInstalled = status.installed
+  features.airshow = status.installed && status.enabled
+}
+
 export async function setFeature(name, enabled) {
-  if (name === 'revelation') {
+  if (name === 'airshow') {
+    setAirshow(await api.setAirshowEnabled(enabled))
+  } else if (name === 'revelation') {
     features.revelation = (await api.setRevelationEnabled(enabled)).enabled
   } else if (name === 'srtSink') {
     const data = await api.setSrtSink(enabled)

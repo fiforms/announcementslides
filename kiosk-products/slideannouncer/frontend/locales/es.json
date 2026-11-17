@@ -3,7 +3,7 @@
         "mainShow": "Programa Principal",
         "playing": "Reproduciendo",
         "settings": "Configuración…",
-        "screenMirroring": "Duplicar pantalla…"
+        "screenMirroring": "Duplicar pantalla"
     },
     "slideshow": {
         "notPaired": "Aún no emparejado. Use Menú o la tecla Escape para abrir Configuración.",
@@ -15,7 +15,8 @@
     "settingsLayout": {
         "videoReceiver": "Receptor de Video LAN",
         "revelationPeering": "Emparejamiento Revelation",
-        "screenMirroring": "Duplicar pantalla"
+        "screenMirroring": "Duplicar pantalla",
+        "features": "Funciones"
     },
     "settings": {
         "srtSink": {
@@ -81,12 +82,6 @@
             "variantLabel": "Variante de Pantalla de Revelation",
             "languageLabel": "Variante de Idioma"
         },
-        "advanced": {
-            "featuresTitle": "Funciones Opcionales",
-            "featureOffHint": "Esta función está desactivada — actívela en Configuración > Avanzado.",
-            "revelationHint": "Permite que un presentador de Revelation en su red tome esta pantalla para una presentación en vivo.",
-            "srtSinkHint": "Recibe una transmisión de video en vivo (OBS, vMix, etc.) desde la red de su iglesia mediante SRT."
-        },
         "airshow": {
             "intro": "Muestre un teléfono, tableta o computadora en esta pantalla con AirShow: AirPlay (iPhone, iPad, Mac), Miracast (Windows Win+K, Android Smart View), Google Cast y DLNA.",
             "notInstalled": "AirShow no está instalado en el software de este dispositivo.",
@@ -98,7 +93,18 @@
             "restarting": "Reiniciando la presentación…",
             "rememberedTitle": "Dispositivos recordados",
             "noneRemembered": "Aún no hay dispositivos. Inicie AirShow y apruebe un dispositivo para recordarlo.",
-            "forget": "Olvidar"
+            "forget": "Olvidar",
+            "backgroundWifiWarning": "Esto mantiene la escucha de Wi-Fi Direct, que puede hacer más lento el Wi-Fi de este dispositivo. Se pausa automáticamente mientras se muestra una transmisión de video LAN o una presentación de Revelation.",
+            "paused": "En pausa: {reason}.",
+            "pausedFor_video_stream": "se está reproduciendo una transmisión de video LAN",
+            "pausedFor_revelation": "hay una presentación de Revelation abierta"
+        },
+        "features": {
+            "title": "Funciones opcionales",
+            "featureOffHint": "Esta función está desactivada — actívela en Configuración > Funciones.",
+            "screenMirroringHint": "Muestre un teléfono, tableta o computadora en esta pantalla (AirPlay, Miracast, Google Cast). Agrega Duplicar pantalla al Menú.",
+            "revelationHint": "Permite que un presentador de Revelation en su red tome esta pantalla para una presentación en vivo.",
+            "srtSinkHint": "Recibe una transmisión de video en vivo (OBS, vMix, etc.) desde la red de su iglesia mediante SRT."
         }
     }
 }

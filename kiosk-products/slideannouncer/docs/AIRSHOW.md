@@ -11,11 +11,28 @@ reference is `docs/session-hooks.md` in that repo, installed on the device as
 mode and background mode start. Casting, approvals and quit keys have not been
 tested end to end yet; see *To verify on hardware* below.
 
+## Switching it on
+
+Settings → **Features** (after Advanced) has the optional features' switches:
+**Screen Mirroring** at the top, then Revelation Peering and LAN Video
+Receiver. Each switched-on feature gets its own page under Features in the
+rail. With Screen Mirroring on:
+
+- the Menu gets **Screen Mirroring**, which starts AirShow mode directly. It
+  isn't behind the Settings PIN, so anyone with the remote can approve a new
+  sender, and that sender can then cast in background mode;
+- Settings → Features → Screen Mirroring has **Start AirShow**, the background
+  switch, and the remembered senders.
+
+Turning the feature off hides both, stops background mirroring, and makes the
+backend refuse to start AirShow mode. The settings are kept for when it's turned
+back on.
+
 ## The two modes
 
 | | AirShow mode (attended) | Background mode (unattended) |
 |---|---|---|
-| Started by | Menu → *Screen Mirroring…* → **Start AirShow** (behind the Settings PIN) | Settings → Screen Mirroring → *Allow mirroring during the slideshow* |
+| Started by | Menu → **Screen Mirroring**, or Settings → Features → Screen Mirroring → **Start AirShow** | Settings → Features → Screen Mirroring → *Allow mirroring during the slideshow* |
 | Unit | `slide-announcer-airshow.service` (`Conflicts=` the kiosk) | inside `slide-announcer-kiosk.service` |
 | New senders | Allow/Deny prompt, answered with the remote (Enter allows) | rejected silently (`--approval known-only`) |
 | Leaves by | Home or Back on the remote (`--quit-keys 172,158`) | the sender disconnecting (≈5 s later) |
@@ -23,8 +40,9 @@ tested end to end yet; see *To verify on hardware* below.
 Both modes share one settings file, `/data/airshow/AirShow/AirShow.conf`
 (`XDG_CONFIG_HOME=/data/airshow`), so a sender approved in AirShow mode is
 admitted in background mode. It has to live on `/data`, because the kiosk
-user's home is on the tmpfs `/var` overlay. The background switch is
-`/data/status/airshow.json`.
+user's home is on the tmpfs `/var` overlay. Both switches are
+`/data/status/airshow.json` (`{"enabled": …, "background": …}`); background
+mirroring runs only when both are on.
 
 ### AirShow mode
 
@@ -57,7 +75,36 @@ execs Chromium, exactly as before. With the switch on, it:
 
 After a session, Chromium restarts on `/kiosk`. Its state and CDP connection
 start over, which takes a few seconds; that's the price of the stop/start design.
-Changing the switch restarts the kiosk unit to apply it.
+Turning background mirroring on or off (either switch) restarts the kiosk unit
+to apply it.
+
+### Pausing for streams and presentations
+
+AirShow's Wi-Fi Direct listening (200 ms of every 2 s, off channel on the Pi's
+single radio) costs an SRT/RIST stream or a Revelation presentation dropped and
+late packets. AirShow can't turn that off while running, so background mirroring
+stops AirShow while either one is on screen:
+
+- **Signals.** The local app (`backend/airshow.py`, `run_hold_monitor`) checks
+  every second for `srt_stream_bridge.is_playing()` (that covers RIST pushes
+  from a Revelation master too) and `/run/slide-announcer/revelation-presenting`.
+  The peer daemon sets that flag on `open-presentation` and clears it on
+  `close-presentation` and at its own start; the session wrapper also clears it
+  whenever it starts Chromium, which always opens `/kiosk`.
+- **The hold.** While there's a reason, the backend writes
+  `/run/slide-announcer/airshow-hold` with `{"reasons": [...]}`. It removes the
+  file only after 30 s with no reason, so back-to-back streams don't cause a
+  stop and start between them.
+- **What the wrapper does.** While the hold exists, the wrapper stops AirShow
+  (Chromium keeps playing). A cast already on screen is left to finish first.
+  When the hold goes, it starts AirShow again and then restarts Chromium,
+  because AirShow's window maps on top. So the end of a pause shows AirShow's
+  idle screen briefly, then the slideshow reloads. A labwc window rule keeping
+  `app_id=airshow` at the bottom could avoid the restart, but it hasn't been
+  tried.
+- **On screen.** Settings → Features → Screen Mirroring shows "Paused: …" with
+  the reason. AirShow mode (attended) isn't affected: starting it is a
+  deliberate choice.
 
 ## Image pieces
 
@@ -121,7 +168,7 @@ wrapper reopens `/dev/null` on fds 0 to 2.
 
 ## Managing remembered senders
 
-Settings → Screen Mirroring lists them, with **Forget**. Over SSH:
+Settings → Features → Screen Mirroring lists them, with **Forget**. Over SSH:
 
 ```bash
 sudo slide-announcer-airshow list
@@ -133,13 +180,18 @@ journalctl _UID=$(id -u slideannouncer) | grep -i airshow
 
 - Image builds; measure rootfs growth (`ROOTFS_FIXED_SIZE_MB` is 5120; the
   test Pi's 2.9 GB filled with build deps, runtime deps should be far less).
-- AirShow mode: Menu → Screen Mirroring → Start; approve S23 (Smart View),
+- Settings → Features: the switches; Screen Mirroring's page and Menu entry
+  appear only while it's on.
+- AirShow mode: Menu → Screen Mirroring; approve S23 (Smart View),
   Windows (Win+K), iPhone; Home/Back returns to the slideshow; Power sleeps and
   wakes to the slideshow.
 - Background mode: toggle on (kiosk restarts with AirShow behind), cast from a
   remembered device (slideshow stops, AirShow visible), disconnect (slideshow
   back in ~5 s plus Chromium start), forgotten device is rejected without a
   prompt.
+- Pausing: with background on, start an SRT/RIST stream or a Revelation
+  presentation (AirShow stops, and the stream has no drops from Wi-Fi Direct);
+  end it (about 30 s later AirShow starts again and the slideshow reloads).
 - AirShow stops cleanly on a unit stop: no "previous run did not exit cleanly"
   on the next start.
 - The hook's casting flag survives AirShow's 5 s `end` delay without flicker.

@@ -13,13 +13,17 @@ Subcommands:
 
   session background CHROMIUM...
       The kiosk unit's session (product.env's KIOSK_SESSION_WRAPPER). If
-      background mirroring is off (Settings > Screen Mirroring), it just execs
-      Chromium, exactly as the kiosk always did. If on, it starts AirShow
+      background mirroring is off (Settings > Features > Screen Mirroring), it
+      just execs Chromium, exactly as the kiosk always did. If on, it starts AirShow
       first (known senders only), waits until AirShow's window is on screen,
       then runs Chromium on top. While a remembered sender is casting, AirShow's
       session hooks have Chromium stopped, revealing AirShow; when the session
-      ends Chromium is started again. If Chromium exits on its own, this exits
-      too, so labwc exits and the unit's Restart=always recovers it as before.
+      ends Chromium is started again. While HOLD_FILE exists (an SRT/RIST
+      stream or Revelation presentation is on screen) AirShow is stopped, so
+      its Wi-Fi Direct listening can't cost those streams packets; afterwards
+      it starts again and Chromium is restarted above it. If Chromium exits
+      on its own, this exits too, so labwc exits and the unit's Restart=always
+      recovers it as before.
 
   prepare-registry [background]
       ExecStartPre of the AirShow unit (and, with "background", of the kiosk
@@ -59,6 +63,14 @@ KIOSK_UNIT = "slide-announcer-kiosk.service"
 CONFIG_HOME = Path("/data/airshow")
 SETTINGS_FILE = Path("/data/status/airshow.json")  # written by the local app
 SLEEP_MARKER = Path("/run/slide-announcer/kiosk-sleeping")
+# Written by the local app (backend/airshow.py) while an SRT/RIST stream or a
+# Revelation presentation is on screen: background mirroring pauses, because
+# AirShow's Wi-Fi Direct listening takes the radio off channel and costs those
+# streams packets.
+HOLD_FILE = Path("/run/slide-announcer/airshow-hold")
+# Written by the Revelation peer daemon while a presentation is open; cleared
+# here whenever Chromium starts, since it always opens the kiosk's own page.
+REVELATION_PRESENTING_FLAG = Path("/run/slide-announcer/revelation-presenting")
 
 # Home (KEY_HOMEPAGE) and Back (KEY_BACK) on the 2.4 GHz remote in keyboard
 # mode. Never Power (116): logind and the power-button service own it.
@@ -76,8 +88,26 @@ def read_settings(path: Path | None = None) -> dict:
     try:
         data = json.loads((path or SETTINGS_FILE).read_text())
     except (OSError, ValueError):
-        return {"background": False}
-    return {"background": data.get("background") is True}
+        data = {}
+    if not isinstance(data, dict):
+        data = {}
+    return {"enabled": data.get("enabled") is True, "background": data.get("background") is True}
+
+
+def background_active(settings: dict) -> bool:
+    """Background mirroring runs only while the feature itself is on."""
+    return settings["enabled"] and settings["background"]
+
+
+def is_held(path: Path | None = None) -> bool:
+    return (path or HOLD_FILE).exists()
+
+
+def clear_presenting_flag() -> None:
+    try:
+        REVELATION_PRESENTING_FLAG.unlink(missing_ok=True)
+    except OSError:
+        pass
 
 
 def airshow_env(base: dict | None = None) -> dict:
@@ -116,7 +146,7 @@ def prepare_registry(mode: str) -> int:
     complete registry, AirShow under labwc only validates it and starts fine.
     `airshow --help` runs gst_init and AirShow's plugin check before printing
     help; offscreen Qt so it needs no display. ~1.7 s cold, ~0.2 s warm."""
-    if mode == "background" and not read_settings()["background"]:
+    if mode == "background" and not background_active(read_settings()):
         return 0
     if not os.access(AIRSHOW, os.X_OK):
         return 0
@@ -218,7 +248,8 @@ def background(chromium_argv: list[str]) -> int:
     if not chromium_argv:
         log("no Chromium command line given")
         return 2
-    if not read_settings()["background"]:
+    if not background_active(read_settings()):
+        clear_presenting_flag()
         os.execvp(chromium_argv[0], chromium_argv)
 
     casting_flag().unlink(missing_ok=True)
@@ -231,7 +262,15 @@ def background(chromium_argv: list[str]) -> int:
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, on_signal)
 
-    airshow = start_airshow(os.path.realpath(sys.argv[0]))
+    self_path = os.path.realpath(sys.argv[0])
+    airshow: subprocess.Popen | None = None
+    paused = is_held()  # True while AirShow is stopped for HOLD_FILE
+    crashed = False  # AirShow died on its own: not restarted until the kiosk restarts
+    if paused:
+        log("a video stream or presentation is on screen; background mirroring paused")
+    else:
+        airshow = start_airshow(self_path)
+        crashed = airshow is None
     chromium: subprocess.Popen | None = None
     chromium_env = {k: v for k, v in os.environ.items() if k != "NOTIFY_SOCKET"}
     status = 0
@@ -240,10 +279,27 @@ def background(chromium_argv: list[str]) -> int:
             if airshow is not None and airshow.poll() is not None:
                 # No end hook comes after a crash: make sure the slideshow returns.
                 log(f"AirShow exited (status {airshow.returncode}); slideshow only until the kiosk restarts")
-                airshow = None
+                airshow, crashed = None, True
                 casting_flag().unlink(missing_ok=True)
 
             casting = airshow is not None and is_casting()
+            held = is_held()
+            if held and airshow is not None and not casting:
+                # A cast already on screen is left to finish; this runs after it.
+                log("a video stream or presentation is on screen; pausing background mirroring")
+                stop(airshow, "AirShow")
+                airshow, paused = None, True
+                casting_flag().unlink(missing_ok=True)
+            elif not held and paused and not crashed:
+                log("resuming background mirroring")
+                paused = False
+                airshow = start_airshow(self_path)
+                crashed = airshow is None
+                if airshow is not None and chromium is not None:
+                    # AirShow's window maps on top: restart Chromium above it.
+                    stop(chromium, "Chromium")
+                    chromium = None
+
             if chromium is not None and chromium.poll() is not None:
                 status = chromium.returncode
                 log(f"Chromium exited on its own (status {status}); ending the session")
@@ -255,6 +311,7 @@ def background(chromium_argv: list[str]) -> int:
             elif not casting and chromium is None:
                 if airshow is not None:
                     log("no one is casting; starting the slideshow")
+                clear_presenting_flag()
                 chromium = subprocess.Popen(chromium_argv, env=chromium_env)
             time.sleep(POLL_SECONDS)
     finally:
