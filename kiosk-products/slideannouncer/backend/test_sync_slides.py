@@ -90,3 +90,31 @@ def test_a_slide_that_loses_everything_drops_out_of_the_playlist(monkeypatch):
     assert [s["id"] for s in run_cycle(monkeypatch, [overlay_only])] == ["2"]
 
     assert run_cycle(monkeypatch, [slide(2)]) == []
+
+
+CHANNEL = {"kind": "hls", "url": "https://3abn.tulixcdn.com/3abn2/3abn_live/smil:3abn_live.smil/playlist.m3u8", "muted": False}
+
+
+def test_a_live_channel_from_the_catalog_syncs_as_a_slide_less_show_and_stays_pinnable(monkeypatch):
+    channel_show = {"id": "channel-7", "name": "3ABN", "is_main": False, "is_channel": True, "slides": [],
+                    "frame": {"file_url": None, "mime_type": None, "youtube_url": None, "channel": CHANNEL,
+                              "overlay_url": None, "overlay_mime_type": None, "overlay_media_id": None, "widgets": []}}
+
+    def handler(request):
+        if request.url.path.endswith("/shows"):
+            return httpx.Response(200, json={"shows": [{"id": "3", "name": "Main", "is_main": True, "slides": [], "frame": None}, channel_show],
+                                             "widgets": [], "location": None, "settings": {}})
+        return httpx.Response(200, content=b"x")
+
+    cleared = []
+    monkeypatch.setattr(sync.pinning, "read_pinned_show_id", lambda: "channel-7")
+    monkeypatch.setattr(sync.pinning, "write_pinned_show_id", cleared.append)
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: REAL_ASYNC_CLIENT(transport=httpx.MockTransport(handler), **kw))
+    asyncio.run(sync.sync_once())
+
+    shows = {s["id"]: s for s in sync.read_shows()}
+    assert shows["channel-7"]["is_channel"] is True
+    assert shows["channel-7"]["slides"] == []
+    assert shows["channel-7"]["frame"]["channel"] == CHANNEL
+    assert shows["3"]["is_channel"] is False
+    assert cleared == []  # still offered, so the pin stays

@@ -157,6 +157,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::prefix('slide-announcers')->name('slide-announcers.')->group(function () {
         Route::get('/', [EntitySlideAnnouncerController::class, 'index'])->name('index');
         Route::post('/pairing-codes', [EntitySlideAnnouncerController::class, 'storePairingCode'])->name('pairing-codes.store');
+        Route::patch('/live-channels', [EntitySlideAnnouncerController::class, 'updateLiveChannels'])->name('live-channels.update');
         Route::get('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'show'])->name('show');
         Route::patch('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'update'])->name('update');
         Route::delete('/{slideAnnouncer}', [EntitySlideAnnouncerController::class, 'destroy'])->name('destroy');

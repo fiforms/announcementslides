@@ -3,7 +3,8 @@
         "mainShow": "Programa Principal",
         "playing": "Reproduciendo",
         "settings": "Configuración…",
-        "screenMirroring": "Duplicar pantalla"
+        "screenMirroring": "Duplicar pantalla",
+        "liveChannels": "Canales en vivo"
     },
     "slideshow": {
         "notPaired": "Aún no emparejado. Use Menú o la tecla Escape para abrir Configuración.",

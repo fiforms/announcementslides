@@ -735,6 +735,8 @@
         "no_images": "No OS disk images have been published yet.",
         "no_mac": "no MAC on file",
         "no_devices": "No Slide Announcer devices paired yet. Generate a pairing code and enter it on the device's setup screen.",
+        "offer_live_channels": "Offer live channels in the remote menu",
+        "offer_live_channels_help": "Your Slide Announcers list these under \"Live Channels\" in the remote's menu: {channels}. Picking one plays it full-screen until another show is picked. Turn this off to keep live TV off your screens.",
         "btn_devices": "Slide Announcer Devices",
         "status_published": "Published",
         "status_pending": "Pending",
