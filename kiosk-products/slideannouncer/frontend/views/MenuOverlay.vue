@@ -3,15 +3,57 @@
 // the slideshow keeps running underneath it and Back (remoteNav.js)
 // dismisses without navigating anywhere. Mounted at the top level in
 // App.vue alongside <router-view>, not nested inside it.
-import { nextTick, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { menuOpen, closeMenu } from '@core/menuOverlay.js'
 import { shows, pinnedShowId, pinShow } from '../slideshowState.js'
 import { features, loadFeatures } from '../features.js'
+import { groupShows } from '../showFolders.js'
 
 const router = useRouter()
 const { t } = useI18n()
+
+// Show folders (showFolders.js): "Channels/3ABN" is listed as "3ABN" inside a
+// "Channels" folder. Enter opens a folder; Back (or its "‹" header) returns.
+// The main show is never in a folder.
+const entries = computed(() => groupShows(shows.value, { foldable: (show) => !show.is_main }))
+const openFolderName = ref(null)
+const openFolder = computed(() => entries.value.find((e) => e.folder && e.folder === openFolderName.value) ?? null)
+const isPlaying = (show) => show.id === pinnedShowId.value
+const folderIsPlaying = (entry) => entry.items.some((item) => isPlaying(item.show))
+
+function focusFirst(selector = '.menu-overlay .list-item') {
+  nextTick(() => document.querySelector(selector)?.focus())
+}
+
+function enterFolder(entry) {
+  openFolderName.value = entry.folder
+  focusFirst('.menu-overlay .folder-items .list-item')
+}
+
+function leaveFolder() {
+  const name = openFolderName.value
+  openFolderName.value = null
+  nextTick(() => {
+    const row = [...document.querySelectorAll('.menu-overlay [data-folder]')].find((el) => el.dataset.folder === name)
+    ;(row ?? document.querySelector('.menu-overlay .list-item'))?.focus()
+  })
+}
+
+// Back inside a folder goes up a level instead of closing the menu. This
+// runs in the capture phase, ahead of remoteNav.js's own (bubble-phase)
+// window listener, and stops the event so neither it nor Slideshow.vue's
+// listener also handles the same press. Same key list as remoteNav.js.
+const BACK_KEYS = ['GoBack', 'BrowserBack', 'Back', 'Escape']
+function onKeydown(event) {
+  if (!menuOpen.value || !openFolder.value || !BACK_KEYS.includes(event.key)) return
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  leaveFolder()
+}
+window.addEventListener('keydown', onKeydown, true)
+onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown, true))
 
 async function selectShow(show) {
   // "Main" is always represented as null server-side (see pin-show's
@@ -41,26 +83,63 @@ function openSettings() {
 // first item ourselves whenever it opens.
 watch(menuOpen, (open) => {
   if (!open) return
+  openFolderName.value = null
   if (!features.loaded) loadFeatures().catch(() => {})
-  nextTick(() => {
-    document.querySelector('.menu-overlay .list-item')?.focus()
-  })
+  focusFirst()
+})
+
+// A folder emptied by a sync (shows renamed or removed) falls back to the top.
+watch(openFolder, (folder) => {
+  if (!folder && openFolderName.value) leaveFolder()
 })
 </script>
 
 <template>
   <div v-if="menuOpen" class="menu-overlay">
     <div class="menu-card">
-      <button
-        v-for="show in shows"
-        :key="show.id"
-        class="list-item"
-        :class="{ 'list-item--active': show.id === pinnedShowId }"
-        @click="selectShow(show)"
-      >
-        <span>{{ show.is_main ? t('menu.mainShow') : show.name }}</span>
-        <span v-if="show.id === pinnedShowId" class="pill ok">{{ t('menu.playing') }}</span>
-      </button>
+      <template v-if="openFolder">
+        <button class="list-item folder-header" @click="leaveFolder">
+          <span>‹ {{ openFolder.folder }}</span>
+        </button>
+        <div class="folder-items">
+          <button
+            v-for="item in openFolder.items"
+            :key="item.show.id"
+            class="list-item"
+            :class="{ 'list-item--active': isPlaying(item.show) }"
+            @click="selectShow(item.show)"
+          >
+            <span>{{ item.label }}</span>
+            <span v-if="isPlaying(item.show)" class="pill ok">{{ t('menu.playing') }}</span>
+          </button>
+        </div>
+      </template>
+      <template v-else>
+        <template v-for="entry in entries" :key="entry.folder ? `f:${entry.folder}` : entry.show.id">
+          <button
+            v-if="entry.folder"
+            class="list-item"
+            :class="{ 'list-item--active': folderIsPlaying(entry) }"
+            :data-folder="entry.folder"
+            @click="enterFolder(entry)"
+          >
+            <span>{{ entry.folder }}</span>
+            <span class="folder-tail">
+              <span v-if="folderIsPlaying(entry)" class="pill ok">{{ t('menu.playing') }}</span>
+              <span aria-hidden="true">›</span>
+            </span>
+          </button>
+          <button
+            v-else
+            class="list-item"
+            :class="{ 'list-item--active': isPlaying(entry.show) }"
+            @click="selectShow(entry.show)"
+          >
+            <span>{{ entry.show.is_main ? t('menu.mainShow') : entry.show.name }}</span>
+            <span v-if="isPlaying(entry.show)" class="pill ok">{{ t('menu.playing') }}</span>
+          </button>
+        </template>
+      </template>
       <div class="menu-divider" />
       <button v-if="features.airshow" class="list-item" @click="openScreenMirroring">
         {{ t('menu.screenMirroring') }}
@@ -104,6 +183,19 @@ watch(menuOpen, (open) => {
 }
 .menu-card .list-item--active {
   border-color: var(--accent);
+}
+.folder-items {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.folder-header {
+  color: var(--text-dim);
+}
+.folder-tail {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 .menu-divider {
   border-top: var(--line) solid var(--border);

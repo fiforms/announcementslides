@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import { groupShows } from '@/Composables/showFolders';
 import DropZone from '@/Components/DropZone.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
@@ -323,7 +324,12 @@ async function submit() {
                         <select v-model="targetShowId"
                             class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
                             <option value="">{{ $t('show_manage.create_new_show') }}</option>
-                            <option v-for="s in shows" :key="s.id" :value="s.id">{{ s.name }}</option>
+                            <template v-for="entry in groupShows(shows)" :key="entry.folder ? `f:${entry.folder}` : entry.show.id">
+                                <optgroup v-if="entry.folder" :label="entry.folder">
+                                    <option v-for="item in entry.items" :key="item.show.id" :value="item.show.id">{{ item.label }}</option>
+                                </optgroup>
+                                <option v-else :value="entry.show.id">{{ entry.show.name }}</option>
+                            </template>
                         </select>
                         <input v-if="!targetShowId" v-model="newShowName" type="text" :placeholder="$t('show_manage.new_show_name_placeholder')"
                             class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />

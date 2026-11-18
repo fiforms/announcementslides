@@ -9,6 +9,7 @@ import RevelationInfoModal from '@/Components/RevelationInfoModal.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
 import { useLightbox } from '@/Composables/useLightbox.js';
 import { useI18n } from 'vue-i18n';
+import { groupShows } from '@/Composables/showFolders';
 
 const { t, locale } = useI18n();
 
@@ -36,6 +37,8 @@ const showLabel = (show) => show.system ? t(`shows.${show.system}`) : show.name;
 // show), which is addressed by ?promo= rather than ?show= since every
 // site holds its own copy of it. Both use public tokens, never database ids.
 const showKey = (show) => show.promo ? `promo-${show.promo}` : `show-${show.token}`;
+// "Channels/3ABN" is listed as "3ABN" under a "Channels" group; system shows (main, global) never are.
+const groupedShows = computed(() => groupShows(props.availableShows, { foldable: (s) => !s.system }));
 const selectedShowKey = computed(() => props.promoToken ? `promo-${props.promoToken}` : `show-${props.showToken}`);
 
 const currentLanguageCode = computed(() => props.selectedLanguage || locale.value);
@@ -274,7 +277,12 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
 
                 <select v-if="availableShows.length > 1" :value="selectedShowKey" @change="changeShow($event.target.value)"
                     class="rounded-lg border border-gray-300 px-3 py-2 pr-8 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 appearance-none bg-white bg-no-repeat bg-right">
-                    <option v-for="show in availableShows" :key="showKey(show)" :value="showKey(show)">{{ showLabel(show) }}</option>
+                    <template v-for="entry in groupedShows" :key="entry.folder ? `f:${entry.folder}` : showKey(entry.show)">
+                        <optgroup v-if="entry.folder" :label="entry.folder">
+                            <option v-for="item in entry.items" :key="showKey(item.show)" :value="showKey(item.show)">{{ item.label }}</option>
+                        </optgroup>
+                        <option v-else :value="showKey(entry.show)">{{ showLabel(entry.show) }}</option>
+                    </template>
                 </select>
 
                 <div class="flex flex-wrap gap-2">
