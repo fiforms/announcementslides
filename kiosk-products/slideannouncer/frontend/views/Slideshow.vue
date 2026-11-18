@@ -94,6 +94,36 @@ const paused = ref(false)
 // clobbered by) whatever the user's own paused/unpaused state was going
 // into the external playback.
 const externalPlaybackActive = ref(false)
+
+// Idle interlock for streamed backgrounds (a live channel or a YouTube
+// background): after `stream_timeout_hours` (device setting, default 5,
+// 0 = never) with no remote activity, the stream is stopped outright —
+// ShowFrameLayer's `halted` unmounts it, so nothing keeps downloading in
+// an empty building — and a notice asks for any button to continue. Any
+// key press, or picking another show, counts as activity. Slides and
+// uploaded background videos play from local storage and aren't affected.
+// The clock restarts if the kiosk page reloads.
+const DEFAULT_STREAM_TIMEOUT_HOURS = 5
+const STREAM_CHECK_MS = 60 * 1000
+const streamsLive = computed(() => !!(frame.value?.channel || frame.value?.youtube_url))
+const streamTimeoutHours = computed(() => {
+  const hours = Number(settings.value?.stream_timeout_hours ?? DEFAULT_STREAM_TIMEOUT_HOURS)
+  return Number.isFinite(hours) && hours > 0 ? hours : 0
+})
+const streamHalted = ref(false)
+let lastActivityAt = Date.now()
+let streamCheckTimer = null
+function noteActivity() {
+  lastActivityAt = Date.now()
+}
+function checkStreamTimeout() {
+  if (streamHalted.value || !streamsLive.value || !streamTimeoutHours.value) return
+  if (Date.now() - lastActivityAt >= streamTimeoutHours.value * 3600 * 1000) streamHalted.value = true
+}
+watch(() => activeShow()?.id, () => {
+  noteActivity()
+  streamHalted.value = false
+})
 const volume = ref(100)
 const muted = ref(false)
 const showVolumeIndicator = ref(false)
@@ -483,6 +513,13 @@ function onKeydown(event) {
   // still visible behind the scrim. remoteNav.js's global listener handles
   // the overlay's own focus movement separately.
   if (menuOpen.value || externalPlaybackActive.value) return
+  // A stopped stream resumes on any button; that press does nothing else
+  // (so Home/Back don't also restart the show).
+  if (streamHalted.value) {
+    event.preventDefault()
+    streamHalted.value = false
+    return
+  }
   if (NEXT_SLIDE_KEYS.includes(event.key)) { event.preventDefault(); goToIndex(targetIndex() + 1) }
   else if (PREV_SLIDE_KEYS.includes(event.key)) { event.preventDefault(); goToIndex(targetIndex() - 1) }
   else if (SEEK_FORWARD_KEYS.includes(event.key)) { event.preventDefault(); seekOrGoToIndex(1) }
@@ -557,6 +594,10 @@ onMounted(async () => {
   refreshTimer = setInterval(refreshPlaylist, REFRESH_INTERVAL_MS)
   statusTimer = setInterval(refreshStatus, STATUS_INTERVAL_MS)
   externalPlaybackTimer = setInterval(refreshExternalPlayback, EXTERNAL_PLAYBACK_POLL_MS)
+  streamCheckTimer = setInterval(checkStreamTimeout, STREAM_CHECK_MS)
+  // Capture phase: every key counts as activity, including ones the Menu
+  // overlay or remoteNav.js handle and never pass on.
+  window.addEventListener('keydown', noteActivity, true)
   window.addEventListener('keydown', onKeydown)
 })
 
@@ -565,6 +606,8 @@ onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
   if (statusTimer) clearInterval(statusTimer)
   if (externalPlaybackTimer) clearInterval(externalPlaybackTimer)
+  if (streamCheckTimer) clearInterval(streamCheckTimer)
+  window.removeEventListener('keydown', noteActivity, true)
   if (volumeSettleTimer) clearTimeout(volumeSettleTimer)
   if (volumeHideTimer) clearTimeout(volumeHideTimer)
   if (seekHideTimer) clearTimeout(seekHideTimer)
@@ -583,6 +626,7 @@ onUnmounted(() => {
       :frame="frame"
       layer="base"
       :suspended="paused || externalPlaybackActive"
+      :halted="streamHalted"
     />
     <SlideStage
       v-for="stage in stages"
@@ -613,6 +657,11 @@ onUnmounted(() => {
     />
 
     <div v-if="needsAttention" class="attention-dot" :title="t('slideshow.needsAttention')" />
+
+    <div v-if="streamHalted" class="stream-halted">
+      <p class="stream-halted-title">{{ t('slideshow.streamStopped', { hours: streamTimeoutHours }) }}</p>
+      <p>{{ t('slideshow.pressToContinue') }}</p>
+    </div>
 
     <div v-if="paused" class="pause-indicator" :title="t('slideshow.paused')">
       <span class="pause-icon" />
@@ -673,6 +722,25 @@ onUnmounted(() => {
   border-radius: 50%;
   background: var(--danger);
   box-shadow: 0 0 0 4px rgba(255, 107, 107, 0.25);
+}
+.stream-halted {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  max-width: min(40rem, 80vw);
+  padding: 2rem 2.5rem;
+  border-radius: 1rem;
+  background: rgba(0, 0, 0, 0.75);
+  color: var(--text-dim);
+  font-size: 1.3rem;
+  text-align: center;
+  z-index: 6;
+}
+.stream-halted-title {
+  color: #fff;
+  font-size: 1.6rem;
+  margin-bottom: 0.75rem;
 }
 .pause-indicator {
   position: absolute;

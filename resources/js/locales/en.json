@@ -767,6 +767,8 @@
         "auto_update": "Auto-install updates",
         "slide_duration": "Slide duration (seconds)",
         "slide_duration_help": "How long each slide stays on screen before switching to the next.",
+        "stream_timeout": "Stop live streams after (hours idle)",
+        "stream_timeout_help": "A live channel or YouTube background stops after this many hours with no button pressed on the remote, so it doesn't stream all week to an empty building. Any button starts it again. 0 = never stop.",
         "lan_title": "LAN Video Receiver",
         "lan_help": "Lets a video switcher or encoder on this church's network (OBS, vMix, etc.) send a live feed to this device over SRT or RIST. It also has to be switched on in the device's own Settings > Advanced.",
         "lan_allow": "Allow the LAN video receiver",

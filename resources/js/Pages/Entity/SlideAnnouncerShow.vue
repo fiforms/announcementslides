@@ -19,7 +19,9 @@ const props = defineProps({
 // out into its own field since "how fast do slides switch" is common enough
 // to deserve a real control instead of hand-editing JSON. settings_pin is
 // the on-device Settings PIN gate (4-6 digits, optional) — same treatment.
-const { interval_seconds, settings_pin, ...otherSettings } = props.device.settings ?? {};
+// stream_timeout_hours: the kiosk stops a live channel / YouTube background
+// after this long with no remote activity (Slideshow.vue; default 5, 0 = never).
+const { interval_seconds, settings_pin, stream_timeout_hours, ...otherSettings } = props.device.settings ?? {};
 
 // LAN Video Receiver settings, as last reported by the device (or a web
 // edit it hasn't applied yet) — synced both ways by revision, see
@@ -43,6 +45,7 @@ const form = useForm({
     rx_sender_passphrase: receiver.sender_passphrase || '',
     rx_encryption_bits: receiver.rist_encryption_bits ?? 128,
     interval_seconds: interval_seconds ?? 10,
+    stream_timeout_hours: stream_timeout_hours ?? 5,
     settings_pin: settings_pin ?? '',
     settings_text: JSON.stringify(otherSettings, null, 2),
 });
@@ -94,6 +97,7 @@ function submit() {
         settings: {
             ...settings,
             interval_seconds: Number(data.interval_seconds),
+            stream_timeout_hours: Number(data.stream_timeout_hours) || 0,
             settings_pin: data.settings_pin || null,
         },
     })).patch(route('slide-announcers.update', { slideAnnouncer: props.device.id, entity_id: props.entity.id }));
@@ -265,6 +269,13 @@ function copyConnectUrl() {
                     <input v-model.number="form.interval_seconds" type="number" min="1" step="1" required
                         class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                     <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.slide_duration_help') }}</p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.stream_timeout') }}</label>
+                    <input v-model.number="form.stream_timeout_hours" type="number" min="0" max="168" step="1" required
+                        class="w-32 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.stream_timeout_help') }}</p>
                 </div>
 
                 <!-- LAN Video Receiver — mode/passphrases sync down to the device
