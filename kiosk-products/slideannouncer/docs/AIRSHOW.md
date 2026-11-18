@@ -10,7 +10,7 @@ reference is `docs/session-hooks.md` in that repo, installed on the device as
 **Status:** tested on a Raspberry Pi 4B and working: AirShow mode, background
 mode, casting, approvals and quit keys. (`0.4.7_0.3.0` is the image version,
 platform_product. The AirShow release itself is whatever `image/debs.lock` pins,
-currently `v0.1.0+fiforms1`.) AirShow was also tested earlier on a separate
+currently `v0.1.0+fiforms2`.) AirShow was also tested earlier on a separate
 throwaway Pi image: see *What the handoff tested* below. *To verify on hardware*
 is the checklist to rerun after changes to the units, wrapper or AirShow
 version.
