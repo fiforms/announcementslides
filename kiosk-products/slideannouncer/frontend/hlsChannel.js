@@ -13,6 +13,9 @@
 //  - Fatal network errors restart after a pause; media errors are recovered.
 //  - A watchdog restarts the stream when playback stops advancing on its own
 //    (live streams can stall without ever raising an error).
+//  - Audio-only renditions are dropped: some broadcasters (It Is Written)
+//    list one beside the video qualities, and when hls.js's bandwidth logic
+//    switches to it the picture freezes on its last frame.
 
 const RESTART_DELAY_MS = 15000
 const WATCHDOG_INTERVAL_MS = 5000
@@ -65,7 +68,7 @@ export function attachHls(video, url, { muted = false } = {}) {
       if (!pausedByUs) playWithFallback(video, muted)
       return
     }
-    hls = new Hls({ liveDurationInfinity: true, lowLatencyMode: false })
+    hls = new Hls({ liveDurationInfinity: true, lowLatencyMode: false, capLevelToPlayerSize: true })
     hls.on(Hls.Events.ERROR, (_event, data) => {
       if (!data.fatal) return
       if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {
@@ -74,7 +77,13 @@ export function attachHls(video, url, { muted = false } = {}) {
         scheduleRestart()
       }
     })
-    hls.on(Hls.Events.MANIFEST_PARSED, () => { if (!pausedByUs) playWithFallback(video, muted) })
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      for (let i = hls.levels.length - 1; i >= 0 && hls.levels.length > 1; i--) {
+        const level = hls.levels[i]
+        if (!level.videoCodec && !level.width) hls.removeLevel(i)
+      }
+      if (!pausedByUs) playWithFallback(video, muted)
+    })
     hls.loadSource(url)
     hls.attachMedia(video)
   }
