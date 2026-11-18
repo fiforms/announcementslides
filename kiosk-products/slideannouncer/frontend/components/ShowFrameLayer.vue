@@ -64,6 +64,25 @@ function startHls() {
 watch(() => channel.value?.url, startHls, { flush: 'post' })
 onBeforeUnmount(() => hlsPlayer?.stop())
 
+// A background iframe must never keep keyboard focus: once it has it, remote
+// keys (Menu, Back, Home) go to the broadcaster's page and the kiosk can't
+// react to them. Focus can land there from a click into the player (the
+// JetStream play assist, or the remote's pointer). The top window gets a
+// `blur` when focus moves into a child frame; take it straight back.
+function reclaimFocus() {
+  setTimeout(() => {
+    const el = document.activeElement
+    if (el?.tagName === 'IFRAME' && el.closest('.frame-layer')) {
+      el.blur()
+      window.focus()
+    }
+  }, 0)
+}
+if (props.layer === 'base') {
+  window.addEventListener('blur', reclaimFocus)
+  onBeforeUnmount(() => window.removeEventListener('blur', reclaimFocus))
+}
+
 // enablejsapi=1 (in the URL) lets the player be paused and resumed by message.
 function youtubeCommand(func) {
   ytEl.value?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*')
