@@ -778,7 +778,7 @@
         "mode_hint": {
             "srt": "Este dispositivo espera que un emisor (OBS, vMix, un codificador) se conecte a él mediante SRT. Pegue la URL de conexión de abajo en el emisor.",
             "rist_unicast": "Este dispositivo espera que un emisor se conecte a él mediante RIST. Ideal cuando un emisor alimenta solo este dispositivo.",
-            "rist_caller": "Este dispositivo se conecta a un emisor que espera receptores (en OBS, una salida RIST en modo escucha, p. ej. rist://@0.0.0.0:5000). Permite que un emisor alimente varios dispositivos. La reproducción empieza sola cuando el emisor arranca y termina cuando se detiene.",
+            "rist_caller": "Este dispositivo se conecta a un emisor que espera receptores (en OBS, una salida RIST en modo escucha, p. ej. rist://{'@'}0.0.0.0:5000). Permite que un emisor alimente varios dispositivos. La reproducción empieza sola cuando el emisor arranca y termina cuando se detiene.",
             "rist_multicast": "Este dispositivo se une a un grupo multicast al que transmite el emisor. Permite que un emisor alimente varios dispositivos en una red cableada; el grupo, el puerto y la frase de contraseña deben coincidir con los del emisor."
         },
         "multicast_ip": "IP multicast",
