@@ -202,6 +202,9 @@ async def _sync_frame(client: httpx.AsyncClient, show_id: str, frame, previous) 
         # A YouTube background is just a server-built embed URL (nothing to
         # cache); the kiosk checks it before mounting an iframe.
         "youtube_url": frame.get("youtube_url"),
+        # A live channel ({kind: iframe|hls, url, muted}) likewise streams
+        # straight from the broadcaster; ShowFrameLayer.vue checks its URL.
+        "channel": frame.get("channel"),
         "overlay_url": frame.get("overlay_url"),
         "overlay_local_filename": overlay,
         "overlay_media_id": frame.get("overlay_media_id"),
@@ -224,10 +227,12 @@ def _playlist_frame(frame, widget_index: dict):
     overlay_ok = bool(overlay) and (MEDIA_DIR / overlay).exists()
     placements = widgets.placements_for_playlist(frame, widget_index)
     youtube = frame.get("youtube_url")
-    if not (base_ok or overlay_ok or placements or youtube):
+    channel = frame.get("channel") or None
+    if not (base_ok or overlay_ok or placements or youtube or channel):
         return None
     return {
         "youtube_url": youtube,
+        "channel": channel,
         "media_url": f"/media/{base}" if base_ok else None,
         "mime_type": frame.get("mime_type") if base_ok else None,
         "overlay_media_url": f"/media/{overlay}" if overlay_ok else None,
@@ -262,7 +267,7 @@ def _build_active_playlist(manifest: dict) -> list:
     for show_id, show in manifest.items():
         frame = _playlist_frame(show.get("frame"), widget_index)
         # A background video plays alone — never two videos at once.
-        skip_video = bool(frame and ((frame["mime_type"] or "").startswith("video/") or frame["youtube_url"]))
+        skip_video = bool(frame and ((frame["mime_type"] or "").startswith("video/") or frame["youtube_url"] or frame["channel"]))
         slides = []
         # dict insertion order (preserved through json dump/load) is the
         # server's display order for this show — no sort key to apply.

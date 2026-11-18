@@ -184,7 +184,7 @@ const slideshowSlides = ref([]);
 
 // With a background video (uploaded or YouTube) in the show's frame, slides
 // that are themselves videos are skipped, so two videos never play at once.
-const frameHasVideo = computed(() => !!props.frame && (!!props.frame.youtube_url || !!props.frame.mime_type?.startsWith('video/')));
+const frameHasVideo = computed(() => !!props.frame && (!!props.frame.youtube_url || !!props.frame.channel || !!props.frame.mime_type?.startsWith('video/')));
 const playable = (list) => list.filter(s => (s.file_url || s.overlay_url)
     && !(frameHasVideo.value && s.mime_type?.startsWith('video/')));
 
