@@ -33,6 +33,8 @@
 // points — so steady-state playback doesn't spam the backend with an
 // HTTP request every fragment.
 
+import { LOCAL_HEADERS } from '@core/api.js'
+
 // Diagnostic flag: when true, runCatchup() only trims the buffer and
 // never touches playbackRate/currentTime — useful for isolating whether
 // the catch-up logic itself is driving a given stall, versus reacting to
@@ -148,7 +150,7 @@ function logClient(message) {
   console.log(`[srt-stream-player] ${message}`)
   fetch('/api/local/srt-sink/client-log', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...LOCAL_HEADERS, 'Content-Type': 'application/json' },
     body: JSON.stringify({ message }),
   }).catch(() => {})
 }
