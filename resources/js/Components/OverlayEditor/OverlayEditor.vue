@@ -11,6 +11,7 @@ import WidgetLayer from '@/Components/Widgets/WidgetLayer.vue';
 import { useOverlayEditor } from '@/Composables/overlay/useOverlayEditor.js';
 import { CANVAS, createImage, createQr, createRect, createSvgImport, createText, createWidget, fromSource, nextId, toSource } from '@/Composables/overlay/model.js';
 import { compileOverlay } from '@/Composables/overlay/compileOverlay.js';
+import { embedFontCss, installEditorFonts } from '@/Composables/overlay/fonts.js';
 import { loadRasterAsDataUri, prepareSvgImport, readFileAs } from '@/Composables/overlay/importSvg.js';
 
 // Builds a slide's overlay in the browser and saves it as the slide's
@@ -92,6 +93,7 @@ function routeFor(name, extra = {}) {
 }
 
 onMounted(async () => {
+    installEditorFonts();
     try {
         const { data } = await axios.get(routeFor(props.showRoute));
         widgetList.value = data.widgets ?? [];
@@ -220,7 +222,7 @@ function onKeydown(evt) {
     }
 }
 
-function save() {
+async function save() {
     error.value = null;
     const elements = editor.elements.value;
 
@@ -238,7 +240,16 @@ function save() {
         return;
     }
 
-    const svg = compileOverlay(elements);
+    // The file must carry the fonts its text uses: players show it through
+    // <img>, which can't see the page's fonts.
+    let fontCss;
+    try {
+        fontCss = await embedFontCss(elements);
+    } catch {
+        error.value = t('overlay_editor.font_load_failed');
+        return;
+    }
+    const svg = compileOverlay(elements, fontCss);
     if (svg.length > MAX_SVG_BYTES) {
         error.value = t('overlay_editor.too_large');
         return;

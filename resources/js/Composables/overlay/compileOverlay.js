@@ -1,4 +1,5 @@
 import { CANVAS } from './model.js';
+import { fontStack } from './fonts.js';
 
 // Compiles the editor model to a single self-contained SVG string — the
 // file the displays render over the slide. Pure and synchronous: QR codes
@@ -75,7 +76,7 @@ function textInner(el) {
         out += `<rect x="${num(el.x)}" y="${num(el.y)}" width="${num(el.w)}" height="${num(el.h)}" `
             + `rx="${num(el.backgroundRadius)}" fill="${color(el.background)}"${fillOpacity(el)}/>`;
     }
-    out += `<text x="${num(x)}" y="${num(el.y + TEXT_PADDING)}" font-family="${escapeXml(el.fontFamily || 'sans-serif')}" `
+    out += `<text x="${num(x)}" y="${num(el.y + TEXT_PADDING)}" font-family="${escapeXml(fontStack(el.fontFamily || 'sans-serif'))}" `
         + `font-size="${size}" font-weight="${el.bold ? 'bold' : 'normal'}" font-style="${el.italic ? 'italic' : 'normal'}" `
         + `fill="${color(el.fill, '#ffffff')}" text-anchor="${anchor}" xml:space="preserve">`;
     lines.forEach((line, i) => {
@@ -126,8 +127,11 @@ export function compileElement(el) {
     return `<g ${wrapperAttrs(el)}>${inner}</g>`;
 }
 
-export function compileOverlay(elements) {
+// `styles` is markup placed first in the SVG, e.g. the @font-face <style>
+// from embedFontCss().
+export function compileOverlay(elements, styles = '') {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${CANVAS.w}" height="${CANVAS.h}" viewBox="0 0 ${CANVAS.w} ${CANVAS.h}">`
+        + styles
         + elements.map(compileElement).join('')
         + '</svg>';
 }

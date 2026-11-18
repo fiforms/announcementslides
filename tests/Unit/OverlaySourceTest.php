@@ -108,4 +108,27 @@ class OverlaySourceTest extends TestCase
         $this->assertNull($sanitizer->sanitize('<svg xmlns="http://www.w3.org/2000/svg"/>'));
         $this->assertNull($sanitizer->sanitize('garbage'));
     }
+
+    public function test_embedded_font_face_survives_sanitizing(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080"><style>@font-face{font-family:\'Italianno\';src:url(data:font/woff2;base64,d09GMg==) format(\'woff2\')}</style>'
+            . '<text x="5" y="50" font-family="\'Italianno\', cursive">Hi</text></svg>';
+
+        $clean = (new SvgSanitizer())->sanitize($svg);
+
+        $this->assertStringContainsString('@font-face', $clean);
+        $this->assertStringContainsString('data:font/woff2;base64,d09GMg==', $clean);
+    }
+
+    public function test_every_editor_font_has_a_web_and_a_server_file(): void
+    {
+        $js = file_get_contents(dirname(__DIR__, 2) . '/resources/js/Composables/overlay/fonts.js');
+        preg_match_all("/file: '([^']+)'/", $js, $m);
+        $this->assertNotEmpty($m[1]);
+
+        foreach ($m[1] as $file) {
+            $this->assertFileExists(dirname(__DIR__, 2) . "/public/fonts/overlay/{$file}.woff2");
+            $this->assertNotEmpty(glob(dirname(__DIR__, 2) . "/resources/fonts/overlay/{$file}.{ttf,otf}", GLOB_BRACE), $file);
+        }
+    }
 }

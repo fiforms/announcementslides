@@ -386,6 +386,7 @@
         "saving": "Guardando…",
         "remove_overlay": "Quitar superposición",
         "save_failed": "No se pudo guardar la superposición.",
+        "font_load_failed": "No se pudieron cargar las fuentes que usa esta superposición. Revise su conexión e intente guardar de nuevo.",
         "too_large": "La superposición es demasiado grande para guardarse. Use imágenes más pequeñas o menos imágenes.",
         "image_too_large": "La imagen es demasiado grande, incluso después de reducirla. Pruebe con un archivo más pequeño.",
         "import_failed": "No se pudo importar ese archivo.",

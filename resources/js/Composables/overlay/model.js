@@ -5,13 +5,19 @@
 // re-editable; heavy content (image data URIs, QR / imported SVG markup)
 // lives only in the SVG body and is read back from it by element id.
 
+import { CUSTOM_FONTS } from './fonts.js';
+
 export const SCHEMA_VERSION = 1;
 export const CANVAS = { w: 1920, h: 1080 };
 
+// Bundled fonts first; the CSS generics stay selectable (and keep working in
+// older overlays) but vary by device, so they're no longer the default.
+export const DEFAULT_FONT = 'Inter';
 export const FONTS = [
-    { value: 'sans-serif', label: 'Sans-serif' },
-    { value: 'serif', label: 'Serif' },
-    { value: 'monospace', label: 'Monospace' },
+    ...CUSTOM_FONTS.map(f => ({ value: f.family, label: f.label })),
+    { value: 'sans-serif', label: 'System sans-serif' },
+    { value: 'serif', label: 'System serif' },
+    { value: 'monospace', label: 'System monospace' },
 ];
 
 // Fields stored only in the compiled SVG body, per element type.
@@ -43,7 +49,7 @@ export function createText(elements) {
     return {
         ...base(elements, 'text', { x: 660, y: 440, w: 600, h: 200 }),
         text: 'Your text',
-        fontFamily: 'sans-serif',
+        fontFamily: DEFAULT_FONT,
         fontSize: 72,
         bold: true,
         italic: false,

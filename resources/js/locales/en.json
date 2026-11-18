@@ -386,6 +386,7 @@
         "saving": "Saving…",
         "remove_overlay": "Remove overlay",
         "save_failed": "The overlay couldn't be saved.",
+        "font_load_failed": "Couldn't load the fonts this overlay uses. Check your connection and try saving again.",
         "too_large": "This overlay is too large to save. Try smaller or fewer images.",
         "image_too_large": "That image is too large, even after resizing. Try a smaller file.",
         "import_failed": "That file couldn't be imported.",
