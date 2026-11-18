@@ -578,8 +578,8 @@ onUnmounted(() => {
 <template>
   <div class="kiosk">
     <ShowFrameLayer
-      v-if="frame?.media_url || frame?.youtube_url"
-      :key="`base:${frame.media_url || frame.youtube_url}`"
+      v-if="frame?.media_url || frame?.youtube_url || frame?.channel"
+      :key="`base:${frame.media_url || frame.youtube_url || frame.channel?.url}`"
       :frame="frame"
       layer="base"
       :suspended="paused || externalPlaybackActive"
@@ -599,7 +599,8 @@ onUnmounted(() => {
       :frame="frame"
       layer="top"
     />
-    <div v-if="!stages.length" class="empty-state">
+    <!-- A show with a background and no slides (e.g. just a live channel) shows only that. -->
+    <div v-if="!stages.length && !(status?.paired && (frame?.media_url || frame?.youtube_url || frame?.channel))" class="empty-state">
       <p v-if="status && !status.paired">{{ t('slideshow.notPaired') }}</p>
       <p v-else>{{ t('slideshow.waiting') }}</p>
     </div>

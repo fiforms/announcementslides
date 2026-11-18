@@ -36,7 +36,7 @@ class Show extends Model
 
     protected $fillable = [
         'token', 'entity_id', 'global_template_id', 'name', 'is_main', 'language_id',
-        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'created_by',
+        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'frame_channel_id', 'frame_channel_muted', 'created_by',
     ];
 
     protected function casts(): array
@@ -47,6 +47,7 @@ class Show extends Model
             'auto_fill_nearby' => 'boolean',
             'auto_delete_when_empty' => 'boolean',
             'frame_youtube' => 'array',
+            'frame_channel_muted' => 'boolean',
         ];
     }
 
@@ -58,6 +59,12 @@ class Show extends Model
     public function language(): BelongsTo
     {
         return $this->belongsTo(Language::class);
+    }
+
+    /** A live channel used as the frame background (exclusive with base media and YouTube). */
+    public function liveChannel(): BelongsTo
+    {
+        return $this->belongsTo(LiveChannel::class, 'frame_channel_id');
     }
 
     public function globalTemplate(): BelongsTo
@@ -95,13 +102,13 @@ class Show extends Model
     }
 
     /**
-     * With a looping background video (an uploaded one or a YouTube
-     * video/playlist), slides that contain a video are left out of playback
+     * With a looping background video (an uploaded one, a YouTube
+     * video/playlist, or a live channel), slides that contain a video are left out of playback
      * entirely: two videos at once would be heavy and mix audio.
      */
     public function skipsVideoSlides(): bool
     {
-        return !empty($this->frame_youtube) || (bool) $this->baseMedia?->isVideo();
+        return !empty($this->frame_youtube) || $this->frame_channel_id !== null || (bool) $this->baseMedia?->isVideo();
     }
 
     public static function mainFor(Entity $entity): self

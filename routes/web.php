@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\SlideController as AdminSlideController;
 use App\Http\Controllers\Admin\UpscalerSettingsController as AdminUpscalerSettingsController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\WidgetController as AdminWidgetController;
+use App\Http\Controllers\Admin\LiveChannelController as AdminLiveChannelController;
 use App\Http\Controllers\Admin\BackupController as AdminBackupController;
 use App\Http\Controllers\ChunkedUploadController;
 use App\Http\Controllers\EntityController;
@@ -134,6 +135,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::get('/{show}/overlay', [ShowController::class, 'showOverlay'])->name('overlay.show');
         Route::put('/{show}/overlay', [ShowController::class, 'saveOverlay'])->name('overlay.save');
         Route::put('/{show}/youtube', [ShowController::class, 'saveYoutube'])->name('youtube.save');
+        Route::put('/{show}/channel', [ShowController::class, 'saveChannel'])->name('channel.save');
         Route::post('/{show}/media', [ShowController::class, 'storeMedia'])->name('media.store');
         Route::delete('/{show}/media/{media}', [ShowController::class, 'destroyMedia'])->name('media.destroy');
     });
@@ -246,6 +248,12 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/widgets', [AdminWidgetController::class, 'store'])->name('widgets.store');
     Route::patch('/widgets/{widget}', [AdminWidgetController::class, 'update'])->name('widgets.update');
     Route::delete('/widgets/{widget}', [AdminWidgetController::class, 'destroy'])->name('widgets.destroy');
+
+    // ── Live channels (global catalog of show backgrounds) ────────────────
+    Route::get('/live-channels', [AdminLiveChannelController::class, 'index'])->name('live-channels.index');
+    Route::post('/live-channels', [AdminLiveChannelController::class, 'store'])->name('live-channels.store');
+    Route::patch('/live-channels/{liveChannel}', [AdminLiveChannelController::class, 'update'])->name('live-channels.update');
+    Route::delete('/live-channels/{liveChannel}', [AdminLiveChannelController::class, 'destroy'])->name('live-channels.destroy');
 
     Route::get('/about', [\App\Http\Controllers\Admin\AboutController::class, 'show'])->name('about');
 

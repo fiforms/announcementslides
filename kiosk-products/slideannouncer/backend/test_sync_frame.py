@@ -140,3 +140,37 @@ def test_a_youtube_background_is_carried_without_a_file_and_drops_video_slides()
     assert playlist[0]["frame"]["youtube_url"] == yt
     assert playlist[0]["frame"]["media_url"] is None
     assert [s["id"] for s in playlist[0]["slides"]] == ["1"]
+
+
+def test_a_live_channel_is_carried_without_a_file_and_drops_video_slides():
+    channel = {"kind": "hls", "url": "https://3abn.tulixcdn.com/3abn2/3abn_live/smil:3abn_live.smil/playlist.m3u8", "muted": False}
+    entry = run_sync("4", {**frame(base=None, overlay=None), "channel": channel})
+
+    assert entry["channel"] == channel and entry["base_local_filename"] is None
+    slides = {"1": slide("1", "image/jpeg"), "2": slide("2", "video/mp4")}
+
+    playlist = sync._build_active_playlist(manifest_with(slides, entry))
+
+    assert playlist[0]["frame"]["channel"] == channel
+    assert playlist[0]["frame"]["media_url"] is None
+    assert [s["id"] for s in playlist[0]["slides"]] == ["1"]
+
+
+def test_a_channel_only_show_with_no_slides_keeps_its_frame():
+    channel = {"kind": "iframe", "url": "https://embed.jetstream.studio/embed/jsl:0sUSK6VA7GTNxQaY8E8L", "muted": False}
+    entry = run_sync("5", {**frame(base=None, overlay=None), "channel": channel})
+
+    playlist = sync._build_active_playlist(manifest_with({}, entry))
+
+    assert playlist[0]["slides"] == []
+    assert playlist[0]["frame"]["channel"] == channel
+
+
+def test_a_manifest_from_before_channels_still_builds():
+    entry = run_sync("6", frame(overlay=None))
+    entry.pop("channel")
+
+    playlist = sync._build_active_playlist(manifest_with({"1": slide("1", "video/mp4")}, entry))
+
+    assert playlist[0]["frame"]["channel"] is None
+    assert [s["id"] for s in playlist[0]["slides"]] == ["1"]

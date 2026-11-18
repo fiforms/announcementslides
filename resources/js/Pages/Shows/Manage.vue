@@ -18,7 +18,8 @@ const props = defineProps({
     entity: { type: Object, required: true },
     shows: { type: Array, default: () => [] },
     selectedShowId: { type: Number, required: true },
-    frame: { type: Object, default: () => ({ id: null, media: [], youtube: null }) },
+    frame: { type: Object, default: () => ({ id: null, media: [], youtube: null, channel: null }) },
+    liveChannels: { type: Array, default: () => [] },
     showSlides: { type: Array, default: () => [] },
     unusedSlides: { type: Array, default: () => [] },
     isAdmin: { type: Boolean, default: false },
@@ -101,6 +102,25 @@ function removeYoutube() {
     if (!confirm(t('show_manage.frame_remove_confirm'))) return;
     router.put(route('shows.youtube.save', { show: props.selectedShowId, entity_id: props.entity.id }),
         { url: '' }, { preserveScroll: true, only: ['frame'] });
+}
+
+// A live channel from the admin-curated catalog as the background.
+const channelForm = useForm({ channel_id: props.frame.channel?.id ?? '', muted: props.frame.channel?.muted ?? false });
+watch(() => props.frame.channel, (ch) => {
+    channelForm.channel_id = ch?.id ?? '';
+    channelForm.muted = ch?.muted ?? false;
+});
+const selectedChannel = computed(() => props.liveChannels.find((c) => c.id === Number(channelForm.channel_id)) ?? null);
+const currentChannel = computed(() => props.liveChannels.find((c) => c.id === props.frame.channel?.id) ?? null);
+function saveChannel() {
+    channelForm.put(route('shows.channel.save', { show: props.selectedShowId, entity_id: props.entity.id }), {
+        preserveScroll: true, only: ['frame'],
+    });
+}
+function removeChannel() {
+    if (!confirm(t('show_manage.frame_remove_confirm'))) return;
+    router.put(route('shows.channel.save', { show: props.selectedShowId, entity_id: props.entity.id }),
+        { channel_id: null }, { preserveScroll: true, only: ['frame'] });
 }
 
 const frameFileInput = ref(null);
@@ -549,6 +569,37 @@ function persistLeaderOrder() {
                         </p>
                         <p v-if="frame.youtube" class="text-xs text-amber-700">{{ $t('show_manage.frame_video_note') }}</p>
                         <p class="text-xs text-gray-500">{{ $t('show_manage.frame_youtube_hint') }}</p>
+                    </div>
+
+                    <div v-if="liveChannels.length" class="space-y-1">
+                        <p class="text-sm font-medium text-gray-700">{{ $t('show_manage.frame_channel') }}</p>
+                        <form class="flex flex-wrap items-center gap-2" @submit.prevent="saveChannel">
+                            <select v-model="channelForm.channel_id"
+                                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">{{ $t('show_manage.frame_channel_pick') }}</option>
+                                <option v-for="c in liveChannels" :key="c.id" :value="c.id">{{ c.name }}</option>
+                            </select>
+                            <label v-if="selectedChannel?.supports_mute" class="flex items-center gap-1 text-sm text-gray-700">
+                                <input v-model="channelForm.muted" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
+                                {{ $t('show_manage.frame_youtube_muted') }}
+                            </label>
+                            <button type="submit" :disabled="channelForm.processing || !channelForm.channel_id"
+                                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                                {{ $t('show_manage.frame_youtube_use') }}
+                            </button>
+                            <button v-if="frame.channel" type="button" @click="removeChannel"
+                                class="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
+                                {{ $t('show_manage.frame_remove') }}
+                            </button>
+                        </form>
+                        <p v-if="channelForm.errors.channel_id" class="text-xs text-red-600">{{ channelForm.errors.channel_id }}</p>
+                        <p v-if="currentChannel" class="text-xs text-gray-500">
+                            {{ $t('show_manage.frame_channel_current', { name: currentChannel.name }) }}
+                            <span v-if="frame.channel.muted && currentChannel.supports_mute">· {{ $t('show_manage.frame_youtube_muted') }}</span>
+                        </p>
+                        <p v-if="selectedChannel && !selectedChannel.supports_mute" class="text-xs text-gray-500">{{ $t('show_manage.frame_channel_no_mute') }}</p>
+                        <p v-if="frame.channel" class="text-xs text-amber-700">{{ $t('show_manage.frame_video_note') }}</p>
+                        <p class="text-xs text-gray-500">{{ $t('show_manage.frame_channel_hint') }}</p>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">

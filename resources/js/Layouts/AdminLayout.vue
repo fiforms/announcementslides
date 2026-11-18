@@ -87,6 +87,15 @@ const user  = computed(() => page.props.auth?.user);
                         </svg>
                         {{ $t('nav.widgets') }}
                     </Link>
+                    <Link :href="route('admin.live-channels.index')"
+                        class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
+                        :class="route().current('admin.live-channels.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                        {{ $t('nav.live_channels') }}
+                    </Link>
                     <Link :href="route('admin.upscaler.index')"
                         class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors"
                         :class="route().current('admin.upscaler.*') ? 'bg-indigo-600 text-white' : 'text-gray-300 hover:bg-gray-800 hover:text-white'">

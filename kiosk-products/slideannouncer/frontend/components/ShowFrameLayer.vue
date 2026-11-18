@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import WidgetLayer from './WidgetLayer.vue'
+import { attachHls } from '../hlsChannel.js'
 
 // One half of a show's frame — the kiosk twin of the main app's
 // resources/js/Components/ShowFrameLayer.vue. Slideshow.vue mounts it once
@@ -13,6 +14,10 @@ import WidgetLayer from './WidgetLayer.vue'
 // youtube-nocookie embed, checked here before it goes into an iframe. It
 // needs the internet, so the iframe is only mounted while online (offline
 // it would show a browser error page; it resumes when the network returns).
+// A live channel is `channel`: {kind, url, muted}. An 'iframe' embed must
+// start with a known provider prefix (the server's LiveChannelSource) and,
+// having no player API, is unmounted while suspended; an 'hls' stream plays
+// in our own <video> (hls.js) and pauses/rejoins the live edge instead.
 const props = defineProps({
   frame: { type: Object, required: true },
   layer: { type: String, required: true },
@@ -37,6 +42,28 @@ const youtubeSrc = computed(() => (online.value && props.frame.youtube_url?.star
   ? `${props.frame.youtube_url}&origin=${encodeURIComponent(window.location.origin)}`
   : null)
 
+const CHANNEL_IFRAME_PREFIXES = ['https://embed.jetstream.studio/embed/', 'https://player.zype.com/embed/']
+const channel = computed(() => {
+  const c = props.frame.channel
+  if (!online.value || !c?.url) return null
+  if (c.kind === 'iframe' && CHANNEL_IFRAME_PREFIXES.some((p) => c.url.startsWith(p))) return c
+  if (c.kind === 'hls' && c.url.startsWith('https://')) return c
+  return null
+})
+
+const hlsEl = ref(null)
+let hlsPlayer = null
+function startHls() {
+  hlsPlayer?.stop()
+  hlsPlayer = null
+  if (hlsEl.value && channel.value?.kind === 'hls') {
+    hlsPlayer = attachHls(hlsEl.value, channel.value.url, { muted: !!channel.value.muted })
+    if (props.suspended) hlsPlayer.pause()
+  }
+}
+watch(() => channel.value?.url, startHls, { flush: 'post' })
+onBeforeUnmount(() => hlsPlayer?.stop())
+
 // enablejsapi=1 (in the URL) lets the player be paused and resumed by message.
 function youtubeCommand(func) {
   ytEl.value?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), '*')
@@ -56,14 +83,19 @@ async function play() {
   }
 }
 
-onMounted(() => { if (!props.suspended) play() })
+onMounted(() => {
+  if (!props.suspended) play()
+  startHls()
+})
 watch(() => props.suspended, (suspended) => {
   if (suspended) {
     videoEl.value?.pause()
     youtubeCommand('pauseVideo')
+    hlsPlayer?.pause()
   } else {
     play()
     youtubeCommand('playVideo')
+    hlsPlayer?.resume()
   }
 })
 </script>
@@ -75,6 +107,19 @@ watch(() => props.suspended, (suspended) => {
         <iframe
           ref="ytEl"
           :src="youtubeSrc"
+          title=""
+          tabindex="-1"
+          allow="autoplay; encrypted-media"
+          sandbox="allow-scripts allow-same-origin allow-presentation"
+          referrerpolicy="strict-origin-when-cross-origin"
+        />
+      </div>
+    </template>
+    <template v-else-if="layer === 'base' && channel">
+      <video v-if="channel.kind === 'hls'" ref="hlsEl" playsinline class="frame-image" />
+      <div v-else-if="!suspended" class="frame-youtube">
+        <iframe
+          :src="channel.url"
           title=""
           tabindex="-1"
           allow="autoplay; encrypted-media"

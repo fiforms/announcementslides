@@ -12,6 +12,8 @@ use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Support\NearbyEntities;
 use App\Support\SortZones;
+use App\Models\LiveChannel;
+use App\Support\LiveChannelSource;
 use App\Support\YoutubeSource;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -63,7 +65,17 @@ class ShowController extends Controller
                 'id' => $selectedShow->id,
                 'media' => $this->mediaResource($selectedShow->load('media')),
                 'youtube' => YoutubeSource::describe($selectedShow->frame_youtube),
+                'channel' => $selectedShow->frame_channel_id ? [
+                    'id' => $selectedShow->frame_channel_id,
+                    'muted' => $selectedShow->frame_channel_muted,
+                ] : null,
             ],
+            'liveChannels' => LiveChannel::orderBy('name')->get()->map(fn (LiveChannel $c) => [
+                'id' => $c->id,
+                'name' => $c->name,
+                'provider_label' => LiveChannelSource::label($c->provider),
+                'supports_mute' => $c->supportsMute(),
+            ]),
             'showSlides' => $showSlides->map(fn ($s) => $this->slideResource($s, $selectedShow->is_main)),
             'unusedSlides' => $unusedSlides->map(fn ($s) => $this->slideResource($s)),
             'isAdmin' => $isAdmin,
@@ -197,8 +209,8 @@ class ShowController extends Controller
         $disk = Storage::disk('public');
         abort_unless($disk->exists($request->disk_path), 422, 'Assembled file not found.');
 
-        // An uploaded background replaces a YouTube one, and vice versa.
-        $show->update(['frame_youtube' => null]);
+        // An uploaded background replaces a YouTube or live-channel one, and vice versa.
+        $show->update(['frame_youtube' => null, 'frame_channel_id' => null]);
 
         $old = $show->media()->where('media_type', 'show-base')->get();
         $media = $show->media()->create([
@@ -245,7 +257,43 @@ class ShowController extends Controller
             $m->deleteFiles();
             $m->delete();
         });
-        $show->update(['frame_youtube' => $source + ['muted' => $request->boolean('muted')]]);
+        $show->update([
+            'frame_youtube' => $source + ['muted' => $request->boolean('muted')],
+            'frame_channel_id' => null,
+        ]);
+
+        return back()->with('success', 'Show background saved.');
+    }
+
+    /**
+     * Sets (or, with an empty `channel_id`, clears) a live channel from the
+     * admin-curated catalog as the show's background. It replaces any
+     * uploaded or YouTube background.
+     */
+    public function saveChannel(Request $request, Show $show)
+    {
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
+
+        $request->validate([
+            'channel_id' => 'nullable|integer|exists:live_channels,id',
+            'muted' => 'boolean',
+        ]);
+
+        if (!$request->filled('channel_id')) {
+            $show->update(['frame_channel_id' => null, 'frame_channel_muted' => false]);
+
+            return back()->with('success', 'Removed.');
+        }
+
+        $show->media()->where('media_type', 'show-base')->get()->each(function (SlideMedia $m) {
+            $m->deleteFiles();
+            $m->delete();
+        });
+        $show->update([
+            'frame_youtube' => null,
+            'frame_channel_id' => (int) $request->input('channel_id'),
+            'frame_channel_muted' => $request->boolean('muted'),
+        ]);
 
         return back()->with('success', 'Show background saved.');
     }
