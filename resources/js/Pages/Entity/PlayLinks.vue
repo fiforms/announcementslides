@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import { router, useForm, Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import { groupShows } from '@/Composables/showFolders';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 
 const props = defineProps({
@@ -110,7 +111,12 @@ function formatUsed(link) {
                         <label for="pl-show" class="block text-sm font-medium text-gray-700 mb-1">{{ $t('play_links.field_show') }}</label>
                         <select id="pl-show" v-model="form.show_id" class="block w-full rounded-lg border-gray-300 text-sm">
                             <option :value="null">{{ $t('play_links.show_main') }}</option>
-                            <option v-for="show in shows.filter(s => !s.is_main)" :key="show.id" :value="show.id">{{ show.name }}</option>
+                            <template v-for="entry in groupShows(shows.filter(s => !s.is_main))" :key="entry.folder ? `f:${entry.folder}` : entry.show.id">
+                                <optgroup v-if="entry.folder" :label="entry.folder">
+                                    <option v-for="item in entry.items" :key="item.show.id" :value="item.show.id">{{ item.label }}</option>
+                                </optgroup>
+                                <option v-else :value="entry.show.id">{{ entry.show.name }}</option>
+                            </template>
                         </select>
                         <p v-if="form.errors.show_id" class="mt-1 text-sm text-red-600">{{ form.errors.show_id }}</p>
                     </div>

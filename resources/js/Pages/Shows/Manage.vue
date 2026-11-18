@@ -2,6 +2,7 @@
 import { ref, computed, watch } from 'vue';
 import { router, Link, useForm, usePage } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import { groupShows } from '@/Composables/showFolders';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
 import ShowSlideRow from '@/Components/ShowSlideRow.vue';
@@ -240,6 +241,8 @@ const zoneLabel = (zone) => t(`show_manage.zone_${zone}`);
 
 // Stored show names are user data, except the built-in Main show.
 const showName = (show) => (show?.is_main ? t('shows.main') : show?.name);
+// "Channels/3ABN" is listed as "3ABN" under a "Channels" group; the main show never is.
+const groupedShows = computed(() => groupShows(props.shows, { foldable: (s) => !s.is_main }));
 
 function zoneOf(slide) {
     return ZONE_ORDER.includes(slide.zone) ? slide.zone : 'leader_late';
@@ -443,9 +446,14 @@ function persistLeaderOrder() {
                 <div class="flex items-center gap-3">
                     <select :value="selectedShowId" @change="switchShow($event.target.value)"
                         class="rounded-lg border-gray-300 text-sm font-medium">
-                        <option v-for="show in shows" :key="show.id" :value="show.id">
-                            {{ show.is_main ? '🔒 ' : '' }}{{ showName(show) }}
-                        </option>
+                        <template v-for="entry in groupedShows" :key="entry.folder ? `f:${entry.folder}` : entry.show.id">
+                            <optgroup v-if="entry.folder" :label="entry.folder">
+                                <option v-for="item in entry.items" :key="item.show.id" :value="item.show.id">{{ item.label }}</option>
+                            </optgroup>
+                            <option v-else :value="entry.show.id">
+                                {{ entry.show.is_main ? '🔒 ' : '' }}{{ showName(entry.show) }}
+                            </option>
+                        </template>
                     </select>
                     <select v-model.number="languageFilter"
                         :title="$t('show_manage.language_filter_hint')"
