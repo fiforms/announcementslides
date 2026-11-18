@@ -26,6 +26,7 @@ class Entity extends Model
         'is_custom',
         'deactivated',
         'allow_subscription',
+        'offer_live_channels',
         'created_by',
     ];
 
@@ -33,6 +34,7 @@ class Entity extends Model
         'is_custom'   => 'boolean',
         'deactivated' => 'boolean',
         'allow_subscription' => 'boolean',
+        'offer_live_channels' => 'boolean',
         'latitude'    => 'decimal:7',
         'longitude'   => 'decimal:7',
     ];

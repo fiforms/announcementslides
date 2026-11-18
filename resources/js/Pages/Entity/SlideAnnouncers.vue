@@ -10,6 +10,8 @@ const props = defineProps({
     pairingCode: { type: Object, default: null },
     diskImages: { type: Array, default: () => [] },
     virtImages: { type: Array, default: () => [] },
+    offerLiveChannels: { type: Boolean, default: true },
+    liveChannelNames: { type: Array, default: () => [] },
 });
 
 const { t, locale } = useI18n();
@@ -21,6 +23,11 @@ function generateCode() {
     router.post(route('slide-announcers.pairing-codes.store', { entity_id: props.entity.id }), {}, {
         onFinish: () => { generating.value = false; },
     });
+}
+
+function setOfferLiveChannels(event) {
+    router.patch(route('slide-announcers.live-channels.update', { entity_id: props.entity.id }),
+        { offer_live_channels: event.target.checked }, { preserveScroll: true, only: ['offerLiveChannels'] });
 }
 
 function unpair(device) {
@@ -59,6 +66,17 @@ function formatBytes(bytes) {
             <div v-if="pairingCode" class="rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3 text-sm text-indigo-800">
                 {{ $t('slide_announcers.pairing_code') }} <span class="font-mono text-lg font-bold tracking-widest">{{ pairingCode.code }}</span>
                 {{ $t('slide_announcers.pairing_instructions', { time: new Date(pairingCode.expires_at).toLocaleTimeString(locale) }) }}
+            </div>
+
+            <div v-if="liveChannelNames.length" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-2">
+                <label class="flex items-center gap-2 text-sm font-medium text-gray-900">
+                    <input type="checkbox" :checked="offerLiveChannels" @change="setOfferLiveChannels"
+                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
+                    {{ $t('slide_announcers.offer_live_channels') }}
+                </label>
+                <p class="text-sm text-gray-500">
+                    {{ $t('slide_announcers.offer_live_channels_help', { channels: liveChannelNames.join(', ') }) }}
+                </p>
             </div>
 
             <div class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-3">

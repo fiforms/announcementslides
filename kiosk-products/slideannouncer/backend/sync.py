@@ -298,7 +298,14 @@ def _build_active_playlist(manifest: dict) -> list:
                 "overlay_media_url": f"/media/{overlay}" if overlay_ok else None,
                 "widgets": placements,
             })
-        shows.append({"id": show_id, "name": show.get("name"), "is_main": bool(show.get("is_main")), "slides": slides, "frame": frame})
+        shows.append({
+            "id": show_id,
+            "name": show.get("name"),
+            "is_main": bool(show.get("is_main")),
+            "is_channel": bool(show.get("is_channel")),
+            "slides": slides,
+            "frame": frame,
+        })
     return shows
 
 
@@ -414,6 +421,9 @@ async def sync_once() -> None:
             new_manifest[show_id] = {
                 "name": show.get("name"),
                 "is_main": bool(show.get("is_main")),
+                # A live channel from the catalog, offered as a slide-less
+                # show (the remote menu groups these under "Live Channels").
+                "is_channel": bool(show.get("is_channel")),
                 "slides": slides_manifest,
                 "frame": await _sync_frame(client, show_id, show.get("frame"), manifest.get(show_id, {}).get("frame")),
             }

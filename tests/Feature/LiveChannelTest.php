@@ -216,4 +216,55 @@ class LiveChannelTest extends TestCase
         $this->assertSame(['kind' => 'hls', 'url' => self::HLS, 'muted' => false], $frame['channel']);
         $this->assertNull($frame['file_url']);
     }
+
+    // ── Offered in the device's remote menu ──────────────────────────────────
+
+    private function syncedShows(): array
+    {
+        $device = SlideAnnouncer::create(['entity_id' => $this->entity->id, 'name' => 'Lobby']);
+        $this->app['auth']->forgetGuards();
+
+        return $this->withToken($device->createToken('d')->plainTextToken)
+            ->getJson('/api/slide-announcers/shows')->assertOk()->json('shows');
+    }
+
+    public function test_devices_get_the_catalog_as_slide_less_channel_shows_by_default(): void
+    {
+        $hope = $this->channel();
+        $this->channel(self::HLS, '3ABN');
+
+        $channels = collect($this->syncedShows())->where('is_channel', true)->values();
+
+        $this->assertSame(['channel-' . LiveChannel::where('name', '3ABN')->value('id'), 'channel-' . $hope->id], $channels->pluck('id')->all());
+        $this->assertSame(['3ABN', 'Hope Channel'], $channels->pluck('name')->all());
+        $this->assertSame([], $channels[0]['slides']);
+        $this->assertFalse($channels[0]['is_main']);
+        $this->assertSame(['kind' => 'hls', 'url' => self::HLS, 'muted' => false], $channels[0]['frame']['channel']);
+    }
+
+    public function test_a_church_can_turn_the_channels_off_for_its_devices(): void
+    {
+        $this->channel();
+
+        $this->actingAs($this->leader)->patch(
+            route('slide-announcers.live-channels.update', ['entity_id' => $this->entity->id]),
+            ['offer_live_channels' => false]
+        )->assertSessionHasNoErrors();
+
+        $this->assertFalse($this->entity->fresh()->offer_live_channels);
+        $this->assertSame([], collect($this->syncedShows())->where('is_channel', true)->all());
+    }
+
+    public function test_only_the_churchs_admins_can_change_the_setting(): void
+    {
+        $viewer = User::factory()->create();
+        $viewer->entities()->attach($this->entity->id, ['role' => 'viewer']);
+
+        $this->actingAs($viewer)->patch(
+            route('slide-announcers.live-channels.update', ['entity_id' => $this->entity->id]),
+            ['offer_live_channels' => false]
+        )->assertForbidden();
+
+        $this->assertTrue($this->entity->fresh()->offer_live_channels);
+    }
 }

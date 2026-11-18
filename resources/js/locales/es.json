@@ -735,6 +735,8 @@
         "no_images": "Aún no se ha publicado ninguna imagen de disco del sistema.",
         "no_mac": "sin MAC registrada",
         "no_devices": "Aún no hay dispositivos anunciadores vinculados. Genera un código de vinculación e introdúcelo en la pantalla de configuración del dispositivo.",
+        "offer_live_channels": "Ofrecer canales en vivo en el menú del control remoto",
+        "offer_live_channels_help": "Sus Slide Announcers los muestran en \"Canales en vivo\" en el menú del control remoto: {channels}. Al elegir uno, se reproduce en pantalla completa hasta que se elija otro programa. Desactívelo para mantener la televisión en vivo fuera de sus pantallas.",
         "btn_devices": "Dispositivos anunciadores",
         "status_published": "Publicada",
         "status_pending": "Pendiente",

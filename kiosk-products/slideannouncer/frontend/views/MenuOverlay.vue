@@ -16,10 +16,21 @@ const { t } = useI18n()
 
 // Show folders (showFolders.js): "Channels/3ABN" is listed as "3ABN" inside a
 // "Channels" folder. Enter opens a folder; Back (or its "‹" header) returns.
-// The main show is never in a folder.
-const entries = computed(() => groupShows(shows.value, { foldable: (show) => !show.is_main }))
-const openFolderName = ref(null)
-const openFolder = computed(() => entries.value.find((e) => e.folder && e.folder === openFolderName.value) ?? null)
+// The main show is never in a folder. Live channels the church offers come
+// from the sync as slide-less shows (is_channel) and get a folder of their
+// own, last. Folders are tracked by key, so a church folder that happens to
+// be called "Live Channels" stays separate.
+const entries = computed(() => {
+  const list = groupShows(shows.value.filter((show) => !show.is_channel), { foldable: (show) => !show.is_main })
+    .map((entry) => ({ ...entry, key: entry.folder ? `f:${entry.folder}` : `s:${entry.show.id}` }))
+  const channels = shows.value.filter((show) => show.is_channel)
+  if (channels.length) {
+    list.push({ key: 'channels', folder: t('menu.liveChannels'), items: channels.map((show) => ({ show, label: show.name })) })
+  }
+  return list
+})
+const openFolderKey = ref(null)
+const openFolder = computed(() => entries.value.find((e) => e.folder && e.key === openFolderKey.value) ?? null)
 const isPlaying = (show) => show.id === pinnedShowId.value
 const folderIsPlaying = (entry) => entry.items.some((item) => isPlaying(item.show))
 
@@ -28,15 +39,15 @@ function focusFirst(selector = '.menu-overlay .list-item') {
 }
 
 function enterFolder(entry) {
-  openFolderName.value = entry.folder
+  openFolderKey.value = entry.key
   focusFirst('.menu-overlay .folder-items .list-item')
 }
 
 function leaveFolder() {
-  const name = openFolderName.value
-  openFolderName.value = null
+  const key = openFolderKey.value
+  openFolderKey.value = null
   nextTick(() => {
-    const row = [...document.querySelectorAll('.menu-overlay [data-folder]')].find((el) => el.dataset.folder === name)
+    const row = [...document.querySelectorAll('.menu-overlay [data-folder]')].find((el) => el.dataset.folder === key)
     ;(row ?? document.querySelector('.menu-overlay .list-item'))?.focus()
   })
 }
@@ -83,14 +94,14 @@ function openSettings() {
 // first item ourselves whenever it opens.
 watch(menuOpen, (open) => {
   if (!open) return
-  openFolderName.value = null
+  openFolderKey.value = null
   if (!features.loaded) loadFeatures().catch(() => {})
   focusFirst()
 })
 
 // A folder emptied by a sync (shows renamed or removed) falls back to the top.
 watch(openFolder, (folder) => {
-  if (!folder && openFolderName.value) leaveFolder()
+  if (!folder && openFolderKey.value) leaveFolder()
 })
 </script>
 
@@ -115,12 +126,12 @@ watch(openFolder, (folder) => {
         </div>
       </template>
       <template v-else>
-        <template v-for="entry in entries" :key="entry.folder ? `f:${entry.folder}` : entry.show.id">
+        <template v-for="entry in entries" :key="entry.key">
           <button
             v-if="entry.folder"
             class="list-item"
             :class="{ 'list-item--active': folderIsPlaying(entry) }"
-            :data-folder="entry.folder"
+            :data-folder="entry.key"
             @click="enterFolder(entry)"
           >
             <span>{{ entry.folder }}</span>

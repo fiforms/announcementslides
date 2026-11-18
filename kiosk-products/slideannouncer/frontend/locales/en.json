@@ -3,7 +3,8 @@
         "mainShow": "Main Show",
         "playing": "Playing",
         "settings": "Settings…",
-        "screenMirroring": "Screen Mirroring"
+        "screenMirroring": "Screen Mirroring",
+        "liveChannels": "Live Channels"
     },
     "slideshow": {
         "notPaired": "Not yet paired. Use Menu or Escape key to open Settings.",

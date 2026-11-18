@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Entity;
+use App\Models\LiveChannel;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Services\ShowFrame;
@@ -10,6 +12,7 @@ use App\Services\Widgets\OverlayWidgets;
 use App\Support\WidgetLocation;
 use App\Support\SlideAnnouncerVideoReceiver;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 
 class SlideAnnouncerSyncController extends Controller
@@ -68,6 +71,8 @@ class SlideAnnouncerSyncController extends Controller
                 ->map(fn (Slide $slide) => $this->slideEntry($slide)),
         ]);
 
+        $shows = $shows->concat($this->liveChannelShows($device->entity));
+
         return response()->json([
             'shows' => $shows,
             // Every widget bundle the slides above place, for the device to
@@ -86,6 +91,42 @@ class SlideAnnouncerSyncController extends Controller
             // than one heartbeat (5 min). See App\Support\SlideAnnouncerVideoReceiver.
             'srt_sink_config' => SlideAnnouncerVideoReceiver::push($device),
         ]);
+    }
+
+    /**
+     * The live channel catalog as extra "shows" the remote menu offers
+     * (grouped under "Live Channels"): no slides, the channel as the frame,
+     * ids prefixed `channel-` so they never collide with a real show's. The
+     * device plays, pins and un-pins them like any other show. Only when the
+     * church offers live channels (on by default).
+     */
+    private function liveChannelShows(?Entity $entity): Collection
+    {
+        if (!$entity?->offer_live_channels) {
+            return collect();
+        }
+
+        return LiveChannel::orderBy('name')->get()
+            ->map(fn (LiveChannel $channel) => [$channel, $channel->forPlayer(false)])
+            ->filter(fn (array $pair) => $pair[1] !== null)
+            ->map(fn (array $pair) => [
+                'id' => 'channel-' . $pair[0]->id,
+                'name' => $pair[0]->name,
+                'is_main' => false,
+                'is_channel' => true,
+                'frame' => [
+                    'file_url' => null,
+                    'mime_type' => null,
+                    'youtube_url' => null,
+                    'channel' => $pair[1],
+                    'overlay_url' => null,
+                    'overlay_mime_type' => null,
+                    'overlay_media_id' => null,
+                    'widgets' => [],
+                ],
+                'slides' => collect(),
+            ])
+            ->values();
     }
 
     private function slideEntry(Slide $slide): array

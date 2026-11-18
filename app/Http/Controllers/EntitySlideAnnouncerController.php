@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Concerns\AuthorizesEntityAccess;
 use App\Models\Entity;
+use App\Models\LiveChannel;
 use App\Models\Language;
 use App\Models\SlideAnnouncer;
 use App\Models\SlideAnnouncerHeartbeat;
@@ -43,6 +44,8 @@ class EntitySlideAnnouncerController extends Controller
         return Inertia::render('Entity/SlideAnnouncers', [
             'entity' => ['id' => $entity->id, 'name' => $entity->name],
             'devices' => $devices,
+            'offerLiveChannels' => $entity->offer_live_channels,
+            'liveChannelNames' => LiveChannel::orderBy('name')->pluck('name'),
             'pairingCode' => $pairingCode ? [
                 'code' => $pairingCode->code,
                 'expires_at' => $pairingCode->expires_at->toIso8601String(),
@@ -135,6 +138,20 @@ class EntitySlideAnnouncerController extends Controller
             'heartbeats' => $heartbeats,
             'languages' => Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']),
         ]);
+    }
+
+    /**
+     * Whether this church's devices offer the live channel catalog in their
+     * remote menu. Takes effect at each device's next sync.
+     */
+    public function updateLiveChannels(Request $request)
+    {
+        $entityId = $this->authorizedEntityId($request);
+        $request->validate(['offer_live_channels' => 'required|boolean']);
+
+        Entity::whereKey($entityId)->update(['offer_live_channels' => $request->boolean('offer_live_channels')]);
+
+        return back();
     }
 
     public function storePairingCode(Request $request)
