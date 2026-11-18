@@ -2,4 +2,4 @@
 # "<url> <sha256>" per line. Update both together when bumping a version.
 #
 # AirShow screen mirroring receiver (docs/AIRSHOW.md), https://github.com/fiforms/AirShow
-https://github.com/fiforms/AirShow/releases/download/v0.1.0%2Bfiforms1/airshow_0.1.0%2Bfiforms1_arm64.deb 0635d3bb799b0030a128bd0de3cd51406d4b191f1b8d209df8cbef2afa9454e4
+https://github.com/fiforms/AirShow/releases/download/v0.1.0%2Bfiforms2/airshow_0.1.0%2Bfiforms2_arm64.deb 5884bfc79425089b9954d021219a2981f194f3e56c5857253fca7898029b19fd
