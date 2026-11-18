@@ -408,6 +408,7 @@
         "type_svg_import": "Ilustración importada",
         "properties": "Propiedades",
         "select_hint": "Seleccione una capa para editarla.",
+        "fill_screen": "Llenar la pantalla",
         "locked_hint": "Esta capa está bloqueada. Desbloquéela en la lista de capas para moverla o cambiar su tamaño.",
         "imported_hint": "Ilustración importada de un archivo SVG. Se conserva tal como se importó.",
         "opacity": "Opacidad",

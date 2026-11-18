@@ -408,6 +408,7 @@
         "type_svg_import": "Imported artwork",
         "properties": "Properties",
         "select_hint": "Select a layer to edit it.",
+        "fill_screen": "Fill screen",
         "locked_hint": "This layer is locked. Unlock it in the layer list to move or resize it.",
         "imported_hint": "Artwork imported from an SVG file. It's kept exactly as imported.",
         "opacity": "Opacity",

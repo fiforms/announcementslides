@@ -1,7 +1,7 @@
 <script setup>
 import { computed, inject, nextTick, ref, watch } from 'vue';
 import { useI18n } from 'vue-i18n';
-import { BACKGROUND_OPACITY_TYPES, FONTS } from '@/Composables/overlay/model.js';
+import { BACKGROUND_OPACITY_TYPES, CANVAS, FONTS } from '@/Composables/overlay/model.js';
 import { fitBox, resolveSizing } from '@/Composables/overlay/widgetSizing.js';
 
 // Edits the selected element's fields in place; `change` events (which
@@ -23,6 +23,15 @@ watch(() => resolveSizing(widget.value, el.value?.params), sizing => {
     const fitted = fitBox({ x, y, w, h }, sizing);
     if (fitted.w !== w || fitted.h !== h) editor.update(el.value.id, fitted, false);
 }, { flush: 'sync' });
+
+// Makes the widget as big as the slide: the whole canvas, or the largest box
+// its sizing rules allow (e.g. a wide strip stays a strip, centered).
+function fillScreen() {
+    const e = el.value;
+    if (!e || e.locked) return;
+    const full = { x: 0, y: 0, w: CANVAS.w, h: CANVAS.h };
+    editor.update(e.id, fitBox(full, resolveSizing(widget.value, e.params)));
+}
 
 // Text, QR codes and rectangles fade only their background (and only have
 // the slider while they have one); images and imported artwork fade whole.
@@ -57,6 +66,12 @@ const labelCls = 'block text-[11px] font-medium text-gray-600 mb-0.5';
                 <input v-model.number="el[f]" type="number" :class="input" :disabled="el.locked" />
             </div>
         </div>
+
+        <button v-if="el.type === 'widget'" type="button" :disabled="el.locked"
+            class="w-full rounded-md border border-gray-300 px-3 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            @click="fillScreen">
+            {{ t('overlay_editor.fill_screen') }}
+        </button>
 
         <div v-if="opacityField">
             <label :class="labelCls">{{ t(`overlay_editor.${opacityField.label}`) }} ({{ Math.round((el[opacityField.key] ?? 1) * 100) }}%)</label>
