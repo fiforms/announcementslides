@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\LibraryController as AdminLibraryController;
+use App\Http\Controllers\LibraryBuildController;
 use App\Http\Controllers\Admin\DashboardController as AdminDashboardController;
 use App\Http\Controllers\Admin\DirectoryImportController;
 use App\Http\Controllers\Admin\EntityConsoleController;
@@ -92,6 +94,10 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     // ── Chunked uploads (all authenticated users; role determines outcome) ──
     Route::post('/uploads/chunk', [ChunkedUploadController::class, 'chunk'])->name('uploads.chunk');
     Route::post('/uploads/finalize', [ChunkedUploadController::class, 'finalize'])->name('uploads.finalize');
+
+    // ── Slide library: build a slide from a shared background + overlay template ──
+    Route::get('/library/catalog', [LibraryBuildController::class, 'catalog'])->name('library.catalog');
+    Route::post('/library/build', [LibraryBuildController::class, 'build'])->name('library.build');
 
     // ── Contributor: own unscoped slide management ─────────────────────────
     Route::prefix('my-slides')->name('my-slides.')->group(function () {
@@ -206,6 +212,18 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/slides/{slide}/media/{media}/version', [AdminSlideController::class, 'setMediaVersion'])->name('slides.media.version');
     Route::get('/slides/{slide}/overlay', [AdminSlideController::class, 'showOverlay'])->name('slides.overlay.show');
     Route::put('/slides/{slide}/overlay', [AdminSlideController::class, 'saveOverlay'])->name('slides.overlay.save');
+
+    Route::prefix('library')->name('library.')->group(function () {
+        Route::get('/', [AdminLibraryController::class, 'index'])->name('index');
+        Route::post('/backgrounds', [AdminLibraryController::class, 'storeBackground'])->name('backgrounds.store');
+        Route::post('/templates', [AdminLibraryController::class, 'storeTemplate'])->name('templates.store');
+        Route::get('/templates/{item}/edit', [AdminLibraryController::class, 'editTemplate'])->name('templates.edit');
+        Route::get('/templates/{item}/overlay', [AdminLibraryController::class, 'showOverlay'])->name('overlay.show');
+        Route::put('/templates/{item}/overlay', [AdminLibraryController::class, 'saveOverlay'])->name('overlay.save');
+        Route::delete('/templates/{item}/overlay', [AdminLibraryController::class, 'destroyOverlay'])->name('overlay.destroy');
+        Route::patch('/{item}', [AdminLibraryController::class, 'update'])->name('update');
+        Route::delete('/{item}', [AdminLibraryController::class, 'destroy'])->name('destroy');
+    });
 
     Route::get('/users', [AdminUserController::class, 'index'])->name('users.index');
     Route::patch('/users/{user}', [AdminUserController::class, 'update'])->name('users.update');
