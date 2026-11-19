@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Support\LibraryFiles;
 use App\Support\MediaStore;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -104,11 +105,24 @@ class SlideMedia extends Model
     public static function deleteVersionFiles(array $version): void
     {
         $store = app(MediaStore::class);
-        $store->delete($version['disk'] ?? MediaStore::LOCAL, $version['disk_path'] ?? null);
-        $store->delete(MediaStore::LOCAL, array_filter([
-            $version['thumbnail_path'] ?? null,
-            $version['poster_path'] ?? null,
-        ]));
+        // Slide-library files are shared by many rows: never deleted here, but
+        // swept once nothing references them (see LibraryFiles).
+        $shared = false;
+        $own = static function (?string $path) use (&$shared) {
+            if (LibraryFiles::isShared($path)) {
+                $shared = true;
+
+                return null;
+            }
+
+            return $path;
+        };
+
+        $file = $own($version['disk_path'] ?? null);
+        $file !== null && $store->delete($version['disk'] ?? MediaStore::LOCAL, $file);
+        $small = array_filter([$own($version['thumbnail_path'] ?? null), $own($version['poster_path'] ?? null)]);
+        $small && $store->delete(MediaStore::LOCAL, $small);
+        $shared && LibraryFiles::pruneSoon();
     }
 
     /**

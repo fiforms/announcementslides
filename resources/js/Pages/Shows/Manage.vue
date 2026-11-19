@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n';
 import { groupShows } from '@/Composables/showFolders';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
+import LibraryBuilder from '@/Components/LibraryBuilder.vue';
 import ShowSlideRow from '@/Components/ShowSlideRow.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
 import MediaManager from '@/Components/MediaManager.vue';
@@ -261,6 +262,22 @@ const zoneGroups = computed(() => {
 const uiLanguageId = computed(() => props.languages.find(l => l.abbreviation === locale.value)?.id ?? '');
 
 const showUploadPanel = ref(false);
+const showBuilder = ref(false);
+
+// A slide just built from the library: refresh the lists, then open it (on the
+// overlay tab when a template gave it text to edit).
+function onBuilt(result) {
+    showBuilder.value = false;
+    router.reload({
+        only: ['showSlides', 'unusedSlides'],
+        onSuccess: () => {
+            const slide = [...props.showSlides, ...props.unusedSlides].find(x => x.id === result.slide_id);
+            if (!slide) return;
+            openEdit(slide);
+            if (result.has_overlay) editTab.value = 'overlay';
+        },
+    });
+}
 
 const inShow = ref([...props.showSlides]);
 const unused = ref([...props.unusedSlides]);
@@ -485,6 +502,10 @@ function persistLeaderOrder() {
                         class="rounded-lg border border-red-200 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50">
                         {{ $t('show_manage.delete_show') }}
                     </button>
+                    <button v-if="isAdmin" @click="showBuilder = true"
+                        class="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                        {{ $t('library.builder_button') }}
+                    </button>
                     <button v-if="isAdmin" @click="showUploadPanel = !showUploadPanel"
                         class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700">
                         {{ $t('show_manage.upload_slide') }}
@@ -623,6 +644,9 @@ function persistLeaderOrder() {
                 </div>
                 </div>
             </div>
+
+            <LibraryBuilder v-if="showBuilder && isAdmin" :entity-id="entity.id" :fixed-show="selectedShow"
+                @built="onBuilt" @close="showBuilder = false" />
 
             <UploadPanel
                 v-if="showUploadPanel && isAdmin"

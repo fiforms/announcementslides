@@ -4,6 +4,7 @@ import { useForm, router, Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import AdminLayout from '@/Layouts/AdminLayout.vue';
 import SlideCard from '@/Components/SlideCard.vue';
+import LibraryBuilder from '@/Components/LibraryBuilder.vue';
 import DropZone from '@/Components/DropZone.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import DateTimeLocalInput from '@/Components/DateTimeLocalInput.vue';
@@ -37,6 +38,11 @@ const busy = computed(() => isUploading.value || resize.isResizing.value);
 const { t } = useI18n();
 
 const showUploadPanel = ref(false);
+const showBuilder = ref(false);
+function onBuilt(result) {
+    showBuilder.value = false;
+    router.visit(route('admin.slides.edit', result.slide_id));
+}
 const selectedFiles   = ref([]);
 const filePreviews    = ref([]);
 const fileValidations = ref([]);
@@ -221,6 +227,11 @@ function statusBadge(status) {
         <template #header>
             <div class="flex items-center justify-between w-full">
                 <h1 class="text-xl font-semibold text-gray-900">{{ $t('nav.slides') }}</h1>
+                <div class="flex items-center gap-3">
+                <button @click="showBuilder = true"
+                    class="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50">
+                    {{ $t('library.builder_button') }}
+                </button>
                 <button @click="showUploadPanel = !showUploadPanel"
                     class="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors">
                     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -228,8 +239,11 @@ function statusBadge(status) {
                     </svg>
                     {{ $t('admin.upload_slides') }}
                 </button>
+                </div>
             </div>
         </template>
+
+        <LibraryBuilder v-if="showBuilder" @built="onBuilt" @close="showBuilder = false" />
 
         <!-- Upload Panel -->
         <div v-if="showUploadPanel" class="mb-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">

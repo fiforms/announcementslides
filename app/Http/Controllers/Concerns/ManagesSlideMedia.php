@@ -33,6 +33,8 @@ use Illuminate\Validation\ValidationException;
  */
 trait ManagesSlideMedia
 {
+    use BuildsOverlayFiles;
+
     private function mediaTypesForFrontend(): array
     {
         return collect(config('slides.media_types'))
@@ -259,31 +261,8 @@ trait ManagesSlideMedia
         // A Show's frame overlay is edited exactly like a slide's.
         $media = $slide->overlayMedia;
 
-        $widgets = Widget::editorCatalog($media?->overlay_settings['widgets'] ?? []);
-
         // A large raster overlay may have been offloaded: read it via the cache.
-        $path = $media?->localPath();
-        if (!$path) {
-            return response()->json(['source' => null, 'overlay' => null, 'widgets' => $widgets]);
-        }
-
-        $bytes = file_get_contents($path);
-
-        if ($media->mime_type !== 'image/svg+xml') {
-            return response()->json(['source' => null, 'widgets' => $widgets, 'overlay' => [
-                'mime_type' => $media->mime_type,
-                'data_uri'  => 'data:' . $media->mime_type . ';base64,' . base64_encode($bytes),
-            ]]);
-        }
-
-        $extracted = app(OverlaySource::class)->extract($bytes);
-        $svg = app(SvgSanitizer::class)->sanitize($extracted['svg']);
-
-        return response()->json([
-            'source'  => $svg === null ? null : $extracted['source'],
-            'overlay' => $svg === null ? null : ['mime_type' => 'image/svg+xml', 'svg' => $svg],
-            'widgets' => $widgets,
-        ]);
+        return $this->overlayEditorResponse($media?->localPath(), $media?->mime_type, $media?->overlay_settings['widgets'] ?? []);
     }
 
     /**
@@ -295,28 +274,7 @@ trait ManagesSlideMedia
      */
     private function saveOverlayForSlide(Request $request, Slide|Show $slide): SlideMedia
     {
-        $request->validate([
-            'svg'    => 'required|string|max:8388608',
-            'source' => 'required|string|max:1048576',
-        ]);
-
-        $source = json_decode($request->input('source'), true);
-        if (!is_array($source) || !is_int($source['v'] ?? null) || !is_array($source['elements'] ?? null)) {
-            throw ValidationException::withMessages(['source' => 'The overlay source is malformed.']);
-        }
-
-        try {
-            [$source, $overlaySettings] = app(OverlayWidgets::class)->fromSource($source);
-        } catch (WidgetPackageException $e) {
-            throw ValidationException::withMessages(['source' => $e->errors]);
-        }
-
-        $clean = app(SvgSanitizer::class)->sanitize($request->input('svg'));
-        if ($clean === null) {
-            throw ValidationException::withMessages(['svg' => 'The overlay is not a valid SVG image.']);
-        }
-
-        $svg = app(OverlaySource::class)->embed($clean, $source);
+        [$svg, $overlaySettings] = $this->prepareOverlaySave($request);
         $filename = Str::uuid() . '.svg';
         $diskPath = 'slides/' . $filename;
         $disk = Storage::disk('public');

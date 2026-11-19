@@ -10,6 +10,7 @@ use App\Models\GlobalShowTemplate;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Services\ImageValidationService;
+use App\Services\SlidePlacement;
 use App\Support\ImageResize;
 use App\Support\PublicToken;
 use App\Support\SlideToken;
@@ -373,92 +374,9 @@ class ChunkedUploadController extends Controller
             $slides[] = $slide;
         }
 
-        $this->routeIntoShow($request, $slides, $entityId);
+        app(SlidePlacement::class)->route($request, $slides, $entityId);
 
         return response()->json(['success' => true, 'count' => count($slides), 'status' => $status]);
-    }
-
-    /**
-     * Apply the "add to show" upload choice. Local uploads (entity_id set)
-     * choose among that entity's own Main/other shows — always a direct,
-     * manual placement (never touched by later language reconciliation).
-     * Global uploads (entity_id null) choose between the Global Board (whose
-     * slides then fan out to every entity's auto_fill shows whose language
-     * matches, or which accept any language — see Show::syncAutoFillForSlide)
-     * and a globally-distributed one-off show (unconditionally fanned out to
-     * every entity as its own show, regardless of language).
-     *
-     * @param  Slide[]  $slides
-     */
-    private function routeIntoShow(Request $request, array $slides, ?int $entityId): void
-    {
-        if (empty($slides)) {
-            return;
-        }
-
-        $addToShow = $request->input('add_to_show', 'main');
-
-        if ($entityId !== null) {
-            $entity = Entity::findOrFail($entityId);
-
-            $show = match ($addToShow) {
-                'main' => $entity->mainShow(),
-                'separate' => $request->show_id
-                    ? Show::where('entity_id', $entityId)->findOrFail($request->show_id)
-                    : Show::create([
-                        'entity_id' => $entityId,
-                        'name' => $request->new_show_name,
-                        'is_main' => false,
-                        'created_by' => $request->user()->id,
-                    ]),
-                default => null,
-            };
-
-            if ($show) {
-                [, $end] = SortZones::bounds(SortZones::LEADER_LATE);
-                $nextOrder = ShowController::nextSortOrderInZone($show, SortZones::LEADER_LATE);
-                foreach ($slides as $i => $slide) {
-                    $show->slides()->syncWithoutDetaching([
-                        $slide->id => ['sort_order' => min($nextOrder + $i, $end), 'auto_added' => false],
-                    ]);
-                }
-            }
-
-            return;
-        }
-
-        // Global upload.
-        $globalBoard = Show::globalBoard();
-
-        if ($addToShow === 'separate') {
-            $template = $request->global_template_id
-                ? GlobalShowTemplate::findOrFail($request->global_template_id)
-                : GlobalShowTemplate::create([
-                    'token' => filled($request->promo_token) ? $request->promo_token : null,
-                    'name' => $request->new_show_name,
-                    'created_by' => $request->user()->id,
-                ]);
-
-            foreach ($slides as $slide) {
-                DistributeGlobalSeparateShow::dispatch($template->id, $slide->id);
-            }
-
-            return;
-        }
-
-        // 'main' (default) and 'none' both land on the Global Board — 'none'
-        // just skips the fan-out to every entity's Main show below. The
-        // Global Board's own order is automatic too: every global slide gets
-        // the same shared fanout counter value it'll carry into every other
-        // show, so it always bubbles to the same relative spot everywhere.
-        foreach ($slides as $slide) {
-            $sortOrder = $slide->assignFanoutSortOrderIfNeeded();
-            $globalBoard->slides()->syncWithoutDetaching([$slide->id => ['sort_order' => $sortOrder, 'auto_added' => true]]);
-
-            if ($addToShow !== 'none') {
-                SyncShowAutoFillForSlide::dispatch($slide->id);
-            }
-        }
     }
 
     /**

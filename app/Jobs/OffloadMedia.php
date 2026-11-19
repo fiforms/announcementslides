@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\SlideMedia;
 use App\Services\VideoFrameExtractor;
+use App\Support\LibraryFiles;
 use App\Support\MediaStore;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -89,6 +90,11 @@ class OffloadMedia implements ShouldQueue
     private function qualifies(MediaStore $store, SlideMedia $media, ?string $disk, ?string $path, ?string $mime, ?int $bytes): bool
     {
         if (!$path || !$store->isLocal($disk) || !$store->eligible($mime, $bytes)) {
+            return false;
+        }
+
+        // Shared library files are moved as a unit by OffloadLibraryItem.
+        if (LibraryFiles::isShared($path)) {
             return false;
         }
 

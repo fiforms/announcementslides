@@ -18,6 +18,9 @@ Schedule::command('shows:prune-empty')->daily();
 // target. A no-op when nothing has been offloaded.
 Schedule::command('media:prune-cache')->everyFifteenMinutes()->withoutOverlapping();
 
+// Frees shared slide-library files (backgrounds) once no slide or library item uses them.
+Schedule::command('library:prune')->hourly()->withoutOverlapping();
+
 // Database-only backups (see config/backup.php). Full backups are started by hand.
 $backupDriver = config('database.connections.'.config('database.default').'.driver');
 
