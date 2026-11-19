@@ -635,13 +635,13 @@ onUnmounted(() => {
       :suspended="paused || externalPlaybackActive"
       :halted="streamHalted"
     />
-    <!-- Background music: rests while paused, while an external feed is on screen, and during a video slide. -->
+    <!-- Background music: rests while paused, while an external feed is on screen, and during a video slide that has its own sound. -->
     <FrameAudio
       v-if="frame?.audio?.tracks?.length"
       :tracks="frame.audio.tracks"
       :volume="frame.audio.volume"
       :shuffle="!!frame.audio.shuffle"
-      :suspended="paused || externalPlaybackActive || !!currentSlide?.mime_type?.startsWith('video/')"
+      :suspended="paused || externalPlaybackActive || (!!currentSlide?.mime_type?.startsWith('video/') && !currentSlide?.video_muted)"
     />
     <SlideStage
       v-for="stage in stages"

@@ -260,6 +260,12 @@ class Slide extends Model
         return $this->primaryMedia?->mime_type;
     }
 
+    /** True when players should silence this slide's video (library backdrops without sound). */
+    public function getVideoMutedAttribute(): bool
+    {
+        return (bool) $this->primaryMedia?->muted;
+    }
+
     public function getOverlayUrlAttribute(): ?string
     {
         return $this->overlayMedia?->file_url;

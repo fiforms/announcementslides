@@ -93,6 +93,7 @@ class PlayController extends Controller
             'id' => $slide->id,
             'title' => $slide->title,
             'mime_type' => $slide->mime_type,
+            'video_muted' => $slide->video_muted,
             'video_playback_mode' => $slide->video_playback_mode,
             'file_url' => $slide->file_url,
             'overlay_url' => $slide->overlay_url,

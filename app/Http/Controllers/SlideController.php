@@ -650,6 +650,7 @@ class SlideController extends Controller
             'link'              => $slide->link,
             'video_playback_mode' => $slide->video_playback_mode,
             'mime_type'         => $slide->mime_type,
+            'video_muted'       => $slide->video_muted,
             'file_url'          => $slide->file_url,
             'thumbnail_url'     => $slide->thumbnail_url,
             'overlay_url'       => $slide->overlay_url,

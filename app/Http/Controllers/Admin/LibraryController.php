@@ -66,6 +66,7 @@ class LibraryController extends Controller
             'upload.original_filename' => 'required|string|max:255',
             'upload.mime_type'         => ['required', 'string', Rule::in(config('slides.media_types.slide.mimes'))],
             'title'                    => 'nullable|string|max:255',
+            'has_sound'                => 'nullable|boolean',
         ]);
         $upload = $data['upload'];
         $disk = Storage::disk(MediaStore::LOCAL);
@@ -101,6 +102,7 @@ class LibraryController extends Controller
             'file_size'         => $disk->size($dest),
             'image_width'       => $size[0] ?? null,
             'image_height'      => $size[1] ?? null,
+            'has_sound'         => (bool) ($data['has_sound'] ?? false),
             'created_by'        => $request->user()->id,
         ]);
 
@@ -169,7 +171,16 @@ class LibraryController extends Controller
 
     public function update(Request $request, LibraryItem $item): RedirectResponse
     {
-        $item->update($request->validate(['title' => 'required|string|max:255']));
+        $data = $request->validate([
+            'title'     => 'sometimes|required|string|max:255',
+            'has_sound' => 'sometimes|boolean',
+        ]);
+        $item->update($data);
+
+        // Slides built from this video share its file: keep their copy of the flag in step.
+        if (array_key_exists('has_sound', $data) && $item->isVideo()) {
+            SlideMedia::where('disk_path', $item->disk_path)->update(['muted' => !$item->has_sound]);
+        }
 
         return back();
     }
@@ -260,6 +271,7 @@ class LibraryController extends Controller
             'thumbnail_url' => $i->thumbnail_url,
             'mime_type'     => $i->mime_type,
             'is_video'      => $i->isVideo(),
+            'has_sound'     => (bool) $i->has_sound,
             'duration_seconds' => $i->duration_seconds,
             'file_size'     => $i->file_size,
             'image_width'   => $i->image_width,

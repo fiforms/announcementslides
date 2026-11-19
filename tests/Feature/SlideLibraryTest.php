@@ -252,6 +252,36 @@ class SlideLibraryTest extends TestCase
         $this->assertNotSame('loop', $build($image)->video_playback_mode);
     }
 
+    public function test_library_videos_are_muted_in_players_unless_marked_as_having_sound(): void
+    {
+        $make = fn (string $sha, bool $sound) => LibraryItem::create([
+            'kind' => 'background', 'title' => 'V' . $sha[0], 'sha256' => str_repeat($sha, 64), 'filename' => "$sha.mp4", 'original_filename' => "$sha.mp4",
+            'disk_path' => "library/bg/$sha$sha/$sha.mp4", 'mime_type' => 'video/mp4', 'thumbnail_path' => "library/thumbs/$sha.jpg", 'has_sound' => $sound,
+        ]);
+        $silent = $make('d', false);
+        $loud = $make('e', true);
+
+        $build = fn ($bg) => Slide::findOrFail($this->actingAs($this->leader)->postJson(route('library.build'), [
+            'title' => 'S', 'entity_id' => $this->church->id, 'background_id' => $bg->id,
+        ])->assertOk()->json('slide_id'));
+
+        $silentSlide = $build($silent);
+        $loudSlide = $build($loud);
+        $this->assertTrue($silentSlide->video_muted);
+        $this->assertFalse($loudSlide->video_muted);
+        $this->assertFalse($this->plainSlide()->video_muted);
+
+        // Flipping the library item carries over to slides already built from it.
+        $this->actingAs($this->admin)->patch(route('admin.library.update', $silent->id), ['has_sound' => true])->assertRedirect();
+        $this->assertFalse($silentSlide->fresh()->video_muted);
+    }
+
+    public function test_an_upload_can_be_marked_as_having_sound(): void
+    {
+        $this->actingAs($this->admin)->post(route('admin.library.backgrounds.store'), ['upload' => $this->assembledImage(), 'has_sound' => true])->assertRedirect();
+        $this->assertTrue(LibraryItem::backgrounds()->firstOrFail()->has_sound);
+    }
+
     private function plainSlide(?Entity $entity = null): Slide
     {
         $slide = Slide::create(['title' => 'S', 'status' => 'published', 'uploaded_by' => (($entity ? $this->leader : $this->admin))->id, 'entity_id' => $entity?->id]);

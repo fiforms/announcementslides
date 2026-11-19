@@ -17,9 +17,11 @@ const { t } = useI18n();
 const fileInput = ref(null);
 const notice = ref(null);
 const current = ref(null);
+// Library videos are silent backdrops unless this is ticked for the upload.
+const hasSound = ref(false);
 const uploader = useChunkedUpload({
     finalizeRoute: 'admin.library.backgrounds.store',
-    buildFinalizePayload: (completed) => ({ upload: completed[0] }),
+    buildFinalizePayload: (completed) => ({ upload: completed[0], has_sound: hasSound.value }),
 });
 
 async function onFiles(evt) {
@@ -87,6 +89,10 @@ function removeBackground(item) {
 // ── Templates ──
 const adding = ref(false);
 const form = useForm({ title: '' });
+
+function toggleSound(item) {
+    router.patch(route('admin.library.update', item.id), { has_sound: !item.has_sound }, { preserveScroll: true });
+}
 function createTemplate() {
     form.post(route('admin.library.templates.store'));
 }
@@ -129,7 +135,11 @@ const linkBtn = 'text-xs font-medium text-gray-600 hover:text-indigo-700';
                     </button>
                 </div>
             </div>
-            <p class="mb-3 text-xs text-gray-500">{{ $t('library.upload_hint') }}</p>
+            <p class="mb-2 text-xs text-gray-500">{{ $t('library.upload_hint') }}</p>
+            <label class="mb-3 flex items-center gap-2 text-xs text-gray-700">
+                <input v-model="hasSound" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
+                {{ $t('library.has_sound_upload') }}
+            </label>
 
             <div v-if="uploader.isUploading.value" class="mb-3 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
                 <div>{{ $t('library.uploading', { name: current }) }}</div>
@@ -147,12 +157,16 @@ const linkBtn = 'text-xs font-medium text-gray-600 hover:text-indigo-700';
                         <img v-if="item.thumbnail_url" :src="item.thumbnail_url" :alt="item.title" class="h-full w-full object-cover" loading="lazy" />
                         <div v-else class="flex h-full items-center justify-center text-xs text-gray-500">{{ $t('library.processing') }}</div>
                         <span v-if="item.is_video" class="absolute left-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium uppercase text-white">{{ $t('library.video') }}</span>
+                        <span v-if="item.is_video && item.has_sound" class="absolute right-2 top-2 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-medium uppercase text-white">{{ $t('library.sound') }}</span>
                     </div>
                     <div class="space-y-1 p-3">
                         <div class="truncate text-sm font-medium text-gray-900" :title="item.title">{{ item.title }}</div>
                         <div class="text-xs text-gray-500">{{ $t('library.used_by', { n: item.uses }) }}</div>
                         <div class="flex gap-3 pt-1">
                             <button type="button" :class="linkBtn" @click="rename(item)">{{ $t('library.rename') }}</button>
+                            <button v-if="item.is_video" type="button" :class="linkBtn" @click="toggleSound(item)">
+                                {{ item.has_sound ? $t('library.make_silent') : $t('library.has_sound') }}
+                            </button>
                             <button type="button" class="text-xs font-medium text-red-600 hover:text-red-800" @click="removeBackground(item)">{{ $t('library.delete') }}</button>
                         </div>
                     </div>
