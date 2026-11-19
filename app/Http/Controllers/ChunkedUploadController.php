@@ -30,14 +30,16 @@ class ChunkedUploadController extends Controller
     public function chunk(Request $request)
     {
         $mediaType = $request->input('media_type', 'slide');
-        $allowedMimes = config("slides.media_types.{$mediaType}.mimes", []);
+        $allowedMimes = $mediaType === 'library-audio'
+            ? config('slides.library_audio.mimes')
+            : config("slides.media_types.{$mediaType}.mimes", []);
 
         $request->validate([
             'upload_id'    => ['required', 'string', 'regex:/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/'],
             'chunk_index'  => 'required|integer|min:0|max:9999',
             'total_chunks' => 'required|integer|min:1|max:10000',
             'filename'     => 'required|string|max:255',
-            'media_type'   => ['nullable', 'string', Rule::in(array_keys(config('slides.media_types')))],
+            'media_type'   => ['nullable', 'string', Rule::in([...array_keys(config('slides.media_types')), 'library-audio'])],
             'mime_type'    => ['required', 'string', Rule::in($allowedMimes)],
             'chunk'        => 'required|file',
         ]);

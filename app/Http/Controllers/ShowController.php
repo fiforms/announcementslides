@@ -71,7 +71,16 @@ class ShowController extends Controller
                     'id' => $selectedShow->frame_channel_id,
                     'muted' => $selectedShow->frame_channel_muted,
                 ] : null,
+                'audio' => [
+                    'tracks' => $selectedShow->audioItems->map(fn (LibraryItem $i) => [
+                        'id' => $i->id, 'title' => $i->title, 'duration_seconds' => $i->duration_seconds, 'file_url' => $i->file_url,
+                    ])->values(),
+                    'volume' => (int) $selectedShow->frame_audio_volume,
+                ],
             ],
+            'libraryAudio' => $isAdmin ? LibraryItem::audio()->ready()->orderBy('title')->get()->map(fn (LibraryItem $i) => [
+                'id' => $i->id, 'title' => $i->title, 'duration_seconds' => $i->duration_seconds,
+            ])->values() : [],
             'liveChannels' => LiveChannel::orderBy('name')->get()->map(fn (LiveChannel $c) => [
                 'id' => $c->id,
                 'name' => $c->name,
@@ -316,6 +325,40 @@ class ShowController extends Controller
         ]);
 
         return back()->with('success', 'Show background saved.');
+    }
+
+    /**
+     * Sets (or, with an empty `library_item_id`, clears) the show's background
+     * music from the library's audio. Independent of the background. The
+     * pivot is an ordered list so a playlist can come later; for now exactly
+     * one track is kept, and picking another replaces it.
+     */
+    public function saveAudio(Request $request, Show $show)
+    {
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
+
+        $data = $request->validate([
+            'library_item_id' => 'nullable|integer|exists:library_items,id',
+            'volume'          => 'nullable|integer|min:0|max:100',
+        ]);
+
+        if (array_key_exists('volume', $data) && $data['volume'] !== null) {
+            $show->update(['frame_audio_volume' => $data['volume']]);
+        }
+
+        if (array_key_exists('library_item_id', $data)) {
+            if ($data['library_item_id'] === null) {
+                $show->audioItems()->detach();
+
+                return back()->with('success', 'Removed.');
+            }
+
+            $item = LibraryItem::audio()->ready()->find($data['library_item_id']);
+            abort_unless($item, 422, 'That library item is not available.');
+            $show->audioItems()->sync([$item->id => ['sort_order' => 0]]);
+        }
+
+        return back()->with('success', 'Background music saved.');
     }
 
     public function destroyMedia(Request $request, Show $show, SlideMedia $media)

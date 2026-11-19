@@ -36,7 +36,7 @@ class Show extends Model
 
     protected $fillable = [
         'token', 'entity_id', 'global_template_id', 'name', 'is_main', 'language_id',
-        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'frame_channel_id', 'frame_channel_muted', 'created_by',
+        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'frame_channel_id', 'frame_channel_muted', 'frame_audio_volume', 'created_by',
     ];
 
     protected function casts(): array
@@ -65,6 +65,18 @@ class Show extends Model
     public function liveChannel(): BelongsTo
     {
         return $this->belongsTo(LiveChannel::class, 'frame_channel_id');
+    }
+
+    /**
+     * The show's background music: library audio items in play order, looped
+     * by the players. Independent of the background (image, video, YouTube or
+     * live channel). The UI offers one track today; the list is the playlist.
+     */
+    public function audioItems(): BelongsToMany
+    {
+        return $this->belongsToMany(LibraryItem::class, 'show_audio')
+            ->withPivot('sort_order')
+            ->orderBy('show_audio.sort_order');
     }
 
     public function globalTemplate(): BelongsTo

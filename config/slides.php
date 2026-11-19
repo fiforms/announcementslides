@@ -39,6 +39,7 @@ return [
     |
     */
     'ffmpeg_binary' => env('FFMPEG_BINARY', 'ffmpeg'),
+    'ffprobe_binary' => env('FFPROBE_BINARY', 'ffprobe'),
 
     /*
     |--------------------------------------------------------------------------
@@ -125,6 +126,16 @@ return [
         'video/quicktime' => 'mov',
         'video/webm'      => 'webm',
         'application/pdf' => 'pdf',
+        'audio/mpeg'      => 'mp3',
+        'audio/mp4'       => 'm4a',
+        'audio/webm'      => 'webm',
+    ],
+
+    // Audio for the slide library (background music for a show). Kept out of
+    // media_types so it never shows in a slide's "add media" list; the chunk
+    // endpoint accepts it as media_type 'library-audio'.
+    'library_audio' => [
+        'mimes' => ['audio/mpeg', 'audio/mp4', 'audio/webm'],
     ],
 
     'media_types' => [

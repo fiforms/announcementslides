@@ -182,6 +182,31 @@ async def _sync_frame_file(client: httpx.AsyncClient, url, previous: dict, key: 
     return filename
 
 
+async def _sync_frame_audio(client: httpx.AsyncClient, show_id: str, audio, previous) -> dict | None:
+    """The show's background-music playlist, each track cached under a name
+    keyed by its library item id (so reordering or swapping tracks never
+    reuses a stale file). Tracks the server dropped lose their cached file."""
+    old = {t["id"]: t for t in (previous or {}).get("tracks", []) if t.get("id") is not None}
+    tracks = []
+    for track in (audio or {}).get("tracks", []):
+        ext = Path(urlparse(track["url"]).path).suffix or mimetypes.guess_extension(track.get("mime_type") or "") or ""
+        name = f"show-{show_id}-audio-{track['id']}{ext}"
+        prev = old.get(track["id"]) or {}
+        local = await _sync_frame_file(
+            client, track["url"],
+            {"audio_url": prev.get("url"), "audio_local_filename": prev.get("local_filename")},
+            "audio", name,
+        )
+        tracks.append({"id": track["id"], "url": track["url"], "local_filename": local})
+    keep = {t["local_filename"] for t in tracks if t["local_filename"]}
+    for prev in old.values():
+        if prev.get("local_filename") and prev["local_filename"] not in keep:
+            (MEDIA_DIR / prev["local_filename"]).unlink(missing_ok=True)
+    if not tracks:
+        return None
+    return {"volume": int(audio.get("volume", 100)), "tracks": tracks}
+
+
 async def _sync_frame(client: httpx.AsyncClient, show_id: str, frame, previous) -> dict | None:
     """The show's frame as a manifest entry, with its files cached, or None."""
     previous = previous or {}
@@ -192,10 +217,12 @@ async def _sync_frame(client: httpx.AsyncClient, show_id: str, frame, previous) 
 
     base = await _sync_frame_file(client, frame.get("file_url"), previous, "base", base_name)
     overlay = await _sync_frame_file(client, frame.get("overlay_url"), previous, "overlay", overlay_name)
+    audio = await _sync_frame_audio(client, show_id, frame.get("audio"), previous.get("audio"))
     if not frame:
         return None
 
     return {
+        "audio": audio,
         "base_url": frame.get("file_url"),
         "base_local_filename": base,
         "mime_type": frame.get("mime_type"),
@@ -213,7 +240,9 @@ async def _sync_frame(client: httpx.AsyncClient, show_id: str, frame, previous) 
 
 
 def _frame_files(frame) -> list:
-    return [name for name in ((frame or {}).get("base_local_filename"), (frame or {}).get("overlay_local_filename")) if name]
+    frame = frame or {}
+    audio = [t.get("local_filename") for t in (frame.get("audio") or {}).get("tracks", [])]
+    return [name for name in (frame.get("base_local_filename"), frame.get("overlay_local_filename"), *audio) if name]
 
 
 def _playlist_frame(frame, widget_index: dict):
@@ -228,9 +257,14 @@ def _playlist_frame(frame, widget_index: dict):
     placements = widgets.placements_for_playlist(frame, widget_index)
     youtube = frame.get("youtube_url")
     channel = frame.get("channel") or None
-    if not (base_ok or overlay_ok or placements or youtube or channel):
+    # Background music: only the tracks whose file is on disk.
+    audio = frame.get("audio") or {}
+    tracks = [{"url": f"/media/{t['local_filename']}"} for t in audio.get("tracks", [])
+              if t.get("local_filename") and (MEDIA_DIR / t["local_filename"]).exists()]
+    if not (base_ok or overlay_ok or placements or youtube or channel or tracks):
         return None
     return {
+        "audio": {"tracks": tracks, "volume": audio.get("volume", 100)} if tracks else None,
         "youtube_url": youtube,
         "channel": channel,
         "media_url": f"/media/{base}" if base_ok else None,

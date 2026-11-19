@@ -10,6 +10,7 @@ import { menuOpen } from '@core/menuOverlay.js'
 import { startSrtStream, stopSrtStream, setDebugOverlay } from '../srtStreamPlayer.js'
 import SlideStage from '../components/SlideStage.vue'
 import ShowFrameLayer from '../components/ShowFrameLayer.vue'
+import FrameAudio from '../components/FrameAudio.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -634,6 +635,13 @@ onUnmounted(() => {
       :suspended="paused || externalPlaybackActive"
       :halted="streamHalted"
     />
+    <!-- Background music: rests while paused, while an external feed is on screen, and during a video slide. -->
+    <FrameAudio
+      v-if="frame?.audio?.tracks?.length"
+      :tracks="frame.audio.tracks"
+      :volume="frame.audio.volume"
+      :suspended="paused || externalPlaybackActive || !!currentSlide?.mime_type?.startsWith('video/')"
+    />
     <SlideStage
       v-for="stage in stages"
       :key="stage.id"
@@ -650,7 +658,7 @@ onUnmounted(() => {
       layer="top"
     />
     <!-- A show with a background and no slides (e.g. just a live channel) shows only that. -->
-    <div v-if="!stages.length && !(status?.paired && (frame?.media_url || frame?.youtube_url || frame?.channel))" class="empty-state">
+    <div v-if="!stages.length && !(status?.paired && (frame?.media_url || frame?.youtube_url || frame?.channel || frame?.audio?.tracks?.length))" class="empty-state">
       <p v-if="status && !status.paired">{{ t('slideshow.notPaired') }}</p>
       <p v-else>{{ t('slideshow.waiting') }}</p>
     </div>

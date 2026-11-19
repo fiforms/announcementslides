@@ -21,7 +21,8 @@ const props = defineProps({
     entity: { type: Object, required: true },
     shows: { type: Array, default: () => [] },
     selectedShowId: { type: Number, required: true },
-    frame: { type: Object, default: () => ({ id: null, media: [], youtube: null, channel: null }) },
+    frame: { type: Object, default: () => ({ id: null, media: [], youtube: null, channel: null, audio: null }) },
+    libraryAudio: { type: Array, default: () => [] },
     liveChannels: { type: Array, default: () => [] },
     showSlides: { type: Array, default: () => [] },
     unusedSlides: { type: Array, default: () => [] },
@@ -124,6 +125,21 @@ function removeChannel() {
     if (!confirm(t('show_manage.frame_remove_confirm'))) return;
     router.put(route('shows.channel.save', { show: props.selectedShowId, entity_id: props.entity.id }),
         { channel_id: null }, { preserveScroll: true, only: ['frame'] });
+}
+
+// Background music: one library audio file looped under the show. The server
+// keeps an ordered list (a playlist later); the form edits its first entry.
+const audioForm = useForm({ library_item_id: props.frame.audio?.tracks?.[0]?.id ?? '', volume: props.frame.audio?.volume ?? 100 });
+watch(() => props.frame.audio, (a) => {
+    audioForm.library_item_id = a?.tracks?.[0]?.id ?? '';
+    audioForm.volume = a?.volume ?? 100;
+});
+const currentTrack = computed(() => props.frame.audio?.tracks?.[0] ?? null);
+function saveAudio() {
+    audioForm.transform((d) => ({ ...d, library_item_id: d.library_item_id || null }))
+        .put(route('shows.audio.save', { show: props.selectedShowId, entity_id: props.entity.id }), {
+            preserveScroll: true, only: ['frame'],
+        });
 }
 
 const frameFileInput = ref(null);
@@ -652,6 +668,32 @@ function persistLeaderOrder() {
                         <p v-if="selectedChannel && !selectedChannel.supports_mute" class="text-xs text-gray-500">{{ $t('show_manage.frame_channel_no_mute') }}</p>
                         <p v-if="frame.channel" class="text-xs text-amber-700">{{ $t('show_manage.frame_video_note') }}</p>
                         <p class="text-xs text-gray-500">{{ $t('show_manage.frame_channel_hint') }}</p>
+                    </div>
+
+                    <div class="space-y-1">
+                        <p class="text-sm font-medium text-gray-700">{{ $t('show_manage.frame_music') }}</p>
+                        <p v-if="!libraryAudio.length && !currentTrack" class="text-xs text-gray-500">{{ $t('show_manage.frame_music_none_in_library') }}</p>
+                        <form v-else class="flex flex-wrap items-center gap-2" @submit.prevent="saveAudio">
+                            <select v-model="audioForm.library_item_id"
+                                class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="">{{ $t('show_manage.frame_music_pick') }}</option>
+                                <option v-for="a in libraryAudio" :key="a.id" :value="a.id">{{ a.title }}</option>
+                                <!-- A track no longer offered (it is always listed once it exists, so this is only a safety net). -->
+                                <option v-if="currentTrack && !libraryAudio.some((a) => a.id === currentTrack.id)" :value="currentTrack.id">{{ currentTrack.title }}</option>
+                            </select>
+                            <label class="flex items-center gap-2 text-sm text-gray-700">
+                                {{ $t('show_manage.frame_music_volume') }}
+                                <input v-model.number="audioForm.volume" type="range" min="0" max="100" step="5" class="w-28" />
+                                <span class="w-9 tabular-nums text-xs text-gray-500">{{ audioForm.volume }}%</span>
+                            </label>
+                            <button type="submit" :disabled="audioForm.processing"
+                                class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                                {{ $t('show_manage.frame_music_use') }}
+                            </button>
+                        </form>
+                        <audio v-if="currentTrack" :src="currentTrack.file_url" controls preload="none" class="h-9 w-full max-w-md" />
+                        <p v-if="audioForm.errors.library_item_id" class="text-xs text-red-600">{{ audioForm.errors.library_item_id }}</p>
+                        <p class="text-xs text-gray-500">{{ $t('show_manage.frame_music_hint') }}</p>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">

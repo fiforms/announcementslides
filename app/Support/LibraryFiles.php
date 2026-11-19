@@ -31,6 +31,11 @@ class LibraryFiles
         return self::PREFIX . 'bg/' . substr($sha256, 0, 2) . "/{$sha256}.{$ext}";
     }
 
+    public static function audioPath(string $sha256, string $ext): string
+    {
+        return self::PREFIX . 'audio/' . substr($sha256, 0, 2) . "/{$sha256}.{$ext}";
+    }
+
     public static function thumbnailPath(string $sha256): string
     {
         return self::PREFIX . "thumbs/{$sha256}.jpg";
@@ -58,7 +63,7 @@ class LibraryFiles
             }
         };
 
-        LibraryItem::backgrounds()->get(['disk_path', 'thumbnail_path', 'poster_path'])
+        LibraryItem::whereIn('kind', [LibraryItem::BACKGROUND, LibraryItem::AUDIO])->get(['disk_path', 'thumbnail_path', 'poster_path'])
             ->each(fn ($i) => array_map($add, [$i->disk_path, $i->thumbnail_path, $i->poster_path]));
 
         SlideMedia::where(fn ($q) => $q
@@ -95,7 +100,7 @@ class LibraryFiles
         $disks = array_unique(array_filter([MediaStore::LOCAL, $store->offloadDisk()]));
         foreach ($disks as $name) {
             $disk = Storage::disk($name);
-            foreach (['bg', 'thumbs', 'posters'] as $dir) {
+            foreach (['bg', 'audio', 'thumbs', 'posters'] as $dir) {
                 foreach ($disk->allFiles(self::PREFIX . $dir) as $path) {
                     if (isset($referenced[$path]) || $disk->lastModified($path) > time() - $minAgeSeconds) {
                         continue;

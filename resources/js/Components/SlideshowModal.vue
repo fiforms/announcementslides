@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 import SlideStage from '@/Components/SlideStage.vue';
 import ShowFrameLayer from '@/Components/ShowFrameLayer.vue';
+import FrameAudio from '@/Components/FrameAudio.vue';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -439,6 +440,9 @@ const handleShow = () => {
             <!-- Slide Image -->
             <div class="relative w-full h-full flex items-center justify-center">
                 <ShowFrameLayer v-if="frame?.file_url || frame?.youtube_url || frame?.channel" :frame="frame" layer="base" />
+                <!-- Background music rests while paused and during a video slide (which has its own sound). -->
+                <FrameAudio v-if="frame?.audio?.tracks?.length" :tracks="frame.audio.tracks" :volume="frame.audio.volume"
+                    :suspended="isPaused || !!currentSlide?.mime_type?.startsWith('video/')" />
                 <SlideStage
                     v-for="stage in stages"
                     :key="stage.id"
