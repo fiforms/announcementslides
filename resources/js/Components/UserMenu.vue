@@ -1,4 +1,5 @@
 <script setup>
+import { entityQuery } from '@/Composables/useEntitySelection.js';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
 
@@ -42,17 +43,17 @@ function getInitials(name) {
                     </div>
                 </div>
                 <DropdownLink
-                    :href="route('profile.edit')"
+                    :href="route('profile.edit', entityQuery())"
                 >
                     {{ $t('nav.profile') }}
                 </DropdownLink>
                 <DropdownLink
-                    :href="route('qr-code')"
+                    :href="route('qr-code', entityQuery())"
                 >
                     {{ $t('nav.qr_code') }}
                 </DropdownLink>
                 <DropdownLink
-                    :href="route('about')"
+                    :href="route('about', entityQuery())"
                 >
                     {{ $t('nav.about') }}
                 </DropdownLink>

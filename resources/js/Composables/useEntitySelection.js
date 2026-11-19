@@ -1,8 +1,32 @@
 import { computed } from 'vue';
-import { router } from '@inertiajs/vue3';
+import { router, usePage } from '@inertiajs/vue3';
 
 // Pages that have no meaning without an entity.
 const ENTITY_ROUTES = ['shows.*', 'slide-announcers.*', 'play-links.*', 'local-slides.*'];
+
+/**
+ * The entity carried by the current URL: ?entity_id=, or the {entity} path
+ * parameter on /entity/{entity}/... pages. null is the Global View.
+ */
+export function currentEntityIdFromUrl() {
+    const param = new URLSearchParams(window.location.search).get('entity_id');
+    if (param) return parseInt(param) || null;
+    try {
+        const routed = route().params?.entity;
+        return routed ? parseInt(routed) || null : null;
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Query params that keep the current entity selected on the next page.
+ * Spread into route() params: route('my-slides.index', entityQuery()).
+ */
+export function entityQuery() {
+    const id = currentEntityIdFromUrl();
+    return id ? { entity_id: id } : {};
+}
 
 /**
  * Shared entity-selection state for the top nav (used by both
@@ -11,9 +35,12 @@ const ENTITY_ROUTES = ['shows.*', 'slide-announcers.*', 'play-links.*', 'local-s
  * remembered between visits, so a URL without one is the Global View.
  */
 export function useEntitySelection(userEntitiesRef) {
+    const page = usePage();
+
+    // Reading page.url makes this recompute on every Inertia visit.
     const currentEntityId = computed(() => {
-        const param = new URLSearchParams(window.location.search).get('entity_id');
-        return param ? parseInt(param) : null;
+        void page.url;
+        return currentEntityIdFromUrl();
     });
 
     const currentEntity = computed(() => userEntitiesRef.value.find(e => e.id === currentEntityId.value));

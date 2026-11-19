@@ -7,7 +7,7 @@ import UserMenu from '@/Components/UserMenu.vue';
 import Dropdown from '@/Components/Dropdown.vue';
 import ShowsNav from '@/Components/ShowsNav.vue';
 import ResponsiveNavLink from '@/Components/ResponsiveNavLink.vue';
-import { useEntitySelection } from '@/Composables/useEntitySelection.js';
+import { useEntitySelection, entityQuery } from '@/Composables/useEntitySelection.js';
 
 const page = usePage();
 const appName = useAppName();
@@ -27,7 +27,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
         <nav class="bg-indigo-700 shadow-lg">
             <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
                 <div class="flex h-16 items-center justify-between">
-                    <Link :href="route('slides.index')" class="flex items-center gap-2">
+                    <Link :href="route('slides.index', entityQuery())" class="flex items-center gap-2">
                         <BrandMark size="h-7 w-7" icon-class="text-white" />
                         <span class="text-lg font-bold text-white">{{ appName }}</span>
                     </Link>
@@ -40,7 +40,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                         </Link>
 
                         <template v-if="auth?.user?.role === 'viewer' || auth?.user?.role === 'contributor'">
-                            <Link :href="route('my-slides.index')"
+                            <Link :href="route('my-slides.index', entityQuery())"
                                 class="text-sm text-indigo-200 hover:text-white transition-colors"
                                 :class="{ 'text-white font-semibold': route().current('my-slides.*') }">
                                 {{ $t('nav.my_slides') }}
@@ -135,7 +135,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
                     </ResponsiveNavLink>
                     <ResponsiveNavLink
                         v-if="auth.user.role === 'viewer' || auth.user.role === 'contributor'"
-                        :href="route('my-slides.index')"
+                        :href="route('my-slides.index', entityQuery())"
                         :active="route().current('my-slides.*')"
                     >
                         {{ $t('nav.my_slides') }}
