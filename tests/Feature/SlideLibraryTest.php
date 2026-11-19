@@ -307,4 +307,47 @@ class SlideLibraryTest extends TestCase
         $this->actingAs($this->admin)->post(route('admin.slides.media.library', $slide), ['media_type' => 'slide', 'library_item_id' => $bg->id])->assertRedirect();
         $this->assertSame($bg->disk_path, $slide->media()->where('media_type', 'slide')->first()->disk_path);
     }
+
+    public function test_a_show_background_can_come_from_the_library(): void
+    {
+        $bg = $this->readyBackground();
+        $show = $this->church->mainShow();
+        $show->update(['frame_youtube' => ['kind' => 'video', 'id' => 'abc', 'muted' => false]]);
+        Storage::disk('public')->put('slides/own.jpg', 'x');
+        $own = $show->media()->create([
+            'media_type' => 'show-base', 'filename' => 'own.jpg', 'original_filename' => 'own.jpg',
+            'disk_path' => 'slides/own.jpg', 'file_size' => 1, 'mime_type' => 'image/jpeg',
+        ]);
+        $url = route('shows.media.library', ['show' => $show->id, 'entity_id' => $this->church->id]);
+
+        $this->actingAs($this->leader)->post($url, ['library_item_id' => $bg->id])->assertRedirect();
+
+        $base = $show->media()->where('media_type', 'show-base')->get();
+        $this->assertCount(1, $base);
+        $this->assertSame($bg->disk_path, $base[0]->disk_path);          // shared file, not a copy
+        $this->assertSame($bg->thumbnail_path, $base[0]->thumbnail_path);
+        $this->assertNull($show->fresh()->frame_youtube);                 // replaces a YouTube background
+        $this->assertNull(SlideMedia::find($own->id));
+        Storage::disk('public')->assertMissing('slides/own.jpg');
+        $this->assertCount(1, Storage::disk('public')->allFiles('library/bg'));
+    }
+
+    public function test_a_show_background_from_the_library_checks_kind_and_permission(): void
+    {
+        $bg = $this->readyBackground();
+        $tpl = $this->readyTemplate();
+        $show = $this->church->mainShow();
+        $url = route('shows.media.library', ['show' => $show->id, 'entity_id' => $this->church->id]);
+
+        $this->actingAs($this->leader)->post($url, ['library_item_id' => $tpl->id])->assertStatus(422);
+        $this->actingAs(User::factory()->create())->post($url, ['library_item_id' => $bg->id])->assertForbidden();
+
+        // Another church's leader can't set this show's background.
+        $other = Entity::create(['name' => 'Elsewhere']);
+        $stranger = User::factory()->create();
+        $stranger->entities()->attach($other->id, ['role' => 'admin']);
+        $this->actingAs($stranger)->post(route('shows.media.library', ['show' => $show->id, 'entity_id' => $other->id]), ['library_item_id' => $bg->id])
+            ->assertNotFound();
+        $this->assertSame(0, $show->media()->count());
+    }
 }
