@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\ShowFrame;
 use App\Support\LibraryFiles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -130,27 +131,30 @@ class ShowAudioTest extends TestCase
         Storage::disk('public')->assertMissing($item->disk_path);
     }
 
-    public function test_a_leader_sets_the_shows_music_and_volume_and_clears_it(): void
+    public function test_a_leader_sets_the_shows_playlist_in_order_and_clears_it(): void
     {
-        $item = $this->audioItem();
-
-        $this->saveAudio(['library_item_id' => $item->id, 'volume' => 40])->assertSessionHasNoErrors();
-        $show = $this->show->fresh();
-        $this->assertSame([$item->id], $show->audioItems->pluck('id')->all());
-        $this->assertSame(40, $show->frame_audio_volume);
-
-        // Picking another track replaces it: a single entry today.
+        $a = $this->audioItem();
         $this->addAudio($this->assembledAudio('mp3', 'audio/mpeg', 880));
-        $other = LibraryItem::audio()->where('id', '!=', $item->id)->firstOrFail();
-        $this->saveAudio(['library_item_id' => $other->id]);
-        $this->assertSame([$other->id], $this->show->fresh()->audioItems->pluck('id')->all());
+        $b = LibraryItem::audio()->where('id', '!=', $a->id)->firstOrFail();
 
-        // Volume alone leaves the track alone.
+        $this->saveAudio(['library_item_ids' => [$a->id], 'volume' => 40])->assertSessionHasNoErrors();
+        $this->assertSame([$a->id], $this->show->fresh()->audioItems->pluck('id')->all());
+        $this->assertSame(40, $this->show->fresh()->frame_audio_volume);
+
+        $this->saveAudio(['library_item_ids' => [$b->id, $a->id]]);
+        $this->assertSame([$b->id, $a->id], $this->show->fresh()->audioItems->pluck('id')->all());
+
+        // Reordering keeps the same rows, just renumbered.
+        $this->saveAudio(['library_item_ids' => [$a->id, $b->id]]);
+        $this->assertSame([$a->id, $b->id], $this->show->fresh()->audioItems->pluck('id')->all());
+        $this->assertSame(2, DB::table('show_audio')->where('show_id', $this->show->id)->count());
+
+        // Volume alone leaves the list alone.
         $this->saveAudio(['volume' => 10]);
-        $this->assertSame([$other->id], $this->show->fresh()->audioItems->pluck('id')->all());
+        $this->assertSame([$a->id, $b->id], $this->show->fresh()->audioItems->pluck('id')->all());
         $this->assertSame(10, $this->show->fresh()->frame_audio_volume);
 
-        $this->saveAudio(['library_item_id' => null]);
+        $this->saveAudio(['library_item_ids' => []]);
         $this->assertCount(0, $this->show->fresh()->audioItems);
     }
 
@@ -159,14 +163,17 @@ class ShowAudioTest extends TestCase
         $item = $this->audioItem();
         $this->show->update(['frame_youtube' => ['video' => 'dQw4w9WgXcQ']]);
 
-        $this->saveAudio(['library_item_id' => $item->id]);
+        $this->saveAudio(['library_item_ids' => [$item->id]]);
         $this->assertNotNull($this->show->fresh()->frame_youtube);
 
-        $this->saveAudio(['library_item_id' => 99999])->assertSessionHasErrors('library_item_id');
+        $this->saveAudio(['library_item_ids' => [99999]])->assertSessionHasErrors('library_item_ids.0');
+        $this->saveAudio(['library_item_ids' => [$item->id, $item->id]])->assertSessionHasErrors('library_item_ids.0');
         $this->saveAudio(['volume' => 101])->assertSessionHasErrors('volume');
 
         $template = LibraryItem::create(['kind' => 'template', 'title' => 'T', 'disk_path' => 'library/templates/t.svg', 'mime_type' => 'image/svg+xml']);
-        $this->saveAudio(['library_item_id' => $template->id])->assertStatus(422);
+        $this->saveAudio(['library_item_ids' => [$template->id]])->assertStatus(422);
+        // A rejected list changes nothing.
+        $this->assertSame([$item->id], $this->show->fresh()->audioItems->pluck('id')->all());
     }
 
     public function test_another_entitys_leader_cannot_change_the_music(): void
@@ -176,14 +183,14 @@ class ShowAudioTest extends TestCase
         $outsider = User::factory()->create();
         $outsider->entities()->attach($other->id, ['role' => 'admin']);
 
-        $this->saveAudio(['library_item_id' => $item->id], $outsider, null, $other->id)->assertNotFound();
+        $this->saveAudio(['library_item_ids' => [$item->id]], $outsider, null, $other->id)->assertNotFound();
         $this->assertCount(0, $this->show->fresh()->audioItems);
     }
 
     public function test_deleting_the_library_item_removes_it_from_shows(): void
     {
         $item = $this->audioItem();
-        $this->saveAudio(['library_item_id' => $item->id]);
+        $this->saveAudio(['library_item_ids' => [$item->id]]);
 
         $this->actingAs($this->admin)->delete(route('admin.library.destroy', $item))->assertRedirect();
 
@@ -194,7 +201,7 @@ class ShowAudioTest extends TestCase
     public function test_players_and_devices_receive_the_playlist_even_with_no_other_frame(): void
     {
         $item = $this->audioItem();
-        $this->saveAudio(['library_item_id' => $item->id, 'volume' => 55]);
+        $this->saveAudio(['library_item_ids' => [$item->id], 'volume' => 55]);
 
         $frame = app(ShowFrame::class)->forPlayer($this->show->fresh());
         $this->assertSame(55, $frame['audio']['volume']);
@@ -213,7 +220,7 @@ class ShowAudioTest extends TestCase
     public function test_the_editor_page_lists_library_audio_and_the_current_track(): void
     {
         $item = $this->audioItem();
-        $this->saveAudio(['library_item_id' => $item->id]);
+        $this->saveAudio(['library_item_ids' => [$item->id]]);
 
         $this->actingAs($this->leader)->followingRedirects()->get(route('shows.index', ['entity_id' => $this->entity->id]))
             ->assertInertia(fn ($page) => $page

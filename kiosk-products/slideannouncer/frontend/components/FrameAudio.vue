@@ -47,5 +47,5 @@ watch(src, () => nextTick(() => { applyVolume(); play() }))
 </script>
 
 <template>
-  <audio ref="el" :src="src" :loop="tracks.length === 1" preload="auto" style="display: none" @ended="next" />
+  <audio ref="el" :src="src" :loop="tracks.length === 1" preload="auto" style="display: none" @ended="next" @error="next" />
 </template>

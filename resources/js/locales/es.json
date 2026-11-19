@@ -689,11 +689,13 @@
         "media_remove": "Quitar",
         "media_add_type": "Agregar tipo de archivo",
         "frame_music": "Música de fondo",
-        "frame_music_pick": "Sin música",
         "frame_music_volume": "Volumen",
         "frame_music_none_in_library": "Todavía no hay audio en la biblioteca. Un administrador del sitio lo agrega en Biblioteca.",
-        "frame_music_hint": "Un archivo de audio de la biblioteca que se repite mientras el programa se reproduce, sin necesidad de conexión a internet. Se detiene cuando el programa está en pausa y durante las diapositivas de video.",
-        "frame_music_use": "Guardar música"
+        "frame_music_hint": "Audio de la biblioteca que se reproduce en este orden y vuelve a empezar tras la última pista (una sola pista se repite). No requiere conexión a internet. Se detiene cuando el programa está en pausa y durante las diapositivas de video.",
+        "frame_music_use": "Guardar música",
+        "frame_music_add": "Agregar una pista…",
+        "frame_music_up": "Subir",
+        "frame_music_down": "Bajar"
     },
     "slide_announcers": {
         "online": "En línea",

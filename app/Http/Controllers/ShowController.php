@@ -328,34 +328,33 @@ class ShowController extends Controller
     }
 
     /**
-     * Sets (or, with an empty `library_item_id`, clears) the show's background
-     * music from the library's audio. Independent of the background. The
-     * pivot is an ordered list so a playlist can come later; for now exactly
-     * one track is kept, and picking another replaces it.
+     * Sets the show's background music: `library_item_ids`, an ordered list of
+     * library audio items (empty clears it). The players play them in order
+     * and loop; a single track simply repeats. `volume` is saved on its own
+     * when no list is sent. Independent of the background.
      */
     public function saveAudio(Request $request, Show $show)
     {
         abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
 
         $data = $request->validate([
-            'library_item_id' => 'nullable|integer|exists:library_items,id',
-            'volume'          => 'nullable|integer|min:0|max:100',
+            'library_item_ids'   => 'nullable|array|max:50',
+            'library_item_ids.*' => 'integer|distinct|exists:library_items,id',
+            'volume'             => 'nullable|integer|min:0|max:100',
         ]);
 
-        if (array_key_exists('volume', $data) && $data['volume'] !== null) {
+        if (($data['volume'] ?? null) !== null) {
             $show->update(['frame_audio_volume' => $data['volume']]);
         }
 
-        if (array_key_exists('library_item_id', $data)) {
-            if ($data['library_item_id'] === null) {
-                $show->audioItems()->detach();
+        if (array_key_exists('library_item_ids', $data)) {
+            $ids = array_values($data['library_item_ids'] ?? []);
+            $available = LibraryItem::audio()->ready()->whereIn('id', $ids)->pluck('id')->all();
+            abort_unless(count($available) === count($ids), 422, 'That library item is not available.');
 
-                return back()->with('success', 'Removed.');
-            }
+            $show->audioItems()->sync(collect($ids)->mapWithKeys(fn ($id, $i) => [$id => ['sort_order' => $i]])->all());
 
-            $item = LibraryItem::audio()->ready()->find($data['library_item_id']);
-            abort_unless($item, 422, 'That library item is not available.');
-            $show->audioItems()->sync([$item->id => ['sort_order' => 0]]);
+            return back()->with('success', $ids ? 'Background music saved.' : 'Removed.');
         }
 
         return back()->with('success', 'Background music saved.');

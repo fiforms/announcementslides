@@ -207,3 +207,21 @@ def test_a_missing_music_file_drops_out_of_the_playlist():
     (sync.MEDIA_DIR / "show-3-audio-5.m4a").unlink()
 
     assert sync._build_active_playlist(manifest_with({}, entry))[0]["frame"] is None
+
+
+def test_a_playlist_keeps_server_order_and_drops_only_removed_tracks():
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(5, 6, 7)})
+    assert [t["local_filename"] for t in entry["audio"]["tracks"]] == ["show-3-audio-5.m4a", "show-3-audio-6.m4a", "show-3-audio-7.m4a"]
+
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        return httpx.Response(200, content=b"x")
+
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(7, 5)}, entry, handler)
+    assert calls == []  # already cached, only reordered
+    assert [t["id"] for t in entry["audio"]["tracks"]] == [7, 5]
+    assert not (sync.MEDIA_DIR / "show-3-audio-6.m4a").exists()
+    out = sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]
+    assert [t["url"] for t in out["audio"]["tracks"]] == ["/media/show-3-audio-7.m4a", "/media/show-3-audio-5.m4a"]

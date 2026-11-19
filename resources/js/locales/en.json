@@ -689,11 +689,13 @@
         "media_remove": "Remove",
         "media_add_type": "Add media type",
         "frame_music": "Background music",
-        "frame_music_pick": "No music",
         "frame_music_volume": "Volume",
         "frame_music_none_in_library": "There is no audio in the library yet. A site administrator adds it under Library.",
-        "frame_music_hint": "A library audio file that loops for as long as the show plays, with no internet connection needed. It rests while the show is paused and during video slides.",
-        "frame_music_use": "Save music"
+        "frame_music_hint": "Library audio that plays in this order and starts over after the last track (a single track simply repeats). No internet connection needed. It rests while the show is paused and during video slides.",
+        "frame_music_use": "Save music",
+        "frame_music_add": "Add a track…",
+        "frame_music_up": "Move up",
+        "frame_music_down": "Move down"
     },
     "slide_announcers": {
         "online": "Online",
