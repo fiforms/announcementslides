@@ -1105,6 +1105,13 @@
         "building": "Creating…",
         "build_failed": "The slide could not be created.",
         "need_one": "Pick a background or a template.",
-        "cancel": "Cancel"
+        "cancel": "Cancel",
+        "add_from_library": "Add from library",
+        "library_replace_confirm": "Replace this slide's current {type} with the library item?",
+        "library_pick_background": "Pick a background",
+        "library_pick_template": "Pick an overlay template",
+        "library_none_for_type": "The library has nothing of this kind yet.",
+        "library_adding": "Adding…",
+        "library_add_failed": "Could not add that item."
     }
 }
