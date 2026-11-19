@@ -90,4 +90,22 @@ class RevelationImagelessSlideTest extends TestCase
 
         $this->build([$this->slide('c', image: false, overlay: false)]);
     }
+
+    public function test_an_overlays_embedded_fonts_reach_the_export_untouched(): void
+    {
+        $svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><style>@font-face{font-family:\'Italianno\';src:url(data:font/woff2;base64,d09GMgABAAA=) format(\'woff2\')}</style>'
+            . '<text font-family="\'Italianno\', cursive">Hi</text></svg>';
+        $slide = $this->slide('f', image: false, overlay: true);
+        Storage::disk('public')->put('slides/f.svg', $svg);
+
+        $path = app(RevelationSnapshotBuilder::class)->build(collect([$slide]), 'Test');
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open($path) === true);
+        $exported = $zip->getFromName('001_f - Overlay.svg');
+        $zip->close();
+        @unlink($path);
+
+        // The overlay is added to the archive as stored: same bytes, font data intact.
+        $this->assertSame($svg, $exported);
+    }
 }
