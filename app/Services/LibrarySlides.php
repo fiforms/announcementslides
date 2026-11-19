@@ -41,6 +41,7 @@ class LibrarySlides
                 'disk_path'         => $item->disk_path,
                 'file_size'         => $item->file_size,
                 'mime_type'         => $item->mime_type,
+                'muted'             => $item->isVideo() && !$item->has_sound,
                 'thumbnail_path'    => $item->thumbnail_path,
                 'poster_path'       => $item->poster_path,
                 'image_width'       => $item->image_width,

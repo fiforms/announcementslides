@@ -15,7 +15,7 @@ class SlideMedia extends Model
 
     protected $fillable = [
         'slide_id', 'show_id', 'media_type', 'filename', 'original_filename', 'disk_path', 'disk',
-        'file_size', 'mime_type', 'thumbnail_path', 'poster_path', 'image_width', 'image_height',
+        'file_size', 'mime_type', 'muted', 'thumbnail_path', 'poster_path', 'image_width', 'image_height',
         'validation_issues', 'validation_status', 'overlay_settings', 'sort_order',
         'variants', 'active_variant',
     ];
@@ -29,6 +29,7 @@ class SlideMedia extends Model
     {
         return [
             'file_size'         => 'integer',
+            'muted'             => 'boolean',
             'image_width'       => 'integer',
             'image_height'      => 'integer',
             'sort_order'        => 'integer',

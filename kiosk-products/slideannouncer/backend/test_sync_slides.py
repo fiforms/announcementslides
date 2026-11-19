@@ -38,7 +38,7 @@ async def _noop_mirror(client, bundles, server_url):
 
 
 def slide(sid, **kw):
-    base = {"id": sid, "language": None, "file_url": None, "mime_type": None, "video_playback_mode": None,
+    base = {"id": sid, "language": None, "file_url": None, "mime_type": None, "video_playback_mode": None, "video_muted": False,
             "overlay_url": None, "overlay_mime_type": None, "overlay_media_id": None, "widgets": [], "expires_at": None}
     return {**base, **kw}
 
@@ -118,3 +118,13 @@ def test_a_live_channel_from_the_catalog_syncs_as_a_slide_less_show_and_stays_pi
     assert shows["channel-7"]["frame"]["channel"] == CHANNEL
     assert shows["3"]["is_channel"] is False
     assert cleared == []  # still offered, so the pin stays
+
+
+def test_a_muted_library_video_keeps_its_flag_so_the_player_mutes_it(monkeypatch):
+    silent = slide(1, file_url=f"{SERVER}/storage/library/bg/aa/a.mp4", mime_type="video/mp4", video_muted=True)
+    own = slide(2, file_url=f"{SERVER}/storage/slides/b.mp4", mime_type="video/mp4")
+
+    played = {s["id"]: s for s in run_cycle(monkeypatch, [silent, own])}
+
+    assert played["1"]["video_muted"] is True
+    assert played["2"]["video_muted"] is False

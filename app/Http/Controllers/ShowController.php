@@ -536,6 +536,7 @@ class ShowController extends Controller
             'entity_id' => $slide->entity_id,
             'language_id' => $slide->language_id,
             'mime_type' => $slide->mime_type,
+            'video_muted' => $slide->video_muted,
             'file_url' => $slide->file_url,
             'thumbnail_url' => $slide->thumbnail_url,
             'overlay_url' => $slide->overlay_url,

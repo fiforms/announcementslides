@@ -82,7 +82,8 @@ async function imageLoaded(name, event) {
 async function playWithSound() {
     const el = videoEl.value;
     if (!el) return;
-    el.muted = false;
+    // A silent library backdrop stays muted so the show's music isn't fighting it.
+    el.muted = !!props.slide.video_muted;
     try {
         await el.play();
     } catch {
@@ -108,6 +109,7 @@ defineExpose({ videoEl });
             :loop="slide.video_playback_mode === 'loop'"
             preload="auto"
             playsinline
+            :muted="!!slide.video_muted"
             class="absolute inset-0 h-full w-full object-contain"
             @canplay="settle('media')"
             @error="settle('media')"

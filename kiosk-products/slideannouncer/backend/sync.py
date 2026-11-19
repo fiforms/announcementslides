@@ -329,6 +329,8 @@ def _build_active_playlist(manifest: dict) -> list:
                 "media_url": f"/media/{base}" if base_ok else None,
                 "mime_type": entry.get("mime_type") if base_ok else None,
                 "video_playback_mode": entry.get("video_playback_mode"),
+                # A silent library backdrop: played muted, and the show's music keeps going.
+                "video_muted": bool(entry.get("video_muted")),
                 "overlay_media_url": f"/media/{overlay}" if overlay_ok else None,
                 "widgets": placements,
             })

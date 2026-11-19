@@ -140,6 +140,7 @@ class SlideAnnouncerSyncController extends Controller
             'file_url' => $slide->file_url,
             'thumbnail_url' => $slide->thumbnail_url,
             'mime_type' => $slide->mime_type,
+            'video_muted' => $slide->video_muted,
             'video_playback_mode' => $slide->video_playback_mode,
             'overlay_url' => $slide->overlay_url,
             'overlay_mime_type' => $slide->overlay_mime_type,

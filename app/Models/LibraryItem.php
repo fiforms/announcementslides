@@ -24,14 +24,14 @@ class LibraryItem extends Model
 
     protected $fillable = [
         'kind', 'title', 'sha256', 'filename', 'original_filename', 'disk', 'disk_path', 'mime_type',
-        'file_size', 'thumbnail_path', 'poster_path', 'image_width', 'image_height', 'duration_seconds', 'overlay_settings', 'created_by',
+        'file_size', 'thumbnail_path', 'poster_path', 'image_width', 'image_height', 'duration_seconds', 'has_sound', 'overlay_settings', 'created_by',
     ];
 
     protected $attributes = ['disk' => MediaStore::LOCAL];
 
     protected function casts(): array
     {
-        return ['file_size' => 'integer', 'image_width' => 'integer', 'image_height' => 'integer', 'duration_seconds' => 'integer', 'overlay_settings' => 'array'];
+        return ['file_size' => 'integer', 'image_width' => 'integer', 'image_height' => 'integer', 'duration_seconds' => 'integer', 'has_sound' => 'boolean', 'overlay_settings' => 'array'];
     }
 
     public function scopeBackgrounds(Builder $q): Builder
