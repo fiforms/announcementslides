@@ -1,4 +1,5 @@
 <script setup>
+import { entityQuery } from '@/Composables/useEntitySelection.js';
 import { Link } from '@inertiajs/vue3';
 
 defineProps({
@@ -39,19 +40,19 @@ function getInitials(name) {
         </div>
 
         <!-- Profile Link -->
-        <Link :href="route('profile.edit')"
+        <Link :href="route('profile.edit', entityQuery())"
             class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-center">
             {{ $t('nav.profile') }}
         </Link>
 
         <!-- QR Code Creator Link -->
-        <Link :href="route('qr-code')"
+        <Link :href="route('qr-code', entityQuery())"
             class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-center">
             {{ $t('nav.qr_code') }}
         </Link>
 
         <!-- About Link -->
-        <Link :href="route('about')"
+        <Link :href="route('about', entityQuery())"
             class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-center">
             {{ $t('nav.about') }}
         </Link>
