@@ -5,13 +5,16 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Concerns\BuildsOverlayFiles;
 use App\Http\Controllers\Controller;
 use App\Jobs\GenerateLibraryThumbnail;
+use App\Jobs\OffloadLibraryItem;
 use App\Models\LibraryItem;
 use App\Models\SlideMedia;
+use App\Services\AudioProbe;
 use App\Support\LibraryFiles;
 use App\Support\MediaStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -24,7 +27,8 @@ use Inertia\Response;
  * in ARCHITECTURE.md). A background is uploaded through the normal chunk
  * endpoint, then adopted here: hashed, stored once under its content address
  * and given a thumbnail. A template is an ordinary overlay made in the
- * overlay editor.
+ * overlay editor. Audio (a show's background music) is adopted the same way
+ * but has no thumbnail.
  */
 class LibraryController extends Controller
 {
@@ -38,7 +42,11 @@ class LibraryController extends Controller
             ->where('media_type', 'slide')
             ->selectRaw('disk_path, count(*) as n')->groupBy('disk_path')->pluck('n', 'disk_path');
 
+        $audioUses = DB::table('show_audio')->selectRaw('library_item_id, count(distinct show_id) as n')
+            ->groupBy('library_item_id')->pluck('n', 'library_item_id');
+
         return Inertia::render('Admin/Library/Index', [
+            'audio'       => $items->where('kind', LibraryItem::AUDIO)->values()->map(fn ($i) => $this->resource($i, $audioUses[$i->id] ?? 0)),
             'backgrounds' => $items->where('kind', LibraryItem::BACKGROUND)->values()->map(fn ($i) => $this->resource($i, $uses[$i->disk_path] ?? 0)),
             'templates'   => $items->where('kind', LibraryItem::TEMPLATE)->values()->map(fn ($i) => $this->resource($i, 0)),
             'storage'     => ['offload' => app(MediaStore::class)->offloadEnabled()],
@@ -97,6 +105,64 @@ class LibraryController extends Controller
         ]);
 
         GenerateLibraryThumbnail::dispatch($item);
+
+        return $this->done($request, 'added');
+    }
+
+    /** Adopts a file assembled by the chunk endpoint (media_type library-audio) as library audio. */
+    public function storeAudio(Request $request, AudioProbe $probe): RedirectResponse|JsonResponse
+    {
+        $mimes = config('slides.library_audio.mimes');
+        $ext = implode('|', array_map('preg_quote', array_map(fn ($m) => config("slides.mime_extensions.{$m}"), $mimes)));
+
+        $data = $request->validate([
+            'upload'                   => 'required|array',
+            'upload.disk_path'         => ['required', 'string', "regex:/^slides\/[0-9a-f\-]{36}\.({$ext})$/"],
+            'upload.original_filename' => 'required|string|max:255',
+            'upload.mime_type'         => ['required', 'string', Rule::in($mimes)],
+            'title'                    => 'nullable|string|max:255',
+        ]);
+        $upload = $data['upload'];
+        $disk = Storage::disk(MediaStore::LOCAL);
+
+        abort_unless($disk->exists($upload['disk_path']), 422, 'Assembled file not found.');
+
+        $info = $probe->inspect($disk->path($upload['disk_path']));
+        if ($info && !$info['playable']) {
+            $disk->delete($upload['disk_path']);
+            abort(422, 'That file does not contain playable audio.');
+        }
+
+        $sha = hash_file('sha256', $disk->path($upload['disk_path']));
+        $existing = LibraryItem::audio()->where('sha256', $sha)->first();
+        if ($existing) {
+            $disk->delete($upload['disk_path']);
+
+            return $this->done($request, 'duplicate', ['existing' => $existing->title]);
+        }
+
+        $dest = LibraryFiles::audioPath($sha, config("slides.mime_extensions.{$upload['mime_type']}"));
+        $disk->makeDirectory(dirname($dest));
+        $disk->move($upload['disk_path'], $dest);
+
+        $item = LibraryItem::create([
+            'kind'              => LibraryItem::AUDIO,
+            'title'             => filled($data['title'] ?? null)
+                ? $data['title']
+                : trim(preg_replace('/[-_]+/', ' ', pathinfo($upload['original_filename'], PATHINFO_FILENAME))),
+            'sha256'            => $sha,
+            'filename'          => basename($dest),
+            'original_filename' => $upload['original_filename'],
+            'disk_path'         => $dest,
+            'mime_type'         => $upload['mime_type'],
+            'file_size'         => $disk->size($dest),
+            'duration_seconds'  => $info['duration'] ?? null,
+            'created_by'        => $request->user()->id,
+        ]);
+
+        if (app(MediaStore::class)->offloadEnabled()) {
+            OffloadLibraryItem::dispatch($item);
+        }
 
         return $this->done($request, 'added');
     }
@@ -194,10 +260,11 @@ class LibraryController extends Controller
             'thumbnail_url' => $i->thumbnail_url,
             'mime_type'     => $i->mime_type,
             'is_video'      => $i->isVideo(),
+            'duration_seconds' => $i->duration_seconds,
             'file_size'     => $i->file_size,
             'image_width'   => $i->image_width,
             'image_height'  => $i->image_height,
-            'ready'         => $i->isTemplate() ? (bool) $i->disk_path : (bool) $i->thumbnail_path,
+            'ready'         => $i->isTemplate() || $i->isAudio() ? (bool) $i->disk_path : (bool) $i->thumbnail_path,
             'offloaded'     => $i->disk !== MediaStore::LOCAL,
             'uses'          => $uses,
             'created_at'    => $i->created_at?->toIso8601String(),

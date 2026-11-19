@@ -71,7 +71,17 @@ class ShowController extends Controller
                     'id' => $selectedShow->frame_channel_id,
                     'muted' => $selectedShow->frame_channel_muted,
                 ] : null,
+                'audio' => [
+                    'tracks' => $selectedShow->audioItems->map(fn (LibraryItem $i) => [
+                        'id' => $i->id, 'title' => $i->title, 'duration_seconds' => $i->duration_seconds, 'file_url' => $i->file_url,
+                    ])->values(),
+                    'volume' => (int) $selectedShow->frame_audio_volume,
+                    'shuffle' => (bool) $selectedShow->frame_audio_shuffle,
+                ],
             ],
+            'libraryAudio' => $isAdmin ? LibraryItem::audio()->ready()->orderBy('title')->get()->map(fn (LibraryItem $i) => [
+                'id' => $i->id, 'title' => $i->title, 'duration_seconds' => $i->duration_seconds,
+            ])->values() : [],
             'liveChannels' => LiveChannel::orderBy('name')->get()->map(fn (LiveChannel $c) => [
                 'id' => $c->id,
                 'name' => $c->name,
@@ -316,6 +326,44 @@ class ShowController extends Controller
         ]);
 
         return back()->with('success', 'Show background saved.');
+    }
+
+    /**
+     * Sets the show's background music: `library_item_ids`, an ordered list of
+     * library audio items (empty clears it). The players play them in order
+     * and loop; a single track simply repeats. `volume` and `shuffle` are saved on
+     * their own when no list is sent. Independent of the background.
+     */
+    public function saveAudio(Request $request, Show $show)
+    {
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
+
+        $data = $request->validate([
+            'library_item_ids'   => 'nullable|array|max:50',
+            'library_item_ids.*' => 'integer|distinct|exists:library_items,id',
+            'volume'             => 'nullable|integer|min:0|max:100',
+            'shuffle'            => 'nullable|boolean',
+        ]);
+
+        if (($data['volume'] ?? null) !== null) {
+            $show->update(['frame_audio_volume' => $data['volume']]);
+        }
+
+        if (($data['shuffle'] ?? null) !== null) {
+            $show->update(['frame_audio_shuffle' => (bool) $data['shuffle']]);
+        }
+
+        if (array_key_exists('library_item_ids', $data)) {
+            $ids = array_values($data['library_item_ids'] ?? []);
+            $available = LibraryItem::audio()->ready()->whereIn('id', $ids)->pluck('id')->all();
+            abort_unless(count($available) === count($ids), 422, 'That library item is not available.');
+
+            $show->audioItems()->sync(collect($ids)->mapWithKeys(fn ($id, $i) => [$id => ['sort_order' => $i]])->all());
+
+            return back()->with('success', $ids ? 'Background music saved.' : 'Removed.');
+        }
+
+        return back()->with('success', 'Background music saved.');
     }
 
     public function destroyMedia(Request $request, Show $show, SlideMedia $media)

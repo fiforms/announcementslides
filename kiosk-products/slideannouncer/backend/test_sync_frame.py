@@ -174,3 +174,63 @@ def test_a_manifest_from_before_channels_still_builds():
 
     assert playlist[0]["frame"]["channel"] is None
     assert [s["id"] for s in playlist[0]["slides"]] == ["1"]
+
+
+def music(*ids, volume=60):
+    return {"tracks": [{"id": i, "url": f"{SERVER}/storage/library/audio/ab/{i}.m4a", "mime_type": "audio/mp4", "title": f"T{i}"} for i in ids],
+            "volume": volume}
+
+
+def test_background_music_is_cached_per_track_and_listed_in_the_playlist():
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(5)})
+
+    assert entry["audio"]["tracks"][0]["local_filename"] == "show-3-audio-5.m4a"
+    assert (sync.MEDIA_DIR / "show-3-audio-5.m4a").exists()
+    out = sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]
+    assert out["audio"] == {"tracks": [{"url": "/media/show-3-audio-5.m4a"}], "volume": 60, "shuffle": False}
+    assert sync._frame_files(entry) == ["show-3-audio-5.m4a"]
+
+
+def test_swapping_or_removing_music_deletes_the_old_file():
+    entry = run_sync("3", {**frame(), "audio": music(5)})
+    entry = run_sync("3", {**frame(), "audio": music(6)}, entry)
+    assert [t["local_filename"] for t in entry["audio"]["tracks"]] == ["show-3-audio-6.m4a"]
+    assert not (sync.MEDIA_DIR / "show-3-audio-5.m4a").exists()
+
+    entry = run_sync("3", frame(), entry)
+    assert entry["audio"] is None
+    assert not (sync.MEDIA_DIR / "show-3-audio-6.m4a").exists()
+
+
+def test_a_missing_music_file_drops_out_of_the_playlist():
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(5)})
+    (sync.MEDIA_DIR / "show-3-audio-5.m4a").unlink()
+
+    assert sync._build_active_playlist(manifest_with({}, entry))[0]["frame"] is None
+
+
+def test_a_playlist_keeps_server_order_and_drops_only_removed_tracks():
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(5, 6, 7)})
+    assert [t["local_filename"] for t in entry["audio"]["tracks"]] == ["show-3-audio-5.m4a", "show-3-audio-6.m4a", "show-3-audio-7.m4a"]
+
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.path)
+        return httpx.Response(200, content=b"x")
+
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(7, 5)}, entry, handler)
+    assert calls == []  # already cached, only reordered
+    assert [t["id"] for t in entry["audio"]["tracks"]] == [7, 5]
+    assert not (sync.MEDIA_DIR / "show-3-audio-6.m4a").exists()
+    out = sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]
+    assert [t["url"] for t in out["audio"]["tracks"]] == ["/media/show-3-audio-7.m4a", "/media/show-3-audio-5.m4a"]
+
+
+def test_the_shuffle_flag_reaches_the_kiosk():
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": {**music(5, 6), "shuffle": True}})
+    assert entry["audio"]["shuffle"] is True
+    out = sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]
+    assert out["audio"]["shuffle"] is True
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(5, 6)}, entry)
+    assert sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]["audio"]["shuffle"] is False

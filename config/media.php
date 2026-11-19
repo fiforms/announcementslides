@@ -28,6 +28,7 @@ return [
     // on the web server's sandbox CSP header (see "SVG security model").
     'offload_mimes' => [
         'video/*',
+        'audio/*',
         'image/jpeg',
         'image/png',
         'image/webp',

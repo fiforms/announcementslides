@@ -687,7 +687,16 @@
         "media_btn_compress_again": "Comprimir de nuevo",
         "media_download": "Descargar",
         "media_remove": "Quitar",
-        "media_add_type": "Agregar tipo de archivo"
+        "media_add_type": "Agregar tipo de archivo",
+        "frame_music": "Música de fondo",
+        "frame_music_volume": "Volumen",
+        "frame_music_none_in_library": "Todavía no hay audio en la biblioteca. Un administrador del sitio lo agrega en Biblioteca.",
+        "frame_music_hint": "Audio de la biblioteca que se reproduce en este orden y vuelve a empezar tras la última pista (una sola pista se repite). No requiere conexión a internet. Se detiene cuando el programa está en pausa y durante las diapositivas de video.",
+        "frame_music_use": "Guardar música",
+        "frame_music_add": "Agregar una pista…",
+        "frame_music_up": "Subir",
+        "frame_music_down": "Bajar",
+        "frame_music_shuffle": "Aleatorio"
     },
     "slide_announcers": {
         "online": "En línea",
@@ -1113,6 +1122,12 @@
         "library_none_for_type": "La biblioteca aún no tiene elementos de este tipo.",
         "library_adding": "Añadiendo…",
         "library_add_failed": "No se pudo añadir ese elemento.",
-        "frame_replace_confirm": "¿Reemplazar el fondo actual de este programa con el elemento de la biblioteca?"
+        "frame_replace_confirm": "¿Reemplazar el fondo actual de este programa con el elemento de la biblioteca?",
+        "audio": "Audio",
+        "upload_audio": "Subir audio",
+        "audio_hint": "Música de fondo para los programas: audio MP3, M4A o WebM. Los archivos idénticos se almacenan una sola vez.",
+        "no_audio": "Todavía no hay audio.",
+        "delete_audio_confirm": "¿Quitar \"{title}\" de la biblioteca? Los programas que lo usan como música de fondo la perderán.",
+        "used_by_shows": "Usado por {n} programa(s)"
     }
 }

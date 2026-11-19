@@ -143,6 +143,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::put('/{show}/overlay', [ShowController::class, 'saveOverlay'])->name('overlay.save');
         Route::put('/{show}/youtube', [ShowController::class, 'saveYoutube'])->name('youtube.save');
         Route::put('/{show}/channel', [ShowController::class, 'saveChannel'])->name('channel.save');
+        Route::put('/{show}/audio', [ShowController::class, 'saveAudio'])->name('audio.save');
         Route::post('/{show}/media', [ShowController::class, 'storeMedia'])->name('media.store');
         Route::post('/{show}/media/library', [ShowController::class, 'attachLibraryBackground'])->name('media.library');
         Route::delete('/{show}/media/{media}', [ShowController::class, 'destroyMedia'])->name('media.destroy');
@@ -220,6 +221,7 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::prefix('library')->name('library.')->group(function () {
         Route::get('/', [AdminLibraryController::class, 'index'])->name('index');
         Route::post('/backgrounds', [AdminLibraryController::class, 'storeBackground'])->name('backgrounds.store');
+        Route::post('/audio', [AdminLibraryController::class, 'storeAudio'])->name('audio.store');
         Route::post('/templates', [AdminLibraryController::class, 'storeTemplate'])->name('templates.store');
         Route::get('/templates/{item}/edit', [AdminLibraryController::class, 'editTemplate'])->name('templates.edit');
         Route::get('/templates/{item}/overlay', [AdminLibraryController::class, 'showOverlay'])->name('overlay.show');

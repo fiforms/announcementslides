@@ -8,6 +8,7 @@ import { useChunkedUpload } from '@/Composables/useChunkedUpload.js';
 const props = defineProps({
     backgrounds: { type: Array, default: () => [] },
     templates: { type: Array, default: () => [] },
+    audio: { type: Array, default: () => [] },
 });
 
 const { t } = useI18n();
@@ -33,6 +34,48 @@ async function onFiles(evt) {
     }
     current.value = null;
     router.reload({ only: ['backgrounds'] });
+}
+
+// ── Audio (background music): same chunk upload, adopted by its own route ──
+const AUDIO_MIMES = { mp3: 'audio/mpeg', m4a: 'audio/mp4', webm: 'audio/webm' };
+const audioInput = ref(null);
+const audioNotice = ref(null);
+const audioCurrent = ref(null);
+const audioUploader = useChunkedUpload({
+    finalizeRoute: 'admin.library.audio.store',
+    buildFinalizePayload: (completed) => ({ upload: completed[0] }),
+});
+
+async function onAudioFiles(evt) {
+    const files = [...evt.target.files];
+    evt.target.value = '';
+    audioNotice.value = null;
+    for (const file of files) {
+        // Browsers report m4a/webm audio inconsistently (or not at all): go by extension.
+        const mime = AUDIO_MIMES[file.name.split('.').pop().toLowerCase()];
+        if (!mime) {
+            audioNotice.value = t('library.audio_hint');
+            continue;
+        }
+        audioCurrent.value = file.name;
+        const typed = new File([file], file.name, { type: mime });
+        const res = await audioUploader.upload([typed], { media_type: 'library-audio' });
+        if (!res) break;
+        if (res.result === 'duplicate') audioNotice.value = t('library.duplicate', { existing: res.existing });
+    }
+    audioCurrent.value = null;
+    router.reload({ only: ['audio'] });
+}
+
+function removeAudio(item) {
+    if (confirm(t('library.delete_audio_confirm', { title: item.title }))) {
+        router.delete(route('admin.library.destroy', item.id), { preserveScroll: true });
+    }
+}
+
+function duration(seconds) {
+    if (!seconds && seconds !== 0) return '';
+    return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }
 
 function removeBackground(item) {
@@ -112,6 +155,47 @@ const linkBtn = 'text-xs font-medium text-gray-600 hover:text-indigo-700';
                             <button type="button" :class="linkBtn" @click="rename(item)">{{ $t('library.rename') }}</button>
                             <button type="button" class="text-xs font-medium text-red-600 hover:text-red-800" @click="removeBackground(item)">{{ $t('library.delete') }}</button>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Audio -->
+        <section class="mb-12">
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h2 class="text-lg font-semibold text-gray-900">{{ $t('library.audio') }}</h2>
+                <div>
+                    <input ref="audioInput" type="file" multiple accept=".mp3,.m4a,.webm,audio/mpeg,audio/mp4,audio/x-m4a,audio/webm"
+                        class="hidden" @change="onAudioFiles" />
+                    <button type="button" :disabled="audioUploader.isUploading.value" @click="audioInput.click()"
+                        class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
+                        {{ $t('library.upload_audio') }}
+                    </button>
+                </div>
+            </div>
+            <p class="mb-3 text-xs text-gray-500">{{ $t('library.audio_hint') }}</p>
+
+            <div v-if="audioUploader.isUploading.value" class="mb-3 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
+                <div>{{ $t('library.uploading', { name: audioCurrent }) }}</div>
+                <div class="mt-2 h-1.5 overflow-hidden rounded bg-indigo-100">
+                    <div class="h-full bg-indigo-600 transition-all" :style="{ width: audioUploader.overallProgress.value + '%' }" />
+                </div>
+            </div>
+            <p v-if="audioUploader.uploadError.value" class="mb-3 text-sm text-red-600">{{ audioUploader.uploadError.value }}</p>
+            <p v-if="audioNotice" class="mb-3 text-sm text-amber-700">{{ audioNotice }}</p>
+
+            <p v-if="!audio.length" class="text-sm text-gray-500">{{ $t('library.no_audio') }}</p>
+            <div v-else class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div v-for="item in audio" :key="item.id" :class="card" class="space-y-2 p-3">
+                    <div class="flex items-baseline justify-between gap-2">
+                        <div class="truncate text-sm font-medium text-gray-900" :title="item.title">{{ item.title }}</div>
+                        <div class="shrink-0 text-xs text-gray-500">{{ duration(item.duration_seconds) }}</div>
+                    </div>
+                    <audio :src="item.file_url" controls preload="none" class="h-9 w-full" />
+                    <div class="text-xs text-gray-500">{{ $t('library.used_by_shows', { n: item.uses }) }}</div>
+                    <div class="flex gap-3">
+                        <button type="button" :class="linkBtn" @click="rename(item)">{{ $t('library.rename') }}</button>
+                        <button type="button" class="text-xs font-medium text-red-600 hover:text-red-800" @click="removeAudio(item)">{{ $t('library.delete') }}</button>
                     </div>
                 </div>
             </div>

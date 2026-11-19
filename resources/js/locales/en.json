@@ -687,7 +687,16 @@
         "media_btn_compress_again": "Compress again",
         "media_download": "Download",
         "media_remove": "Remove",
-        "media_add_type": "Add media type"
+        "media_add_type": "Add media type",
+        "frame_music": "Background music",
+        "frame_music_volume": "Volume",
+        "frame_music_none_in_library": "There is no audio in the library yet. A site administrator adds it under Library.",
+        "frame_music_hint": "Library audio that plays in this order (or shuffled) and starts over after the last track (a single track simply repeats). No internet connection needed. It rests while the show is paused and during video slides.",
+        "frame_music_use": "Save music",
+        "frame_music_add": "Add a track…",
+        "frame_music_up": "Move up",
+        "frame_music_down": "Move down",
+        "frame_music_shuffle": "Shuffle"
     },
     "slide_announcers": {
         "online": "Online",
@@ -1113,6 +1122,12 @@
         "library_none_for_type": "The library has nothing of this kind yet.",
         "library_adding": "Adding…",
         "library_add_failed": "Could not add that item.",
-        "frame_replace_confirm": "Replace this show's current background with the library item?"
+        "frame_replace_confirm": "Replace this show's current background with the library item?",
+        "audio": "Audio",
+        "upload_audio": "Upload audio",
+        "audio_hint": "Background music for shows: MP3, M4A or WebM audio. Identical files are stored only once.",
+        "no_audio": "No audio yet.",
+        "delete_audio_confirm": "Remove \"{title}\" from the library? Shows using it as background music lose it.",
+        "used_by_shows": "Used by {n} show(s)"
     }
 }

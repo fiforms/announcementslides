@@ -15,6 +15,10 @@ use App\Services\Widgets\OverlayWidgets;
  * The background may instead be a YouTube video (`youtube_url`) or a live
  * channel (`channel`: {kind: 'iframe'|'hls', url, muted}, see LiveChannel).
  *
+ * Background music is `audio` ({tracks: [{id, url, mime_type, title}], volume
+ * 0-100, shuffle}), played in order and looped by the player. It is independent of
+ * the background, so a show may have only music.
+ *
  * Same field names as a slide's (file_url, mime_type, overlay_url,
  * overlay_widgets) so the players' existing pieces apply unchanged.
  */
@@ -31,7 +35,8 @@ class ShowFrame
         [$base, $overlay] = [$show->baseMedia, $show->overlayMedia];
         $youtube = $this->youtubeUrl($show);
         $channel = $this->channel($show);
-        if (!$base && !$overlay && !$youtube && !$channel) {
+        $audio = $this->audio($show);
+        if (!$base && !$overlay && !$youtube && !$channel && !$audio) {
             return null;
         }
 
@@ -50,6 +55,7 @@ class ShowFrame
             'mime_type'       => $base?->mime_type,
             'youtube_url'     => $youtube,
             'channel'         => $channel,
+            'audio'           => $audio,
             'overlay_url'     => $overlay?->file_url,
             'overlay_widgets' => $widgets->values()->all(),
         ];
@@ -69,13 +75,24 @@ class ShowFrame
         return $show->frame_channel_id ? $show->liveChannel?->forPlayer($show->frame_channel_muted) : null;
     }
 
+    /** The background music as players receive it, or null. */
+    private function audio(Show $show): ?array
+    {
+        $tracks = $show->audioItems->filter(fn ($i) => $i->file_url)->map(fn ($i) => [
+            'id' => $i->id, 'url' => $i->file_url, 'mime_type' => $i->mime_type, 'title' => $i->title,
+        ])->values()->all();
+
+        return $tracks ? ['tracks' => $tracks, 'volume' => (int) $show->frame_audio_volume, 'shuffle' => (bool) $show->frame_audio_shuffle] : null;
+    }
+
     /** For a Slide Announcer device (no URLs for widgets — it serves bundles itself). */
     public function forDevice(Show $show): ?array
     {
         [$base, $overlay] = [$show->baseMedia, $show->overlayMedia];
         $youtube = $this->youtubeUrl($show);
         $channel = $this->channel($show);
-        if (!$base && !$overlay && !$youtube && !$channel) {
+        $audio = $this->audio($show);
+        if (!$base && !$overlay && !$youtube && !$channel && !$audio) {
             return null;
         }
 
@@ -84,6 +101,7 @@ class ShowFrame
             'mime_type'        => $base?->mime_type,
             'youtube_url'      => $youtube,
             'channel'          => $channel,
+            'audio'            => $audio,
             'overlay_url'      => $overlay?->file_url,
             'overlay_mime_type' => $overlay?->mime_type,
             'overlay_media_id' => $overlay?->id,

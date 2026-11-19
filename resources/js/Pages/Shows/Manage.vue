@@ -21,7 +21,8 @@ const props = defineProps({
     entity: { type: Object, required: true },
     shows: { type: Array, default: () => [] },
     selectedShowId: { type: Number, required: true },
-    frame: { type: Object, default: () => ({ id: null, media: [], youtube: null, channel: null }) },
+    frame: { type: Object, default: () => ({ id: null, media: [], youtube: null, channel: null, audio: null }) },
+    libraryAudio: { type: Array, default: () => [] },
     liveChannels: { type: Array, default: () => [] },
     showSlides: { type: Array, default: () => [] },
     unusedSlides: { type: Array, default: () => [] },
@@ -124,6 +125,42 @@ function removeChannel() {
     if (!confirm(t('show_manage.frame_remove_confirm'))) return;
     router.put(route('shows.channel.save', { show: props.selectedShowId, entity_id: props.entity.id }),
         { channel_id: null }, { preserveScroll: true, only: ['frame'] });
+}
+
+// Background music: an ordered playlist of library audio that loops under the
+// show. The form edits the ids in play order; saving sends the whole list.
+const trackIds = (audio) => (audio?.tracks ?? []).map((t) => t.id);
+const audioForm = useForm({
+    library_item_ids: trackIds(props.frame.audio), volume: props.frame.audio?.volume ?? 100, shuffle: props.frame.audio?.shuffle ?? false,
+});
+watch(() => props.frame.audio, (a) => {
+    audioForm.defaults({ library_item_ids: trackIds(a), volume: a?.volume ?? 100, shuffle: a?.shuffle ?? false }).reset();
+});
+const audioTitles = computed(() => new Map([
+    ...props.libraryAudio.map((a) => [a.id, a.title]),
+    ...(props.frame.audio?.tracks ?? []).map((t) => [t.id, t.title]),
+]));
+const audioChoices = computed(() => props.libraryAudio.filter((a) => !audioForm.library_item_ids.includes(a.id)));
+const audioDirty = computed(() => audioForm.isDirty);
+function addTrack(event) {
+    const id = Number(event.target.value);
+    event.target.value = '';
+    if (id) audioForm.library_item_ids = [...audioForm.library_item_ids, id];
+}
+function moveTrack(i, by) {
+    const ids = [...audioForm.library_item_ids];
+    const j = i + by;
+    if (j < 0 || j >= ids.length) return;
+    [ids[i], ids[j]] = [ids[j], ids[i]];
+    audioForm.library_item_ids = ids;
+}
+function dropTrack(i) {
+    audioForm.library_item_ids = audioForm.library_item_ids.filter((_, k) => k !== i);
+}
+function saveAudio() {
+    audioForm.put(route('shows.audio.save', { show: props.selectedShowId, entity_id: props.entity.id }), {
+        preserveScroll: true, only: ['frame'],
+    });
 }
 
 const frameFileInput = ref(null);
@@ -652,6 +689,48 @@ function persistLeaderOrder() {
                         <p v-if="selectedChannel && !selectedChannel.supports_mute" class="text-xs text-gray-500">{{ $t('show_manage.frame_channel_no_mute') }}</p>
                         <p v-if="frame.channel" class="text-xs text-amber-700">{{ $t('show_manage.frame_video_note') }}</p>
                         <p class="text-xs text-gray-500">{{ $t('show_manage.frame_channel_hint') }}</p>
+                    </div>
+
+                    <div class="space-y-2">
+                        <p class="text-sm font-medium text-gray-700">{{ $t('show_manage.frame_music') }}</p>
+                        <p v-if="!libraryAudio.length && !audioForm.library_item_ids.length" class="text-xs text-gray-500">{{ $t('show_manage.frame_music_none_in_library') }}</p>
+                        <form v-else class="space-y-2" @submit.prevent="saveAudio">
+                            <ol v-if="audioForm.library_item_ids.length" class="space-y-1">
+                                <li v-for="(id, i) in audioForm.library_item_ids" :key="id"
+                                    class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-2 py-1 text-sm text-gray-800">
+                                    <span class="w-5 text-right text-xs tabular-nums text-gray-400">{{ i + 1 }}</span>
+                                    <span class="min-w-0 flex-1 truncate">{{ audioTitles.get(id) }}</span>
+                                    <button type="button" :disabled="i === 0" :aria-label="$t('show_manage.frame_music_up')" @click="moveTrack(i, -1)"
+                                        class="rounded px-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-30">↑</button>
+                                    <button type="button" :disabled="i === audioForm.library_item_ids.length - 1" :aria-label="$t('show_manage.frame_music_down')" @click="moveTrack(i, 1)"
+                                        class="rounded px-1.5 text-gray-500 hover:bg-gray-200 disabled:opacity-30">↓</button>
+                                    <button type="button" :aria-label="$t('show_manage.frame_remove')" @click="dropTrack(i)"
+                                        class="rounded px-1.5 text-red-600 hover:bg-red-50">✕</button>
+                                </li>
+                            </ol>
+                            <div class="flex flex-wrap items-center gap-2">
+                                <select v-if="audioChoices.length" @change="addTrack"
+                                    class="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                    <option value="">{{ $t('show_manage.frame_music_add') }}</option>
+                                    <option v-for="a in audioChoices" :key="a.id" :value="a.id">{{ a.title }}</option>
+                                </select>
+                                <label v-if="audioForm.library_item_ids.length > 1" class="flex items-center gap-1 text-sm text-gray-700">
+                                    <input v-model="audioForm.shuffle" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
+                                    {{ $t('show_manage.frame_music_shuffle') }}
+                                </label>
+                                <label class="flex items-center gap-2 text-sm text-gray-700">
+                                    {{ $t('show_manage.frame_music_volume') }}
+                                    <input v-model.number="audioForm.volume" type="range" min="0" max="100" step="5" class="w-28" />
+                                    <span class="w-9 tabular-nums text-xs text-gray-500">{{ audioForm.volume }}%</span>
+                                </label>
+                                <button type="submit" :disabled="audioForm.processing || !audioDirty"
+                                    class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                                    {{ $t('show_manage.frame_music_use') }}
+                                </button>
+                            </div>
+                        </form>
+                        <p v-if="audioForm.errors.library_item_ids" class="text-xs text-red-600">{{ audioForm.errors.library_item_ids }}</p>
+                        <p class="text-xs text-gray-500">{{ $t('show_manage.frame_music_hint') }}</p>
                     </div>
 
                     <div class="flex flex-wrap items-center gap-3">
