@@ -24,6 +24,9 @@ const props = defineProps({
   // The background video holds still while the show is paused, and while
   // an external feed is on screen (two audio sources must never mix).
   suspended: { type: Boolean, default: false },
+  // Streamed backgrounds (YouTube, live channels) are removed outright —
+  // nothing left downloading — while Slideshow.vue's idle interlock holds.
+  halted: { type: Boolean, default: false },
 })
 
 const videoEl = ref(null)
@@ -38,14 +41,14 @@ onBeforeUnmount(() => {
   window.removeEventListener('online', setOnline)
   window.removeEventListener('offline', setOnline)
 })
-const youtubeSrc = computed(() => (online.value && props.frame.youtube_url?.startsWith(YOUTUBE_PREFIX))
+const youtubeSrc = computed(() => (!props.halted && online.value && props.frame.youtube_url?.startsWith(YOUTUBE_PREFIX))
   ? `${props.frame.youtube_url}&origin=${encodeURIComponent(window.location.origin)}`
   : null)
 
 const CHANNEL_IFRAME_PREFIXES = ['https://embed.jetstream.studio/embed/', 'https://player.zype.com/embed/']
 const channel = computed(() => {
   const c = props.frame.channel
-  if (!online.value || !c?.url) return null
+  if (props.halted || !online.value || !c?.url) return null
   if (c.kind === 'iframe' && CHANNEL_IFRAME_PREFIXES.some((p) => c.url.startsWith(p))) return c
   if (c.kind === 'hls' && c.url.startsWith('https://')) return c
   return null

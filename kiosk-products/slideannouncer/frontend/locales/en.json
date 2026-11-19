@@ -11,7 +11,9 @@
         "waiting": "Waiting for slides…",
         "needsAttention": "Needs attention — check Settings",
         "paused": "Paused",
-        "muted": "Muted"
+        "muted": "Muted",
+        "streamStopped": "Live stream stopped after {hours} hours with no remote activity.",
+        "pressToContinue": "Press any button to keep watching."
     },
     "settingsLayout": {
         "videoReceiver": "LAN Video Receiver",

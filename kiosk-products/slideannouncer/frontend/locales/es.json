@@ -11,7 +11,9 @@
         "waiting": "Esperando diapositivas…",
         "needsAttention": "Requiere atención — revise Configuración",
         "paused": "En pausa",
-        "muted": "Silenciado"
+        "muted": "Silenciado",
+        "streamStopped": "La transmisión en vivo se detuvo tras {hours} horas sin actividad del control remoto.",
+        "pressToContinue": "Pulse cualquier botón para seguir viendo."
     },
     "settingsLayout": {
         "videoReceiver": "Receptor de Video LAN",

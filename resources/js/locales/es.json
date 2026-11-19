@@ -767,6 +767,8 @@
         "auto_update": "Instalar actualizaciones automáticamente",
         "slide_duration": "Duración de cada diapositiva (segundos)",
         "slide_duration_help": "Cuánto tiempo permanece cada diapositiva en pantalla antes de pasar a la siguiente.",
+        "stream_timeout": "Detener transmisiones en vivo tras (horas sin uso)",
+        "stream_timeout_help": "Un canal en vivo o un fondo de YouTube se detiene tras estas horas sin pulsar ningún botón del control remoto, para no transmitir toda la semana a un edificio vacío. Cualquier botón lo reanuda. 0 = no detener nunca.",
         "lan_title": "Receptor de video en red local",
         "lan_help": "Permite que un mezclador de video o codificador de la red de esta iglesia (OBS, vMix, etc.) envíe una transmisión en vivo a este dispositivo mediante SRT o RIST. También debe activarse en los Ajustes > Avanzado del propio dispositivo.",
         "lan_allow": "Permitir el receptor de video en red local",
