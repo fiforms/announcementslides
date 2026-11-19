@@ -588,6 +588,12 @@ async function refreshVolume() {
 }
 
 onMounted(async () => {
+  // The shared show state (slideshowState.js) outlives this view, so on a
+  // return from Settings the playlist is already populated and the
+  // playlistSignature watch never sees a change — build the first stage
+  // here. (Multi-slide shows used to be rescued by the advance timer's first
+  // tick; a one-slide show has no timer and sat on "Waiting for slides…".)
+  if (playlist.value.length && !stages.value.length) resetStages()
   await refreshPlaylist()
   await refreshStatus()
   await refreshVolume()
