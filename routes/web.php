@@ -121,6 +121,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::post('/{slide}/share-nearby', [LocalSlideController::class, 'shareNearby'])->name('share-nearby');
         Route::post('/{slide}/unshare-nearby', [LocalSlideController::class, 'unshareNearby'])->name('unshare-nearby');
         Route::post('/{slide}/media', [LocalSlideController::class, 'storeMedia'])->name('media.store');
+        Route::post('/{slide}/media/library', [LocalSlideController::class, 'attachLibraryMedia'])->name('media.library');
         Route::delete('/{slide}/media/{media}', [LocalSlideController::class, 'destroyMedia'])->name('media.destroy');
         Route::post('/{slide}/media/{media}/resize', [LocalSlideController::class, 'resizeMedia'])->name('media.resize');
         Route::post('/{slide}/media/{media}/version', [LocalSlideController::class, 'setMediaVersion'])->name('media.version');
@@ -154,6 +155,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::patch('/{slide}', [EntitySlideController::class, 'update'])->name('update');
         Route::post('/{slide}/archive', [EntitySlideController::class, 'archive'])->name('archive');
         Route::post('/{slide}/media', [EntitySlideController::class, 'storeMedia'])->name('media.store');
+        Route::post('/{slide}/media/library', [EntitySlideController::class, 'attachLibraryMedia'])->name('media.library');
         Route::delete('/{slide}/media/{media}', [EntitySlideController::class, 'destroyMedia'])->name('media.destroy');
         Route::post('/{slide}/media/{media}/resize', [EntitySlideController::class, 'resizeMedia'])->name('media.resize');
         Route::post('/{slide}/media/{media}/version', [EntitySlideController::class, 'setMediaVersion'])->name('media.version');
@@ -207,6 +209,7 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::post('/slides/{slide}/archive', [AdminSlideController::class, 'archive'])->name('slides.archive');
     Route::post('/slides/{slide}/unarchive', [AdminSlideController::class, 'unarchive'])->name('slides.unarchive');
     Route::post('/slides/{slide}/media', [AdminSlideController::class, 'storeMedia'])->name('slides.media.store');
+    Route::post('/slides/{slide}/media/library', [AdminSlideController::class, 'attachLibraryMedia'])->name('slides.media.library');
     Route::delete('/slides/{slide}/media/{media}', [AdminSlideController::class, 'destroyMedia'])->name('slides.media.destroy');
     Route::post('/slides/{slide}/media/{media}/resize', [AdminSlideController::class, 'resizeMedia'])->name('slides.media.resize');
     Route::post('/slides/{slide}/media/{media}/version', [AdminSlideController::class, 'setMediaVersion'])->name('slides.media.version');

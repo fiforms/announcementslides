@@ -93,6 +93,14 @@ class EntitySlideController extends Controller
         return back()->with('success', 'Media added.');
     }
 
+    public function attachLibraryMedia(Request $request, Entity $entity, Slide $slide)
+    {
+        $this->authorize('manageForEntity', [$slide, $entity]);
+        $this->attachLibraryMediaForSlide($request, $slide);
+
+        return back()->with('success', 'Media added.');
+    }
+
     public function destroyMedia(Request $request, Entity $entity, Slide $slide, SlideMedia $media)
     {
         $user = $request->user();

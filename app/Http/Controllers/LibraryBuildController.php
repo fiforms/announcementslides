@@ -2,15 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Jobs\SyncOverlayThumbnail;
 use App\Models\LibraryItem;
 use App\Models\Slide;
+use App\Services\LibrarySlides;
 use App\Services\SlidePlacement;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 /**
  * "Build a slide" from the admin-managed library: a shared background plus an
@@ -37,7 +34,7 @@ class LibraryBuildController extends Controller
         ]);
     }
 
-    public function build(Request $request, SlidePlacement $placement): JsonResponse
+    public function build(Request $request, SlidePlacement $placement, LibrarySlides $library): JsonResponse
     {
         $data = $request->validate([
             'title'              => 'required|string|max:255',
@@ -71,58 +68,17 @@ class LibraryBuildController extends Controller
             return response()->json(['message' => 'That library item is no longer available.'], 422);
         }
 
-        $overlayPath = null;
-        if ($template) {
-            $source = $template->localPath();
-            abort_unless($source, 422, 'The template file is missing.');
-            $overlayPath = 'slides/' . Str::uuid() . '.svg';
-            Storage::disk('public')->put($overlayPath, file_get_contents($source));
-        }
+        $slide = Slide::create([
+            'title'       => $data['title'],
+            'status'      => 'published',
+            'uploaded_by' => $user->id,
+            'entity_id'   => $entityId,
+            'language_id' => $data['language_id'] ?? null,
+        ]);
 
-        $slide = DB::transaction(function () use ($data, $user, $entityId, $background, $template, $overlayPath) {
-            $slide = Slide::create([
-                'title'       => $data['title'],
-                'status'      => 'published',
-                'uploaded_by' => $user->id,
-                'entity_id'   => $entityId,
-                'language_id' => $data['language_id'] ?? null,
-            ]);
+        $background && $library->attachBackground($slide, $background);
+        $template && $library->attachTemplate($slide, $template);
 
-            if ($background) {
-                // Same file, thumbnail and poster as the library item: no copy.
-                $slide->media()->create([
-                    'media_type'        => 'slide',
-                    'filename'          => $background->filename,
-                    'original_filename' => $background->original_filename,
-                    'disk'              => $background->disk,
-                    'disk_path'         => $background->disk_path,
-                    'file_size'         => $background->file_size,
-                    'mime_type'         => $background->mime_type,
-                    'thumbnail_path'    => $background->thumbnail_path,
-                    'poster_path'       => $background->poster_path,
-                    'image_width'       => $background->image_width,
-                    'image_height'      => $background->image_height,
-                    'validation_issues' => [],
-                    'validation_status' => 'ok',
-                ]);
-            }
-
-            if ($template) {
-                $slide->media()->create([
-                    'media_type'        => 'slide-overlay',
-                    'filename'          => basename($overlayPath),
-                    'original_filename' => 'overlay.svg',
-                    'disk_path'         => $overlayPath,
-                    'file_size'         => $template->file_size,
-                    'mime_type'         => 'image/svg+xml',
-                    'overlay_settings'  => $template->overlay_settings,
-                ]);
-            }
-
-            return $slide;
-        });
-
-        $template && SyncOverlayThumbnail::dispatch($slide->id);
         $placement->route($request, [$slide], $entityId);
 
         return response()->json(['slide_id' => $slide->id, 'has_overlay' => (bool) $template, 'entity_id' => $entityId]);

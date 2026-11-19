@@ -1105,6 +1105,13 @@
         "building": "Creando…",
         "build_failed": "No se pudo crear la diapositiva.",
         "need_one": "Elija un fondo o una plantilla.",
-        "cancel": "Cancelar"
+        "cancel": "Cancelar",
+        "add_from_library": "Añadir desde la biblioteca",
+        "library_replace_confirm": "¿Reemplazar el {type} actual de esta diapositiva con el elemento de la biblioteca?",
+        "library_pick_background": "Elija un fondo",
+        "library_pick_template": "Elija una plantilla de superposición",
+        "library_none_for_type": "La biblioteca aún no tiene elementos de este tipo.",
+        "library_adding": "Añadiendo…",
+        "library_add_failed": "No se pudo añadir ese elemento."
     }
 }

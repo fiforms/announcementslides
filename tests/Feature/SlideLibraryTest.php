@@ -235,4 +235,76 @@ class SlideLibraryTest extends TestCase
         $this->actingAs($this->admin)->getJson(route('admin.library.overlay.show', $tpl))
             ->assertOk()->assertJsonPath('source.elements.0.id', 'as-el-1');
     }
+
+    public function test_a_slide_built_on_a_library_video_loops_until_the_slide_delay(): void
+    {
+        $video = LibraryItem::create([
+            'kind' => 'background', 'title' => 'Waterfall', 'sha256' => str_repeat('c', 64), 'filename' => 'w.mp4', 'original_filename' => 'w.mp4',
+            'disk_path' => 'library/bg/cc/w.mp4', 'mime_type' => 'video/mp4', 'thumbnail_path' => 'library/thumbs/w.jpg',
+        ]);
+        $image = $this->readyBackground();
+
+        $build = fn ($bg) => Slide::findOrFail($this->actingAs($this->leader)->postJson(route('library.build'), [
+            'title' => 'S', 'entity_id' => $this->church->id, 'background_id' => $bg->id,
+        ])->assertOk()->json('slide_id'));
+
+        $this->assertSame('loop', $build($video)->video_playback_mode);
+        $this->assertNotSame('loop', $build($image)->video_playback_mode);
+    }
+
+    private function plainSlide(?Entity $entity = null): Slide
+    {
+        $slide = Slide::create(['title' => 'S', 'status' => 'published', 'uploaded_by' => (($entity ? $this->leader : $this->admin))->id, 'entity_id' => $entity?->id]);
+        Storage::disk('public')->put('slides/own.jpg', 'x');
+        $slide->media()->create([
+            'media_type' => 'slide', 'filename' => 'own.jpg', 'original_filename' => 'own.jpg',
+            'disk_path' => 'slides/own.jpg', 'file_size' => 1, 'mime_type' => 'image/jpeg',
+        ]);
+
+        return $slide;
+    }
+
+    public function test_the_slide_editor_can_swap_in_a_library_background_or_overlay(): void
+    {
+        $bg = $this->readyBackground();
+        $tpl = $this->readyTemplate();
+        $slide = $this->plainSlide($this->church);
+        $url = route('local-slides.media.library', ['slide' => $slide->id, 'entity_id' => $this->church->id]);
+
+        // Background replaces the slide's own picture; its uploaded file is freed.
+        $this->actingAs($this->leader)->post($url, ['media_type' => 'slide', 'library_item_id' => $bg->id])->assertRedirect();
+        $base = $slide->media()->where('media_type', 'slide')->get();
+        $this->assertCount(1, $base);
+        $this->assertSame($bg->disk_path, $base[0]->disk_path);
+        Storage::disk('public')->assertMissing('slides/own.jpg');
+
+        // Template becomes the overlay (and replaces a previous one).
+        foreach ([1, 2] as $_) {
+            $this->actingAs($this->leader)->post($url, ['media_type' => 'slide-overlay', 'library_item_id' => $tpl->id])->assertRedirect();
+        }
+        $overlays = $slide->media()->where('media_type', 'slide-overlay')->get();
+        $this->assertCount(1, $overlays);
+        $this->assertSame($tpl->overlay_settings, $overlays[0]->overlay_settings);
+        $this->assertCount(1, Storage::disk('public')->allFiles('library/bg'));
+    }
+
+    public function test_adding_from_the_library_checks_kind_and_permission(): void
+    {
+        $bg = $this->readyBackground();
+        $tpl = $this->readyTemplate();
+        $slide = $this->plainSlide($this->church);
+        $url = route('local-slides.media.library', ['slide' => $slide->id, 'entity_id' => $this->church->id]);
+
+        // A template can't be used as the picture, nor a background as the overlay.
+        $this->actingAs($this->leader)->post($url, ['media_type' => 'slide', 'library_item_id' => $tpl->id])->assertStatus(422);
+        $this->actingAs($this->leader)->post($url, ['media_type' => 'slide-overlay', 'library_item_id' => $bg->id])->assertStatus(422);
+        $this->actingAs($this->leader)->post($url, ['media_type' => 'color-flyer', 'library_item_id' => $bg->id])->assertSessionHasErrors('media_type');
+
+        // Someone who doesn't manage the church can't.
+        $this->actingAs(User::factory()->create())->post($url, ['media_type' => 'slide', 'library_item_id' => $bg->id])->assertForbidden();
+
+        // The admin route works too.
+        $this->actingAs($this->admin)->post(route('admin.slides.media.library', $slide), ['media_type' => 'slide', 'library_item_id' => $bg->id])->assertRedirect();
+        $this->assertSame($bg->disk_path, $slide->media()->where('media_type', 'slide')->first()->disk_path);
+    }
 }

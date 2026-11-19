@@ -1,7 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { router } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
+import axios from 'axios';
 import { useChunkedUpload } from '@/Composables/useChunkedUpload';
 import { upscaleImage, upscaleIneligibility, ineligibleMessage, useUpscalerSettings } from '@/Composables/useUpscaler';
 import { downscaleImage, exceedsDownscaleLimit, exceedsFileSizeLimit } from '@/Composables/useImageResize';
@@ -28,6 +29,44 @@ const versionRouteName = computed(() => props.versionRoute ?? props.storeRoute.r
 // Resizes in progress, by media id: { kind, progress, error }
 const resizing = ref({});
 let resizeAbort = null;
+
+// ── Add from the slide library (a background for 'slide', a template for 'slide-overlay') ──
+// The route sits beside the store route ('x.media.store' -> 'x.media.library'); the
+// button only shows where that route exists and the viewer may use the library.
+const libraryRouteName = computed(() => props.storeRoute.replace(/store$/, 'library'));
+const libraryCatalog = ref(null);
+const libraryOpen = ref(false);
+const libraryBusy = ref(false);
+const libraryError = ref(null);
+onMounted(async () => {
+    if (!route().has(libraryRouteName.value)) return;
+    try {
+        libraryCatalog.value = (await axios.get(route('library.catalog'))).data;
+    } catch {
+        libraryCatalog.value = null; // not allowed (or unavailable): no button
+    }
+});
+const libraryKey = computed(() => selectedType.value === 'slide' ? 'backgrounds' : 'templates');
+const libraryItems = computed(() => libraryCatalog.value?.[libraryKey.value] ?? []);
+const canUseLibrary = computed(() => !!libraryCatalog.value && ['slide', 'slide-overlay'].includes(selectedType.value));
+
+async function addFromLibrary(item) {
+    const existing = props.slide.media.some(m => m.media_type === selectedType.value);
+    if (existing && !confirm(t('library.library_replace_confirm', { type: labelFor(selectedType.value).toLowerCase() }))) return;
+    libraryBusy.value = true;
+    libraryError.value = null;
+    try {
+        await axios.post(route(libraryRouteName.value, { ...props.routeParams, slide: props.slide.id }), {
+            media_type: selectedType.value, library_item_id: item.id,
+        });
+        libraryOpen.value = false;
+        router.reload({ only: props.reloadOnly });
+    } catch (e) {
+        libraryError.value = e.response?.data?.message ?? t('library.library_add_failed');
+    } finally {
+        libraryBusy.value = false;
+    }
+}
 
 const selectedType = ref(props.mediaTypes[0]?.value ?? 'slide-overlay');
 const fileInput = ref(null);
@@ -257,8 +296,31 @@ function removeMedia(media) {
                     @change="onFileSelected"
                     class="block text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-indigo-700" />
             </div>
+            <button v-if="canUseLibrary" type="button" :disabled="isUploading || libraryBusy" @click="libraryOpen = !libraryOpen"
+                class="rounded-lg border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+                {{ $t('library.add_from_library') }}
+            </button>
             <p v-if="isUploading" class="text-xs text-gray-500">{{ $t('upload.btn_uploading', { pct: overallProgress }) }}</p>
         </div>
+        <div v-if="libraryOpen && canUseLibrary" class="rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <p class="mb-2 text-xs font-medium text-gray-700">
+                {{ selectedType === 'slide' ? $t('library.library_pick_background') : $t('library.library_pick_template') }}
+            </p>
+            <p v-if="!libraryItems.length" class="text-xs text-gray-500">{{ $t('library.library_none_for_type') }}</p>
+            <div v-else class="grid max-h-56 grid-cols-3 gap-2 overflow-y-auto sm:grid-cols-4">
+                <button v-for="item in libraryItems" :key="item.id" type="button" :disabled="libraryBusy" :title="item.title"
+                    class="overflow-hidden rounded-lg border-2 border-gray-200 bg-white text-left hover:border-indigo-500 disabled:opacity-50"
+                    @click="addFromLibrary(item)">
+                    <div class="aspect-video" :class="selectedType === 'slide' ? '' : 'bg-slate-600'">
+                        <img :src="selectedType === 'slide' ? item.thumbnail_url : item.preview_url" :alt="item.title"
+                            class="h-full w-full" :class="selectedType === 'slide' ? 'object-cover' : 'object-contain'" loading="lazy" />
+                    </div>
+                    <div class="truncate px-1.5 py-1 text-xs text-gray-700">{{ item.title }}</div>
+                </button>
+            </div>
+            <p v-if="libraryBusy" class="mt-2 text-xs text-gray-500">{{ $t('library.library_adding') }}</p>
+        </div>
+        <p v-if="libraryError" class="text-xs text-red-600">{{ libraryError }}</p>
         <p v-if="uploadError" class="text-xs text-red-600">{{ uploadError }}</p>
     </div>
 </template>

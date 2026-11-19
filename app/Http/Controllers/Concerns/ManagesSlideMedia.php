@@ -4,11 +4,13 @@ namespace App\Http\Controllers\Concerns;
 
 use App\Jobs\GenerateThumbnail;
 use App\Jobs\SyncOverlayThumbnail;
+use App\Models\LibraryItem;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use App\Models\Widget;
 use App\Services\ImageValidationService;
+use App\Services\LibrarySlides;
 use App\Services\OverlaySource;
 use App\Services\SvgSanitizer;
 use App\Support\ImageResize;
@@ -80,6 +82,26 @@ trait ManagesSlideMedia
         GenerateThumbnail::dispatch($media);
 
         return $media;
+    }
+
+    /**
+     * Adds a library background (as the slide's picture) or template (as its
+     * overlay) from the slide editor, replacing the slide's current one.
+     */
+    private function attachLibraryMediaForSlide(Request $request, Slide $slide): SlideMedia
+    {
+        $data = $request->validate([
+            'media_type'      => ['required', Rule::in(['slide', 'slide-overlay'])],
+            'library_item_id' => 'required|integer|exists:library_items,id',
+        ]);
+
+        $isOverlay = $data['media_type'] === 'slide-overlay';
+        $item = ($isOverlay ? LibraryItem::templates() : LibraryItem::backgrounds())->ready()->find($data['library_item_id']);
+        abort_unless($item, 422, 'That library item is not available.');
+
+        $library = app(LibrarySlides::class);
+
+        return $isOverlay ? $library->attachTemplate($slide, $item, replace: true) : $library->attachBackground($slide, $item, replace: true);
     }
 
     private function destroyMediaForSlide(Slide $slide, SlideMedia $media): void

@@ -106,6 +106,14 @@ class LocalSlideController extends Controller
         return back()->with('success', 'Media added.');
     }
 
+    public function attachLibraryMedia(Request $request, Slide $slide)
+    {
+        $this->authorizeSlideAction($request, $slide);
+        $this->attachLibraryMediaForSlide($request, $slide);
+
+        return back()->with('success', 'Media added.');
+    }
+
     public function destroyMedia(Request $request, Slide $slide, SlideMedia $media)
     {
         $this->authorizeSlideAction($request, $slide);
