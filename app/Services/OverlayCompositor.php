@@ -110,6 +110,7 @@ class OverlayCompositor
             $svgPath, '-o', $tempPath,
         ]);
         $process->setTimeout(15);
+        $process->setEnv(['FONTCONFIG_FILE' => $this->fontConfigFile()]);
         $process->run();
 
         if (!$process->isSuccessful() || !file_exists($tempPath)) {
@@ -124,6 +125,30 @@ class OverlayCompositor
         }
 
         return $tempPath;
+    }
+
+    /**
+     * A fontconfig file that adds resources/fonts/overlay (TTF subsets of the overlay editor's
+     * fonts) to the system fonts: librsvg ignores @font-face, so this is how
+     * it finds them. Written to storage with the folder paths filled in.
+     */
+    private function fontConfigFile(): string
+    {
+        $dir = storage_path('framework/overlay-fonts');
+        $file = $dir . '/fonts.conf';
+        $conf = strtr((string) file_get_contents(base_path('docker/fontconfig/overlay-fonts.conf')), [
+            '@FONT_DIR@' => resource_path('fonts/overlay'),
+            '@CACHE_DIR@' => $dir . '/cache',
+        ]);
+
+        // Rewritten whenever the content differs, so moving the install or
+        // editing the template is picked up.
+        if (!is_file($file) || file_get_contents($file) !== $conf) {
+            @mkdir($dir . '/cache', 0775, true);
+            file_put_contents($file, $conf);
+        }
+
+        return $file;
     }
 
     private function decode(string $path): ?GdImage

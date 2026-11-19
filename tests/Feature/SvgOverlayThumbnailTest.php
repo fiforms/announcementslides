@@ -48,4 +48,35 @@ class SvgOverlayThumbnailTest extends TestCase
         $this->assertNull($slide->overlay_thumbnail_path);
         $this->assertStringContainsString('thumbs/base.jpg', $slide->thumbnail_url);
     }
+
+    public function test_rasterized_overlay_uses_the_bundled_editor_fonts(): void
+    {
+        if (!trim((string) shell_exec('command -v ' . escapeshellarg(config('slides.rsvg_binary')) . ' 2>/dev/null'))) {
+            $this->markTestSkipped('rsvg-convert is not installed.');
+        }
+
+        Storage::fake('public');
+        $disk = Storage::disk('public');
+        $user = User::factory()->create();
+        $slide = Slide::create(['title' => 'S', 'status' => 'published', 'uploaded_by' => $user->id]);
+        $compositor = new OverlayCompositor();
+
+        $render = function (string $family) use ($slide, $disk, $compositor): string {
+            $disk->put("slides/{$family}.svg", '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100" viewBox="0 0 400 100">'
+                . "<text x=\"10\" y=\"70\" font-size=\"60\" fill=\"#fff\" font-family=\"'{$family}', serif\">Welcome</text></svg>");
+            $media = $slide->media()->create([
+                'media_type' => 'slide-overlay', 'filename' => "{$family}.svg", 'original_filename' => "{$family}.svg",
+                'disk_path' => "slides/{$family}.svg", 'file_size' => 10, 'mime_type' => 'image/svg+xml',
+            ]);
+            $dest = sys_get_temp_dir() . "/font-test-{$family}.jpg";
+            $this->assertTrue($compositor->flatten(null, $media, $dest, 400, 100));
+            $bytes = file_get_contents($dest);
+            @unlink($dest);
+
+            return $bytes;
+        };
+
+        // Italianno ships with the app; a made-up family falls back to serif.
+        $this->assertNotSame($render('NoSuchFontXyz'), $render('Italianno'));
+    }
 }

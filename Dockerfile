@@ -36,7 +36,11 @@ RUN npm run build
 FROM php:${PHP_VERSION}-fpm-alpine AS app
 
 COPY --from=ghcr.io/mlocati/php-extension-installer:latest /usr/bin/install-php-extensions /usr/local/bin/
+# rsvg-convert rasterizes SVG overlays for thumbnails, downloads and the PowerPoint
+# export (OverlayCompositor); fontconfig + a base font set give it the generic
+# sans-serif/serif/monospace faces (the editor's own fonts ship in resources/fonts).
 RUN apk add --no-cache nginx supervisor ffmpeg su-exec curl tzdata mysql-client mariadb-connector-c \
+        rsvg-convert fontconfig font-dejavu \
  && install-php-extensions gd pdo_mysql zip pcntl opcache exif intl bcmath \
  && rm -f /usr/local/bin/install-php-extensions \
  && mkdir -p /run/nginx
