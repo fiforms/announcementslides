@@ -45,13 +45,13 @@ class GenerateThumbnail implements ShouldQueue
 
         if ($media->isVideo()) {
             $poster = $this->ensurePoster($media, $frames);
-            $poster && $this->generateImageThumbnail($poster, $thumbFullPath);
+            $poster && self::generateImageThumbnail($poster, $thumbFullPath);
         } elseif ($media->isImage()) {
             $source = $media->localPath();
             if (!$source) {
                 return;
             }
-            $this->generateImageThumbnail($source, $thumbFullPath);
+            self::generateImageThumbnail($source, $thumbFullPath);
         } elseif (!$media->fileExists()) {
             return;
         }
@@ -94,7 +94,7 @@ class GenerateThumbnail implements ShouldQueue
         return $posterFull;
     }
 
-    private function generateImageThumbnail(string $source, string $dest): void
+    public static function generateImageThumbnail(string $source, string $dest): void
     {
         $info = @getimagesize($source);
         if (! $info || ! $info[0] || ! $info[1]) {
