@@ -86,7 +86,10 @@ class LibraryBuildController extends Controller
                 'uploaded_by' => $user->id,
                 'entity_id'   => $entityId,
                 'language_id' => $data['language_id'] ?? null,
-            ]);
+            ] + ($background?->isVideo()
+                // A library video is a looping backdrop: keep it running for the whole slide delay.
+                ? ['video_playback_mode' => 'loop']
+                : []));
 
             if ($background) {
                 // Same file, thumbnail and poster as the library item: no copy.

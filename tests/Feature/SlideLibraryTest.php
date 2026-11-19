@@ -235,4 +235,20 @@ class SlideLibraryTest extends TestCase
         $this->actingAs($this->admin)->getJson(route('admin.library.overlay.show', $tpl))
             ->assertOk()->assertJsonPath('source.elements.0.id', 'as-el-1');
     }
+
+    public function test_a_slide_built_on_a_library_video_loops_until_the_slide_delay(): void
+    {
+        $video = LibraryItem::create([
+            'kind' => 'background', 'title' => 'Waterfall', 'sha256' => str_repeat('c', 64), 'filename' => 'w.mp4', 'original_filename' => 'w.mp4',
+            'disk_path' => 'library/bg/cc/w.mp4', 'mime_type' => 'video/mp4', 'thumbnail_path' => 'library/thumbs/w.jpg',
+        ]);
+        $image = $this->readyBackground();
+
+        $build = fn ($bg) => Slide::findOrFail($this->actingAs($this->leader)->postJson(route('library.build'), [
+            'title' => 'S', 'entity_id' => $this->church->id, 'background_id' => $bg->id,
+        ])->assertOk()->json('slide_id'));
+
+        $this->assertSame('loop', $build($video)->video_playback_mode);
+        $this->assertNotSame('loop', $build($image)->video_playback_mode);
+    }
 }
