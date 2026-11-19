@@ -6,6 +6,7 @@ import { groupShows } from '@/Composables/showFolders';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
 import UploadPanel from '@/Components/UploadPanel.vue';
 import LibraryBuilder from '@/Components/LibraryBuilder.vue';
+import LibraryPicker from '@/Components/LibraryPicker.vue';
 import ShowSlideRow from '@/Components/ShowSlideRow.vue';
 import SlideLightbox from '@/Components/SlideLightbox.vue';
 import MediaManager from '@/Components/MediaManager.vue';
@@ -141,6 +142,21 @@ async function onFrameFilePicked(event) {
     const saved = await uploader.upload([file], { media_type: 'slide' });
     frameUpload.value = { busy: false, progress: 0, error: saved ? null : uploader.uploadError.value };
     if (saved) router.reload({ only: ['frame'] });
+}
+
+// The show's background from the slide library instead of an upload.
+const framePickerOpen = ref(false);
+const frameLibraryBusy = ref(false);
+function pickFrameBackground(item) {
+    if ((frameBase.value || props.frame.youtube || props.frame.channel) && !confirm(t('library.frame_replace_confirm'))) return;
+    frameLibraryBusy.value = true;
+    router.post(route('shows.media.library', { show: props.selectedShowId, entity_id: props.entity.id }),
+        { library_item_id: item.id }, {
+            preserveScroll: true, only: ['frame'],
+            onSuccess: () => { framePickerOpen.value = false; },
+            onError: (errors) => { frameUpload.value.error = Object.values(errors)[0] ?? t('library.library_add_failed'); },
+            onFinish: () => { frameLibraryBusy.value = false; },
+        });
 }
 function removeFrameMedia(media) {
     if (!confirm(t('show_manage.frame_remove_confirm'))) return;
@@ -567,11 +583,18 @@ function persistLeaderOrder() {
                             class="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
                             {{ frameBase ? $t('show_manage.frame_replace') : $t('show_manage.frame_upload') }}
                         </button>
+                        <button type="button" :disabled="frameUpload.busy || frameLibraryBusy" @click="framePickerOpen = !framePickerOpen"
+                            class="rounded-lg border border-indigo-200 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
+                            {{ $t('library.add_from_library') }}
+                        </button>
                         <button v-if="frameBase" type="button" @click="removeFrameMedia(frameBase)"
                             class="rounded-lg border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50">
                             {{ $t('show_manage.frame_remove') }}
                         </button>
                     </div>
+
+                    <LibraryPicker v-if="framePickerOpen" kind="backgrounds" :busy="frameLibraryBusy"
+                        @pick="pickFrameBackground" @unavailable="framePickerOpen = false" />
 
                     <div class="space-y-1">
                         <p class="text-sm font-medium text-gray-700">{{ $t('show_manage.frame_youtube') }}</p>

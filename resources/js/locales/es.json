@@ -1112,6 +1112,7 @@
         "library_pick_template": "Elija una plantilla de superposición",
         "library_none_for_type": "La biblioteca aún no tiene elementos de este tipo.",
         "library_adding": "Añadiendo…",
-        "library_add_failed": "No se pudo añadir ese elemento."
+        "library_add_failed": "No se pudo añadir ese elemento.",
+        "frame_replace_confirm": "¿Reemplazar el fondo actual de este programa con el elemento de la biblioteca?"
     }
 }

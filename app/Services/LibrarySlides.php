@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Jobs\SyncOverlayThumbnail;
 use App\Models\LibraryItem;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use Illuminate\Support\Facades\DB;
@@ -20,15 +21,20 @@ use Illuminate\Support\Str;
  */
 class LibrarySlides
 {
-    public function attachBackground(Slide $slide, LibraryItem $item, bool $replace = false): SlideMedia
+    /**
+     * A background for a slide (its picture) or a show (its frame background,
+     * `show-base`).
+     */
+    public function attachBackground(Slide|Show $target, LibraryItem $item, bool $replace = false): SlideMedia
     {
-        $old = $replace ? $slide->media()->where('media_type', 'slide')->get() : collect();
+        $type = $target instanceof Show ? 'show-base' : 'slide';
+        $old = $replace ? $target->media()->where('media_type', $type)->get() : collect();
 
-        $media = DB::transaction(function () use ($slide, $item, $old) {
+        $media = DB::transaction(function () use ($target, $item, $old, $type) {
             $old->each->delete();
 
-            return $slide->media()->create([
-                'media_type'        => 'slide',
+            return $target->media()->create([
+                'media_type'        => $type,
                 'filename'          => $item->filename,
                 'original_filename' => $item->original_filename,
                 'disk'              => $item->disk,
@@ -45,12 +51,13 @@ class LibrarySlides
         });
         $old->each->deleteFiles();
 
-        // A library video is a looping backdrop: keep it running for the whole slide delay.
-        if ($item->isVideo()) {
-            $slide->update(['video_playback_mode' => 'loop']);
+        if ($target instanceof Slide) {
+            // A library video is a looping backdrop: keep it running for the whole slide delay.
+            if ($item->isVideo()) {
+                $target->update(['video_playback_mode' => 'loop']);
+            }
+            SyncOverlayThumbnail::dispatch($target->id);
         }
-
-        SyncOverlayThumbnail::dispatch($slide->id);
 
         return $media;
     }

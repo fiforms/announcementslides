@@ -144,6 +144,7 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
         Route::put('/{show}/youtube', [ShowController::class, 'saveYoutube'])->name('youtube.save');
         Route::put('/{show}/channel', [ShowController::class, 'saveChannel'])->name('channel.save');
         Route::post('/{show}/media', [ShowController::class, 'storeMedia'])->name('media.store');
+        Route::post('/{show}/media/library', [ShowController::class, 'attachLibraryBackground'])->name('media.library');
         Route::delete('/{show}/media/{media}', [ShowController::class, 'destroyMedia'])->name('media.destroy');
     });
 

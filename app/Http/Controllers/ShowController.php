@@ -7,9 +7,11 @@ use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Jobs\GenerateThumbnail;
 use App\Models\Entity;
 use App\Models\Language;
+use App\Models\LibraryItem;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
+use App\Services\LibrarySlides;
 use App\Support\NearbyEntities;
 use App\Support\SortZones;
 use App\Models\LiveChannel;
@@ -227,6 +229,24 @@ class ShowController extends Controller
         });
 
         GenerateThumbnail::dispatch($media);
+
+        return back()->with('success', 'Show background saved.');
+    }
+
+    /**
+     * Uses a library background (see LibrarySlides) as the show's background,
+     * replacing the current one (an upload, YouTube video or live channel).
+     */
+    public function attachLibraryBackground(Request $request, Show $show, LibrarySlides $library)
+    {
+        abort_unless($show->entity_id === $this->authorizedEntityId($request), 404);
+
+        $data = $request->validate(['library_item_id' => 'required|integer|exists:library_items,id']);
+        $item = LibraryItem::backgrounds()->ready()->find($data['library_item_id']);
+        abort_unless($item, 422, 'That library item is not available.');
+
+        $show->update(['frame_youtube' => null, 'frame_channel_id' => null]);
+        $library->attachBackground($show, $item, replace: true);
 
         return back()->with('success', 'Show background saved.');
     }
