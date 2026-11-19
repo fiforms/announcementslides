@@ -441,7 +441,7 @@ const handleShow = () => {
             <div class="relative w-full h-full flex items-center justify-center">
                 <ShowFrameLayer v-if="frame?.file_url || frame?.youtube_url || frame?.channel" :frame="frame" layer="base" />
                 <!-- Background music rests while paused and during a video slide (which has its own sound). -->
-                <FrameAudio v-if="frame?.audio?.tracks?.length" :tracks="frame.audio.tracks" :volume="frame.audio.volume"
+                <FrameAudio v-if="frame?.audio?.tracks?.length" :tracks="frame.audio.tracks" :volume="frame.audio.volume" :shuffle="!!frame.audio.shuffle"
                     :suspended="isPaused || !!currentSlide?.mime_type?.startsWith('video/')" />
                 <SlideStage
                     v-for="stage in stages"

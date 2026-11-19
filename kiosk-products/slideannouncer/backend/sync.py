@@ -204,7 +204,7 @@ async def _sync_frame_audio(client: httpx.AsyncClient, show_id: str, audio, prev
             (MEDIA_DIR / prev["local_filename"]).unlink(missing_ok=True)
     if not tracks:
         return None
-    return {"volume": int(audio.get("volume", 100)), "tracks": tracks}
+    return {"volume": int(audio.get("volume", 100)), "shuffle": bool(audio.get("shuffle")), "tracks": tracks}
 
 
 async def _sync_frame(client: httpx.AsyncClient, show_id: str, frame, previous) -> dict | None:
@@ -264,7 +264,7 @@ def _playlist_frame(frame, widget_index: dict):
     if not (base_ok or overlay_ok or placements or youtube or channel or tracks):
         return None
     return {
-        "audio": {"tracks": tracks, "volume": audio.get("volume", 100)} if tracks else None,
+        "audio": {"tracks": tracks, "volume": audio.get("volume", 100), "shuffle": bool(audio.get("shuffle"))} if tracks else None,
         "youtube_url": youtube,
         "channel": channel,
         "media_url": f"/media/{base}" if base_ok else None,

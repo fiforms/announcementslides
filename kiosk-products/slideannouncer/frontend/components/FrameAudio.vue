@@ -13,12 +13,36 @@ import { computed, nextTick, onMounted, ref, watch } from 'vue'
 const props = defineProps({
   tracks: { type: Array, required: true },
   volume: { type: Number, default: 100 },
+  shuffle: { type: Boolean, default: false },
   suspended: { type: Boolean, default: false },
 })
 
 const el = ref(null)
-const index = ref(0)
-const src = computed(() => props.tracks[index.value]?.url ?? null)
+const order = ref([]) // indices into tracks, in play order
+const pos = ref(0)
+const src = computed(() => props.tracks[order.value[pos.value]]?.url ?? null)
+
+// A new pass over the playlist: in order, or shuffled (never opening with the
+// track that just played, when there is a choice).
+function restart(justPlayed = -1) {
+  const idx = props.tracks.map((_, i) => i)
+  if (props.shuffle) {
+    for (let i = idx.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      const tmp = idx[i]
+      idx[i] = idx[j]
+      idx[j] = tmp
+    }
+    if (idx.length > 1 && idx[0] === justPlayed) {
+      const tmp = idx[0]
+      idx[0] = idx[1]
+      idx[1] = tmp
+    }
+  }
+  order.value = idx
+  pos.value = 0
+}
+restart()
 
 function applyVolume() {
   if (el.value) el.value.volume = Math.min(1, Math.max(0, props.volume / 100))
@@ -30,7 +54,9 @@ async function play() {
 }
 
 function next() {
-  if (props.tracks.length > 1) index.value = (index.value + 1) % props.tracks.length
+  if (props.tracks.length < 2) return
+  if (pos.value + 1 < order.value.length) pos.value++
+  else restart(order.value[pos.value])
 }
 
 onMounted(() => {
@@ -40,9 +66,7 @@ onMounted(() => {
 
 watch(() => props.volume, applyVolume)
 watch(() => props.suspended, (s) => (s ? el.value?.pause() : play()))
-watch(() => props.tracks.map((t) => t.url).join('|'), () => {
-  if (index.value >= props.tracks.length) index.value = 0
-})
+watch(() => [props.tracks.map((t) => t.url).join('|'), props.shuffle], () => restart())
 watch(src, () => nextTick(() => { applyVolume(); play() }))
 </script>
 

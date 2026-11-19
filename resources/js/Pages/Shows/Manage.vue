@@ -130,9 +130,11 @@ function removeChannel() {
 // Background music: an ordered playlist of library audio that loops under the
 // show. The form edits the ids in play order; saving sends the whole list.
 const trackIds = (audio) => (audio?.tracks ?? []).map((t) => t.id);
-const audioForm = useForm({ library_item_ids: trackIds(props.frame.audio), volume: props.frame.audio?.volume ?? 100 });
+const audioForm = useForm({
+    library_item_ids: trackIds(props.frame.audio), volume: props.frame.audio?.volume ?? 100, shuffle: props.frame.audio?.shuffle ?? false,
+});
 watch(() => props.frame.audio, (a) => {
-    audioForm.defaults({ library_item_ids: trackIds(a), volume: a?.volume ?? 100 }).reset();
+    audioForm.defaults({ library_item_ids: trackIds(a), volume: a?.volume ?? 100, shuffle: a?.shuffle ?? false }).reset();
 });
 const audioTitles = computed(() => new Map([
     ...props.libraryAudio.map((a) => [a.id, a.title]),
@@ -712,6 +714,10 @@ function persistLeaderOrder() {
                                     <option value="">{{ $t('show_manage.frame_music_add') }}</option>
                                     <option v-for="a in audioChoices" :key="a.id" :value="a.id">{{ a.title }}</option>
                                 </select>
+                                <label v-if="audioForm.library_item_ids.length > 1" class="flex items-center gap-1 text-sm text-gray-700">
+                                    <input v-model="audioForm.shuffle" type="checkbox" class="rounded border-gray-300 text-indigo-600" />
+                                    {{ $t('show_manage.frame_music_shuffle') }}
+                                </label>
                                 <label class="flex items-center gap-2 text-sm text-gray-700">
                                     {{ $t('show_manage.frame_music_volume') }}
                                     <input v-model.number="audioForm.volume" type="range" min="0" max="100" step="5" class="w-28" />

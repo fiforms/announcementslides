@@ -16,7 +16,7 @@ use App\Services\Widgets\OverlayWidgets;
  * channel (`channel`: {kind: 'iframe'|'hls', url, muted}, see LiveChannel).
  *
  * Background music is `audio` ({tracks: [{id, url, mime_type, title}], volume
- * 0-100}), played in order and looped by the player. It is independent of
+ * 0-100, shuffle}), played in order and looped by the player. It is independent of
  * the background, so a show may have only music.
  *
  * Same field names as a slide's (file_url, mime_type, overlay_url,
@@ -82,7 +82,7 @@ class ShowFrame
             'id' => $i->id, 'url' => $i->file_url, 'mime_type' => $i->mime_type, 'title' => $i->title,
         ])->values()->all();
 
-        return $tracks ? ['tracks' => $tracks, 'volume' => (int) $show->frame_audio_volume] : null;
+        return $tracks ? ['tracks' => $tracks, 'volume' => (int) $show->frame_audio_volume, 'shuffle' => (bool) $show->frame_audio_shuffle] : null;
     }
 
     /** For a Slide Announcer device (no URLs for widgets — it serves bundles itself). */

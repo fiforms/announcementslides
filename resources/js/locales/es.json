@@ -695,7 +695,8 @@
         "frame_music_use": "Guardar música",
         "frame_music_add": "Agregar una pista…",
         "frame_music_up": "Subir",
-        "frame_music_down": "Bajar"
+        "frame_music_down": "Bajar",
+        "frame_music_shuffle": "Aleatorio"
     },
     "slide_announcers": {
         "online": "En línea",

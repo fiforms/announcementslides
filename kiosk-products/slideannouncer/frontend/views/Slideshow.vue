@@ -640,6 +640,7 @@ onUnmounted(() => {
       v-if="frame?.audio?.tracks?.length"
       :tracks="frame.audio.tracks"
       :volume="frame.audio.volume"
+      :shuffle="!!frame.audio.shuffle"
       :suspended="paused || externalPlaybackActive || !!currentSlide?.mime_type?.startsWith('video/')"
     />
     <SlideStage

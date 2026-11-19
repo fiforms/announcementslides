@@ -76,6 +76,7 @@ class ShowController extends Controller
                         'id' => $i->id, 'title' => $i->title, 'duration_seconds' => $i->duration_seconds, 'file_url' => $i->file_url,
                     ])->values(),
                     'volume' => (int) $selectedShow->frame_audio_volume,
+                    'shuffle' => (bool) $selectedShow->frame_audio_shuffle,
                 ],
             ],
             'libraryAudio' => $isAdmin ? LibraryItem::audio()->ready()->orderBy('title')->get()->map(fn (LibraryItem $i) => [
@@ -330,8 +331,8 @@ class ShowController extends Controller
     /**
      * Sets the show's background music: `library_item_ids`, an ordered list of
      * library audio items (empty clears it). The players play them in order
-     * and loop; a single track simply repeats. `volume` is saved on its own
-     * when no list is sent. Independent of the background.
+     * and loop; a single track simply repeats. `volume` and `shuffle` are saved on
+     * their own when no list is sent. Independent of the background.
      */
     public function saveAudio(Request $request, Show $show)
     {
@@ -341,10 +342,15 @@ class ShowController extends Controller
             'library_item_ids'   => 'nullable|array|max:50',
             'library_item_ids.*' => 'integer|distinct|exists:library_items,id',
             'volume'             => 'nullable|integer|min:0|max:100',
+            'shuffle'            => 'nullable|boolean',
         ]);
 
         if (($data['volume'] ?? null) !== null) {
             $show->update(['frame_audio_volume' => $data['volume']]);
+        }
+
+        if (($data['shuffle'] ?? null) !== null) {
+            $show->update(['frame_audio_shuffle' => (bool) $data['shuffle']]);
         }
 
         if (array_key_exists('library_item_ids', $data)) {

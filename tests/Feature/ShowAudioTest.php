@@ -154,6 +154,14 @@ class ShowAudioTest extends TestCase
         $this->assertSame([$a->id, $b->id], $this->show->fresh()->audioItems->pluck('id')->all());
         $this->assertSame(10, $this->show->fresh()->frame_audio_volume);
 
+        $this->assertFalse($this->show->fresh()->frame_audio_shuffle);
+        $this->saveAudio(['shuffle' => true]);
+        $this->assertTrue($this->show->fresh()->frame_audio_shuffle);
+        $this->assertTrue(app(ShowFrame::class)->forPlayer($this->show->fresh())['audio']['shuffle']);
+        $this->assertSame([$a->id, $b->id], $this->show->fresh()->audioItems->pluck('id')->all());
+        $this->saveAudio(['shuffle' => false]);
+        $this->assertFalse($this->show->fresh()->frame_audio_shuffle);
+
         $this->saveAudio(['library_item_ids' => []]);
         $this->assertCount(0, $this->show->fresh()->audioItems);
     }

@@ -187,7 +187,7 @@ def test_background_music_is_cached_per_track_and_listed_in_the_playlist():
     assert entry["audio"]["tracks"][0]["local_filename"] == "show-3-audio-5.m4a"
     assert (sync.MEDIA_DIR / "show-3-audio-5.m4a").exists()
     out = sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]
-    assert out["audio"] == {"tracks": [{"url": "/media/show-3-audio-5.m4a"}], "volume": 60}
+    assert out["audio"] == {"tracks": [{"url": "/media/show-3-audio-5.m4a"}], "volume": 60, "shuffle": False}
     assert sync._frame_files(entry) == ["show-3-audio-5.m4a"]
 
 
@@ -225,3 +225,12 @@ def test_a_playlist_keeps_server_order_and_drops_only_removed_tracks():
     assert not (sync.MEDIA_DIR / "show-3-audio-6.m4a").exists()
     out = sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]
     assert [t["url"] for t in out["audio"]["tracks"]] == ["/media/show-3-audio-7.m4a", "/media/show-3-audio-5.m4a"]
+
+
+def test_the_shuffle_flag_reaches_the_kiosk():
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": {**music(5, 6), "shuffle": True}})
+    assert entry["audio"]["shuffle"] is True
+    out = sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]
+    assert out["audio"]["shuffle"] is True
+    entry = run_sync("3", {**frame(base=None, overlay=None), "audio": music(5, 6)}, entry)
+    assert sync._build_active_playlist(manifest_with({}, entry))[0]["frame"]["audio"]["shuffle"] is False
