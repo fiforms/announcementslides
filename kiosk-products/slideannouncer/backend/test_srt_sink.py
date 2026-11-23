@@ -69,3 +69,23 @@ def test_caller_fields_sync_from_server():
     config = srt_sink.read_config()
     assert (config["mode"], config["sender_host"], config["sender_port"]) == ("rist_caller", "10.0.0.5", 6000)
     assert srt_sink.report()["sender_host"] == "10.0.0.5"
+
+
+def test_server_push_can_enable_and_disable_the_receiver():
+    assert not srt_sink.read_config()["local_enabled"]
+    srt_sink.apply_server_config({"revision": 1, "enabled": True})
+    config = srt_sink.read_config()
+    assert config["local_enabled"] and config["passphrase"]
+    assert srt_sink.report()["enabled"] is True
+    srt_sink.apply_server_config({"revision": 2, "enabled": False})
+    assert srt_sink.report()["enabled"] is False
+
+
+def test_server_push_keeps_its_own_passphrase_when_enabling():
+    srt_sink.apply_server_config({"revision": 1, "enabled": True, "passphrase": "WebPassword1"})
+    assert srt_sink.read_config()["passphrase"] == "WebPassword1"
+
+
+def test_local_enable_is_reported_up():
+    srt_sink.set_local_enabled(True)
+    assert srt_sink.report()["enabled"] is True

@@ -34,7 +34,7 @@ const form = useForm({
     language_id: props.device.language_id ?? '',
     update_channel: props.device.update_channel,
     auto_update_enabled: props.device.auto_update_enabled,
-    srt_sink_enabled: props.device.srt_sink_enabled,
+    rx_enabled: receiver.enabled ?? receiver.local_enabled ?? false,
     rx_mode: receiver.mode ?? 'srt',
     rx_passphrase: receiver.passphrase || props.device.srt_sink_passphrase || '',
     rx_multicast_group: receiver.multicast_group || '',
@@ -43,6 +43,8 @@ const form = useForm({
     rx_sender_host: receiver.sender_host || '',
     rx_sender_port: receiver.sender_port ?? 5000,
     rx_sender_passphrase: receiver.sender_passphrase || '',
+    rx_srt_latency_ms: receiver.srt_latency_ms ?? 120,
+    rx_rist_buffer_ms: receiver.rist_buffer_ms ?? 500,
     rx_encryption_bits: receiver.rist_encryption_bits ?? 128,
     interval_seconds: interval_seconds ?? 10,
     stream_timeout_hours: stream_timeout_hours ?? 5,
@@ -63,8 +65,25 @@ const jsonValid = computed(() => {
 
 const pinValid = computed(() => /^\d{4,6}$/.test(form.settings_pin) || form.settings_pin === '');
 
+// Same rule as the server and the device (10-79 printable ASCII characters,
+// no spaces). Blank is left to the server (optional except where a mode
+// needs one). Only the field shown for the current mode is checked.
+function passphraseProblem(value) {
+    if (!value) return null;
+    if (value.length < 10 || value.length > 79) return t('slide_announcers.passphrase_length', { count: value.length });
+    if (/\s/.test(value)) return t('slide_announcers.passphrase_space');
+    if (!/^[\x21-\x7E]+$/.test(value)) return t('slide_announcers.passphrase_chars');
+    return null;
+}
+const passphraseError = computed(() => {
+    if (isMulticast.value) return passphraseProblem(form.rx_multicast_passphrase);
+    if (isCaller.value) return passphraseProblem(form.rx_sender_passphrase);
+    return passphraseProblem(form.rx_passphrase);
+});
+
 function submit() {
     settingsError.value = '';
+    if (passphraseError.value) return;
     let settings;
     try {
         settings = JSON.parse(form.settings_text || '{}');
@@ -82,8 +101,8 @@ function submit() {
         language_id: data.language_id || null,
         update_channel: data.update_channel,
         auto_update_enabled: data.auto_update_enabled,
-        srt_sink_enabled: data.srt_sink_enabled,
         srt_sink_config: {
+            enabled: !!data.rx_enabled,
             mode: data.rx_mode,
             passphrase: data.rx_passphrase || null,
             multicast_group: data.rx_multicast_group || null,
@@ -93,6 +112,8 @@ function submit() {
             sender_port: data.rx_sender_port === '' ? null : Number(data.rx_sender_port),
             sender_passphrase: data.rx_sender_passphrase || null,
             rist_encryption_bits: Number(data.rx_encryption_bits),
+            srt_latency_ms: data.rx_srt_latency_ms === '' ? null : Number(data.rx_srt_latency_ms),
+            rist_buffer_ms: data.rx_rist_buffer_ms === '' ? null : Number(data.rx_rist_buffer_ms),
         },
         settings: {
             ...settings,
@@ -134,8 +155,12 @@ function generatePassphrase() {
 const connectUrl = computed(() => {
     const latencyMs = receiver.srt_latency_ms ?? 120;
     const bufferMs = receiver.rist_buffer_ms ?? 500;
-    // The sender is the listener in caller mode: nothing to configure it with.
-    if (isCaller.value) return null;
+    // Caller mode: this device dials out, so the sender listens ("@" = listen)
+    // on the port saved here, with the secret/encryption saved here.
+    if (isCaller.value) {
+        if (!form.rx_sender_passphrase || !form.rx_sender_port) return null;
+        return `rist://@0.0.0.0:${form.rx_sender_port}?secret=${encodeURIComponent(form.rx_sender_passphrase)}&aes-type=${form.rx_encryption_bits}&buffer=${bufferMs}`;
+    }
     if (form.rx_mode === 'srt') {
         if (!props.device.hostname || !form.rx_passphrase) return null;
         return `srt://${props.device.hostname}.local:${receiver.srt_port ?? 7002}?mode=caller&latency=${latencyMs * 1000}&passphrase=${encodeURIComponent(form.rx_passphrase)}`;
@@ -290,7 +315,7 @@ function copyConnectUrl() {
                     </div>
 
                     <label class="flex items-center gap-2 text-sm text-gray-700">
-                        <input v-model="form.srt_sink_enabled" type="checkbox"
+                        <input v-model="form.rx_enabled" type="checkbox"
                             class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                         {{ $t('slide_announcers.lan_allow') }}
                     </label>
@@ -302,9 +327,6 @@ function copyConnectUrl() {
                     <div v-if="receiver.apply_error" class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
                         {{ $t('slide_announcers.lan_apply_error', { error: receiver.apply_error }) }}
                     </div>
-                    <p v-if="receiver.local_enabled === false" class="text-xs text-gray-500">
-                        {{ $t('slide_announcers.lan_local_off') }}
-                    </p>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -339,6 +361,7 @@ function copyConnectUrl() {
                                 class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">{{ $t('slide_announcers.generate') }}</button>
                         </div>
                         <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.passphrase_help') }}</p>
+                        <p v-if="passphraseError" class="mt-1 text-xs text-red-600">{{ passphraseError }}</p>
                         <p v-if="form.errors['srt_sink_config.passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.passphrase'] }}</p>
                     </div>
 
@@ -360,6 +383,7 @@ function copyConnectUrl() {
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.passphrase') }}</label>
                             <input v-model="form.rx_sender_passphrase" type="text" autocomplete="off" spellcheck="false"
                                 :placeholder="$t('slide_announcers.passphrase_placeholder')" class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="passphraseError" class="mt-1 text-xs text-red-600">{{ passphraseError }}</p>
                             <p v-if="form.errors['srt_sink_config.sender_passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.sender_passphrase'] }}</p>
                         </div>
                     </div>
@@ -382,6 +406,7 @@ function copyConnectUrl() {
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.passphrase') }}</label>
                             <input v-model="form.rx_multicast_passphrase" type="text" autocomplete="off" spellcheck="false"
                                 :placeholder="$t('slide_announcers.passphrase_placeholder')" class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="passphraseError" class="mt-1 text-xs text-red-600">{{ passphraseError }}</p>
                             <p v-if="form.errors['srt_sink_config.multicast_passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.multicast_passphrase'] }}</p>
                         </div>
                         <p class="sm:col-span-2 text-xs text-amber-700">
@@ -389,13 +414,28 @@ function copyConnectUrl() {
                         </p>
                     </div>
 
+                    <div class="max-w-xs">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ isRist ? $t('slide_announcers.rist_buffer') : $t('slide_announcers.srt_latency') }}</label>
+                        <div class="flex items-center gap-2">
+                            <input v-if="isRist" v-model="form.rx_rist_buffer_ms" type="number" min="50" max="3000" step="50"
+                                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <input v-else v-model="form.rx_srt_latency_ms" type="number" min="20" max="2000" step="10"
+                                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <span class="text-sm text-gray-500">ms</span>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.buffer_help') }}</p>
+                        <p v-if="form.errors['srt_sink_config.srt_latency_ms']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.srt_latency_ms'] }}</p>
+                        <p v-if="form.errors['srt_sink_config.rist_buffer_ms']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.rist_buffer_ms'] }}</p>
+                    </div>
+
                     <div v-if="connectUrl" class="flex items-start gap-2">
-                        <span class="text-xs text-gray-500 whitespace-nowrap pt-1">{{ isMulticast ? $t('slide_announcers.sender_url') : $t('slide_announcers.connect_with') }}</span>
+                        <span class="text-xs text-gray-500 whitespace-nowrap pt-1">{{ isCaller ? $t('slide_announcers.caller_sender_url') : isMulticast ? $t('slide_announcers.sender_url') : $t('slide_announcers.connect_with') }}</span>
                         <code class="flex-1 min-w-0 break-all rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-800">{{ connectUrl }}</code>
                         <button type="button" @click="copyConnectUrl" class="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800">
                             {{ $t('slide_announcers.copy') }}
                         </button>
                     </div>
+                    <p v-if="connectUrl && isCaller" class="-mt-2 text-xs text-gray-500">{{ $t('slide_announcers.caller_sender_hint', { host: form.rx_sender_host || '…' }) }}</p>
                     <img v-if="qrDataUrl" :src="qrDataUrl" :alt="$t('slide_announcers.qr_alt')" class="rounded border border-gray-200" width="180" height="180" />
                 </div>
 
@@ -423,7 +463,7 @@ function copyConnectUrl() {
                 </div>
 
                 <div class="flex items-center gap-3 pt-2">
-                    <button type="submit" :disabled="form.processing || !jsonValid || !pinValid"
+                    <button type="submit" :disabled="form.processing || !jsonValid || !pinValid || !!passphraseError"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
                         {{ form.processing ? $t('admin.saving') : $t('admin.save_changes') }}
                     </button>

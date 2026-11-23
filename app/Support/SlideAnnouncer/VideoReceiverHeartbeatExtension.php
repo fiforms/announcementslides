@@ -42,11 +42,7 @@ class VideoReceiverHeartbeatExtension implements HeartbeatExtension
     public function respond(SlideAnnouncer $device): array
     {
         return [
-            // Fleet-wide force-disable (EntitySlideAnnouncerController::update)
-            // — an explicit false always overrides the device's own local
-            // Settings toggle.
-            'srt_sink_enabled' => $device->srt_sink_enabled,
-            // Receiver settings edited on the Slide Announcer page, with the
+            // Receiver on/off, mode and passphrases edited on the Slide Announcer page, with the
             // revision the device uses to tell a new edit from one it has
             // already applied. Also sent with every slide sync.
             'srt_sink_config' => SlideAnnouncerVideoReceiver::push($device),

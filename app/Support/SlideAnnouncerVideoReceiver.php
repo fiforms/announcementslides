@@ -5,7 +5,7 @@ namespace App\Support;
 use App\Models\SlideAnnouncer;
 
 /**
- * Two-way sync of a Slide Announcer's LAN Video Receiver settings (mode,
+ * Two-way sync of a Slide Announcer's LAN Video Receiver settings (on/off, mode,
  * passphrases, RIST multicast group/port or RIST caller sender host/port,
  * encryption), which can be edited
  * both on the device (Settings > LAN Video Receiver) and on the Slide
@@ -29,13 +29,13 @@ class SlideAnnouncerVideoReceiver
 
     /** Settable from either side — the fields push() sends down. */
     public const EDITABLE = [
-        'mode', 'passphrase', 'multicast_group', 'multicast_port', 'multicast_passphrase', 'rist_encryption_bits',
-        'sender_host', 'sender_port', 'sender_passphrase',
+        'enabled', 'mode', 'passphrase', 'multicast_group', 'multicast_port', 'multicast_passphrase', 'rist_encryption_bits',
+        'sender_host', 'sender_port', 'sender_passphrase', 'srt_latency_ms', 'rist_buffer_ms',
     ];
 
-    /** Device-reported only (local on/off switch, tuning, capabilities). */
+    /** Device-reported only (tuning, capabilities). */
     public const REPORTED = [
-        'local_enabled', 'srt_latency_ms', 'rist_buffer_ms', 'rist_supported', 'rist_port', 'srt_port', 'apply_error',
+        'rist_supported', 'rist_port', 'srt_port', 'apply_error',
     ];
 
     /**
@@ -57,6 +57,7 @@ class SlideAnnouncerVideoReceiver
 
         return [
             'srt_sink_config' => 'sometimes|array',
+            'srt_sink_config.enabled' => 'sometimes|boolean',
             'srt_sink_config.mode' => 'required_with:srt_sink_config|in:'.implode(',', self::MODES),
             'srt_sink_config.passphrase' => ['nullable', 'string', ...$passphrase],
             'srt_sink_config.multicast_group' => [$multicast, 'nullable', 'ipv4', function ($attribute, $value, $fail) {
@@ -70,6 +71,9 @@ class SlideAnnouncerVideoReceiver
             'srt_sink_config.sender_host' => [$caller, 'nullable', 'string', 'regex:/^[A-Za-z0-9]([A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/'],
             'srt_sink_config.sender_port' => [$caller, 'nullable', 'integer', 'between:1024,65534', $evenPort],
             'srt_sink_config.sender_passphrase' => [$caller, 'nullable', 'string', ...$passphrase],
+            // SRT latency / RIST buffer — same bounds as the device's srt_sink.py.
+            'srt_sink_config.srt_latency_ms' => 'nullable|integer|between:20,2000',
+            'srt_sink_config.rist_buffer_ms' => 'nullable|integer|between:50,3000',
             'srt_sink_config.rist_encryption_bits' => 'nullable|in:128,256',
         ];
     }
@@ -93,16 +97,20 @@ class SlideAnnouncerVideoReceiver
         $next = $current;
         foreach (self::EDITABLE as $key) {
             if (array_key_exists($key, $edit)) {
-                $next[$key] = in_array($key, ['multicast_port', 'sender_port', 'rist_encryption_bits'], true)
-                    ? ($edit[$key] === null ? null : (int) $edit[$key])
-                    : $edit[$key];
+                $next[$key] = match (true) {
+                    $key === 'enabled' => (bool) $edit[$key],
+                    in_array($key, ['multicast_port', 'sender_port', 'rist_encryption_bits', 'srt_latency_ms', 'rist_buffer_ms'], true)
+                        => $edit[$key] === null ? null : (int) $edit[$key],
+                    default => $edit[$key],
+                };
             }
         }
 
         // '' (as the device reports an unset field) and null (as a blank
         // form field arrives) both mean "not set".
-        $norm = fn ($value) => $value === '' ? null : $value;
-        $changed = collect(self::EDITABLE)->contains(fn ($key) => $norm($next[$key] ?? null) !== $norm($current[$key] ?? null));
+        // An unreported `enabled` is off (the receiver is opt-in).
+        $norm = fn ($value, $key) => $key === 'enabled' ? (bool) $value : ($value === '' ? null : $value);
+        $changed = collect(self::EDITABLE)->contains(fn ($key) => $norm($next[$key] ?? null, $key) !== $norm($current[$key] ?? null, $key));
         if (! $changed) {
             return;
         }

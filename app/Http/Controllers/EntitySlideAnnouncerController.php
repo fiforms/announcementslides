@@ -178,8 +178,6 @@ class EntitySlideAnnouncerController extends Controller
             'language_id' => 'sometimes|nullable|exists:languages,id',
             'update_channel' => 'sometimes|in:stable,testing,developer',
             'auto_update_enabled' => 'sometimes|boolean',
-            // Fleet-wide force-disable for the LAN Video Receiver.
-            'srt_sink_enabled' => 'sometimes|boolean',
             'settings' => 'sometimes|array',
             // Receiver mode/passphrases/multicast — synced down to the
             // device by revision; see App\Support\SlideAnnouncerVideoReceiver.
@@ -239,7 +237,6 @@ class EntitySlideAnnouncerController extends Controller
             'architecture' => $device->architecture,
             'update_channel' => $device->update_channel,
             'auto_update_enabled' => $device->auto_update_enabled,
-            'srt_sink_enabled' => $device->srt_sink_enabled,
             'srt_sink_passphrase' => $device->srt_sink_passphrase,
             'srt_sink_config' => $device->srt_sink_config,
             'srt_sink_config_pending' => SlideAnnouncerVideoReceiver::pending($device),
