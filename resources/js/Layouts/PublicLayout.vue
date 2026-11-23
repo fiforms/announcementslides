@@ -183,6 +183,7 @@ const { currentEntityId, currentEntity, selectEntity } = useEntitySelection(user
         </main>
 
         <footer class="mt-16 border-t border-slate-200 bg-white py-8 text-center text-sm text-slate-400">
+            <Link :href="route('help.index')" class="me-3 text-indigo-600 hover:text-indigo-800">{{ $t('nav.help') }}</Link>
             {{ appName }} &mdash; {{ $t('nav.powered_by') }} <a href="https://github.com/fiforms/announcementslides" class="text-indigo-600 hover:text-indigo-800" target="_blank">AnnouncementSlides</a>
         </footer>
     </div>

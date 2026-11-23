@@ -1,4 +1,5 @@
 <script setup>
+import HelpLink from '@/Components/HelpLink.vue';
 import { ref, computed, watch } from 'vue';
 import { useForm, router, Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
@@ -308,7 +309,10 @@ function copyConnectUrl() {
                      App\Support\SlideAnnouncerVideoReceiver. -->
                 <div class="rounded-lg border border-gray-200 p-4 space-y-4">
                     <div>
-                        <h3 class="text-sm font-medium text-gray-900">{{ $t('slide_announcers.lan_title') }}</h3>
+                        <h3 class="flex items-center gap-2 text-sm font-medium text-gray-900">
+                            {{ $t('slide_announcers.lan_title') }}
+                            <HelpLink topic="lan-video-receiver" />
+                        </h3>
                         <p class="text-xs text-gray-500">
                             {{ $t('slide_announcers.lan_help') }}
                         </p>
