@@ -34,7 +34,7 @@ const form = useForm({
     language_id: props.device.language_id ?? '',
     update_channel: props.device.update_channel,
     auto_update_enabled: props.device.auto_update_enabled,
-    srt_sink_enabled: props.device.srt_sink_enabled,
+    rx_enabled: receiver.enabled ?? receiver.local_enabled ?? false,
     rx_mode: receiver.mode ?? 'srt',
     rx_passphrase: receiver.passphrase || props.device.srt_sink_passphrase || '',
     rx_multicast_group: receiver.multicast_group || '',
@@ -43,6 +43,8 @@ const form = useForm({
     rx_sender_host: receiver.sender_host || '',
     rx_sender_port: receiver.sender_port ?? 5000,
     rx_sender_passphrase: receiver.sender_passphrase || '',
+    rx_srt_latency_ms: receiver.srt_latency_ms ?? 120,
+    rx_rist_buffer_ms: receiver.rist_buffer_ms ?? 500,
     rx_encryption_bits: receiver.rist_encryption_bits ?? 128,
     interval_seconds: interval_seconds ?? 10,
     stream_timeout_hours: stream_timeout_hours ?? 5,
@@ -82,8 +84,8 @@ function submit() {
         language_id: data.language_id || null,
         update_channel: data.update_channel,
         auto_update_enabled: data.auto_update_enabled,
-        srt_sink_enabled: data.srt_sink_enabled,
         srt_sink_config: {
+            enabled: !!data.rx_enabled,
             mode: data.rx_mode,
             passphrase: data.rx_passphrase || null,
             multicast_group: data.rx_multicast_group || null,
@@ -93,6 +95,8 @@ function submit() {
             sender_port: data.rx_sender_port === '' ? null : Number(data.rx_sender_port),
             sender_passphrase: data.rx_sender_passphrase || null,
             rist_encryption_bits: Number(data.rx_encryption_bits),
+            srt_latency_ms: data.rx_srt_latency_ms === '' ? null : Number(data.rx_srt_latency_ms),
+            rist_buffer_ms: data.rx_rist_buffer_ms === '' ? null : Number(data.rx_rist_buffer_ms),
         },
         settings: {
             ...settings,
@@ -290,7 +294,7 @@ function copyConnectUrl() {
                     </div>
 
                     <label class="flex items-center gap-2 text-sm text-gray-700">
-                        <input v-model="form.srt_sink_enabled" type="checkbox"
+                        <input v-model="form.rx_enabled" type="checkbox"
                             class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500" />
                         {{ $t('slide_announcers.lan_allow') }}
                     </label>
@@ -302,9 +306,6 @@ function copyConnectUrl() {
                     <div v-if="receiver.apply_error" class="rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">
                         {{ $t('slide_announcers.lan_apply_error', { error: receiver.apply_error }) }}
                     </div>
-                    <p v-if="receiver.local_enabled === false" class="text-xs text-gray-500">
-                        {{ $t('slide_announcers.lan_local_off') }}
-                    </p>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
@@ -387,6 +388,20 @@ function copyConnectUrl() {
                         <p class="sm:col-span-2 text-xs text-amber-700">
                             {{ $t('slide_announcers.multicast_wifi_warning') }}
                         </p>
+                    </div>
+
+                    <div class="max-w-xs">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ isRist ? $t('slide_announcers.rist_buffer') : $t('slide_announcers.srt_latency') }}</label>
+                        <div class="flex items-center gap-2">
+                            <input v-if="isRist" v-model="form.rx_rist_buffer_ms" type="number" min="50" max="3000" step="50"
+                                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <input v-else v-model="form.rx_srt_latency_ms" type="number" min="20" max="2000" step="10"
+                                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <span class="text-sm text-gray-500">ms</span>
+                        </div>
+                        <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.buffer_help') }}</p>
+                        <p v-if="form.errors['srt_sink_config.srt_latency_ms']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.srt_latency_ms'] }}</p>
+                        <p v-if="form.errors['srt_sink_config.rist_buffer_ms']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.rist_buffer_ms'] }}</p>
                     </div>
 
                     <div v-if="connectUrl" class="flex items-start gap-2">

@@ -23,7 +23,6 @@ class SlideAnnouncer extends Model
         'architecture',
         'update_channel',
         'auto_update_enabled',
-        'srt_sink_enabled',
         'srt_sink_passphrase',
         'srt_sink_config',
         'srt_sink_config_revision',
@@ -41,7 +40,6 @@ class SlideAnnouncer extends Model
     protected $casts = [
         'auto_update_enabled' => 'boolean',
         'language_revision' => 'integer',
-        'srt_sink_enabled' => 'boolean',
         'srt_sink_config' => 'array',
         'srt_sink_config_revision' => 'integer',
         'srt_sink_config_applied_revision' => 'integer',

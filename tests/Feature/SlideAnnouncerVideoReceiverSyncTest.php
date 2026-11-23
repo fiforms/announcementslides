@@ -32,6 +32,7 @@ class SlideAnnouncerVideoReceiverSyncTest extends TestCase
             'multicast_port' => 5000,
             'multicast_passphrase' => '',
             'rist_encryption_bits' => 128,
+            'enabled' => true,
             'local_enabled' => true,
             'srt_latency_ms' => 120,
             'rist_buffer_ms' => 500,
@@ -108,11 +109,11 @@ class SlideAnnouncerVideoReceiverSyncTest extends TestCase
 
         // A report from before the device applied it must not undo the edit,
         // but device-only status still updates.
-        $this->heartbeat($device, $this->report(['srt_latency_ms' => 240]))
+        $this->heartbeat($device, $this->report(['srt_port' => 7010]))
             ->assertJsonPath('srt_sink_config.mode', 'rist_multicast');
         $device->refresh();
         $this->assertSame('rist_multicast', $device->srt_sink_config['mode']);
-        $this->assertSame(240, $device->srt_sink_config['srt_latency_ms']);
+        $this->assertSame(7010, $device->srt_sink_config['srt_port']);
         $this->assertSame(0, $device->srt_sink_config_applied_revision);
 
         // Device applied it and reports at revision 1 — now current.
@@ -211,5 +212,39 @@ class SlideAnnouncerVideoReceiverSyncTest extends TestCase
             ->assertJsonPath('srt_sink_config.mode', 'rist_caller')
             ->assertJsonPath('srt_sink_config.sender_host', 'obs-pc.local')
             ->assertJsonPath('srt_sink_config.sender_port', 5000);
+    }
+
+    public function test_web_enable_is_pushed_down_and_a_device_toggle_comes_back_up(): void
+    {
+        $device = $this->makeDevice();
+        $this->heartbeat($device, $this->report(['enabled' => false, 'local_enabled' => false]))->assertOk();
+
+        $this->webEdit($device, ['mode' => 'srt', 'enabled' => true, 'passphrase' => 'DevicePass01'])->assertSessionHasNoErrors();
+        $this->heartbeat($device, $this->report(['enabled' => false, 'local_enabled' => false]))
+            ->assertJsonPath('srt_sink_config.enabled', true)
+            ->assertJsonPath('srt_sink_config.revision', 1);
+
+        // Device applies it, then the operator switches it off locally.
+        $this->heartbeat($device, $this->report(['revision' => 1]))->assertOk();
+        $this->assertTrue($device->fresh()->srt_sink_config['enabled']);
+        $this->heartbeat($device, $this->report(['revision' => 1, 'enabled' => false, 'local_enabled' => false]))->assertOk();
+        $this->assertFalse($device->fresh()->srt_sink_config['enabled']);
+    }
+
+    public function test_buffer_edits_sync_both_ways_and_are_validated(): void
+    {
+        $device = $this->makeDevice();
+        $this->heartbeat($device, $this->report())->assertOk();
+
+        $this->webEdit($device, ['mode' => 'srt', 'srt_latency_ms' => 10])->assertSessionHasErrors('srt_sink_config.srt_latency_ms');
+
+        $this->webEdit($device, ['mode' => 'srt', 'srt_latency_ms' => 300, 'rist_buffer_ms' => 750])->assertSessionHasNoErrors();
+        $this->heartbeat($device, $this->report())
+            ->assertJsonPath('srt_sink_config.srt_latency_ms', 300)
+            ->assertJsonPath('srt_sink_config.rist_buffer_ms', 750);
+
+        // Device applies, then the operator changes the buffer locally.
+        $this->heartbeat($device, $this->report(['revision' => 1, 'srt_latency_ms' => 450, 'rist_buffer_ms' => 750]))->assertOk();
+        $this->assertSame(450, $device->fresh()->srt_sink_config['srt_latency_ms']);
     }
 }

@@ -149,9 +149,13 @@ DEFAULT_RIST_ENCRYPTION_BITS = 128
 # - a local edit here just changes the values, and the next heartbeat
 #   reports them — the server takes a report as current whenever it
 #   comes with the server's latest revision.
+#
+# `enabled` is the receiver's on/off — it syncs the same way but maps to this
+# device's `local_enabled`, so it isn't in the tuple below (see report(),
+# apply_server_config()).
 SERVER_EDITABLE_FIELDS = (
     "mode", "passphrase", "multicast_group", "multicast_port", "multicast_passphrase", "rist_encryption_bits",
-    "sender_host", "sender_port", "sender_passphrase",
+    "sender_host", "sender_port", "sender_passphrase", "srt_latency_ms", "rist_buffer_ms",
 )
 
 
@@ -353,12 +357,20 @@ def update_settings(changes: dict) -> dict:
         config["sender_port"] = _validate_rist_port(changes["sender_port"])
     if "sender_passphrase" in changes:
         config["sender_passphrase"] = _validate_passphrase(changes["sender_passphrase"])
+    if "srt_latency_ms" in changes:
+        config["srt_latency_ms"] = _clamp_latency_ms(changes["srt_latency_ms"])
     if "rist_buffer_ms" in changes:
         config["rist_buffer_ms"] = _clamp(changes["rist_buffer_ms"], MIN_RIST_BUFFER_MS, MAX_RIST_BUFFER_MS, DEFAULT_RIST_BUFFER_MS)
     if "rist_encryption_bits" in changes:
         if changes["rist_encryption_bits"] not in RIST_ENCRYPTION_BITS:
             raise SrtSinkConfigError("Encryption must be AES-128 or AES-256.")
         config["rist_encryption_bits"] = changes["rist_encryption_bits"]
+    # Last, so a passphrase arriving in the same edit is used rather than a
+    # freshly generated one.
+    if "enabled" in changes:
+        config["local_enabled"] = bool(changes["enabled"])
+        if config["local_enabled"]:
+            config = ensure_passphrase(config)
     _write_raw(config)
     return config
 
@@ -379,6 +391,8 @@ def apply_server_config(push) -> None:
     if revision <= read_config()["server_revision"]:
         return
     changes = {key: push[key] for key in SERVER_EDITABLE_FIELDS if push.get(key) not in (None, "")}
+    if isinstance(push.get("enabled"), bool):
+        changes["enabled"] = push["enabled"]
     error = None
     try:
         update_settings(changes)
@@ -397,9 +411,8 @@ def report() -> dict:
     config = read_config()
     return {
         **{key: config[key] for key in SERVER_EDITABLE_FIELDS},
+        "enabled": config["local_enabled"],
         "local_enabled": config["local_enabled"],
-        "srt_latency_ms": config["srt_latency_ms"],
-        "rist_buffer_ms": config["rist_buffer_ms"],
         "rist_supported": rist_supported(),
         "rist_port": RIST_PORT,
         "srt_port": SRT_PORT,
