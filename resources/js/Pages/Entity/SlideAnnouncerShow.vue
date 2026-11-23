@@ -65,8 +65,25 @@ const jsonValid = computed(() => {
 
 const pinValid = computed(() => /^\d{4,6}$/.test(form.settings_pin) || form.settings_pin === '');
 
+// Same rule as the server and the device (10-79 printable ASCII characters,
+// no spaces). Blank is left to the server (optional except where a mode
+// needs one). Only the field shown for the current mode is checked.
+function passphraseProblem(value) {
+    if (!value) return null;
+    if (value.length < 10 || value.length > 79) return t('slide_announcers.passphrase_length', { count: value.length });
+    if (/\s/.test(value)) return t('slide_announcers.passphrase_space');
+    if (!/^[\x21-\x7E]+$/.test(value)) return t('slide_announcers.passphrase_chars');
+    return null;
+}
+const passphraseError = computed(() => {
+    if (isMulticast.value) return passphraseProblem(form.rx_multicast_passphrase);
+    if (isCaller.value) return passphraseProblem(form.rx_sender_passphrase);
+    return passphraseProblem(form.rx_passphrase);
+});
+
 function submit() {
     settingsError.value = '';
+    if (passphraseError.value) return;
     let settings;
     try {
         settings = JSON.parse(form.settings_text || '{}');
@@ -340,6 +357,7 @@ function copyConnectUrl() {
                                 class="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50">{{ $t('slide_announcers.generate') }}</button>
                         </div>
                         <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.passphrase_help') }}</p>
+                        <p v-if="passphraseError" class="mt-1 text-xs text-red-600">{{ passphraseError }}</p>
                         <p v-if="form.errors['srt_sink_config.passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.passphrase'] }}</p>
                     </div>
 
@@ -361,6 +379,7 @@ function copyConnectUrl() {
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.passphrase') }}</label>
                             <input v-model="form.rx_sender_passphrase" type="text" autocomplete="off" spellcheck="false"
                                 :placeholder="$t('slide_announcers.passphrase_placeholder')" class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="passphraseError" class="mt-1 text-xs text-red-600">{{ passphraseError }}</p>
                             <p v-if="form.errors['srt_sink_config.sender_passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.sender_passphrase'] }}</p>
                         </div>
                     </div>
@@ -383,6 +402,7 @@ function copyConnectUrl() {
                             <label class="block text-sm font-medium text-gray-700 mb-1">{{ $t('slide_announcers.passphrase') }}</label>
                             <input v-model="form.rx_multicast_passphrase" type="text" autocomplete="off" spellcheck="false"
                                 :placeholder="$t('slide_announcers.passphrase_placeholder')" class="w-full font-mono rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                            <p v-if="passphraseError" class="mt-1 text-xs text-red-600">{{ passphraseError }}</p>
                             <p v-if="form.errors['srt_sink_config.multicast_passphrase']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.multicast_passphrase'] }}</p>
                         </div>
                         <p class="sm:col-span-2 text-xs text-amber-700">
@@ -438,7 +458,7 @@ function copyConnectUrl() {
                 </div>
 
                 <div class="flex items-center gap-3 pt-2">
-                    <button type="submit" :disabled="form.processing || !jsonValid || !pinValid"
+                    <button type="submit" :disabled="form.processing || !jsonValid || !pinValid || !!passphraseError"
                         class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
                         {{ form.processing ? $t('admin.saving') : $t('admin.save_changes') }}
                     </button>
