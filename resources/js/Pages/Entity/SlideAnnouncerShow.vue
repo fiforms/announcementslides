@@ -155,8 +155,12 @@ function generatePassphrase() {
 const connectUrl = computed(() => {
     const latencyMs = receiver.srt_latency_ms ?? 120;
     const bufferMs = receiver.rist_buffer_ms ?? 500;
-    // The sender is the listener in caller mode: nothing to configure it with.
-    if (isCaller.value) return null;
+    // Caller mode: this device dials out, so the sender listens ("@" = listen)
+    // on the port saved here, with the secret/encryption saved here.
+    if (isCaller.value) {
+        if (!form.rx_sender_passphrase || !form.rx_sender_port) return null;
+        return `rist://@0.0.0.0:${form.rx_sender_port}?secret=${encodeURIComponent(form.rx_sender_passphrase)}&aes-type=${form.rx_encryption_bits}&buffer=${bufferMs}`;
+    }
     if (form.rx_mode === 'srt') {
         if (!props.device.hostname || !form.rx_passphrase) return null;
         return `srt://${props.device.hostname}.local:${receiver.srt_port ?? 7002}?mode=caller&latency=${latencyMs * 1000}&passphrase=${encodeURIComponent(form.rx_passphrase)}`;
@@ -425,12 +429,13 @@ function copyConnectUrl() {
                     </div>
 
                     <div v-if="connectUrl" class="flex items-start gap-2">
-                        <span class="text-xs text-gray-500 whitespace-nowrap pt-1">{{ isMulticast ? $t('slide_announcers.sender_url') : $t('slide_announcers.connect_with') }}</span>
+                        <span class="text-xs text-gray-500 whitespace-nowrap pt-1">{{ isCaller ? $t('slide_announcers.caller_sender_url') : isMulticast ? $t('slide_announcers.sender_url') : $t('slide_announcers.connect_with') }}</span>
                         <code class="flex-1 min-w-0 break-all rounded bg-gray-100 px-2 py-1 text-xs font-mono text-gray-800">{{ connectUrl }}</code>
                         <button type="button" @click="copyConnectUrl" class="shrink-0 text-xs font-medium text-indigo-600 hover:text-indigo-800">
                             {{ $t('slide_announcers.copy') }}
                         </button>
                     </div>
+                    <p v-if="connectUrl && isCaller" class="-mt-2 text-xs text-gray-500">{{ $t('slide_announcers.caller_sender_hint', { host: form.rx_sender_host || '…' }) }}</p>
                     <img v-if="qrDataUrl" :src="qrDataUrl" :alt="$t('slide_announcers.qr_alt')" class="rounded border border-gray-200" width="180" height="180" />
                 </div>
 

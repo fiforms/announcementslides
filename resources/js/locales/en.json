@@ -785,6 +785,8 @@
         "passphrase_length": "Passphrase must be 10–79 characters (this one is {count}).",
         "passphrase_space": "Passphrase can't contain spaces.",
         "passphrase_chars": "Passphrase can only use letters, numbers and symbols (no accented or other special characters).",
+        "caller_sender_url": "Stream from the sending device to:",
+        "caller_sender_hint": "On the sending device ({host}), stream to this URL. It listens for this device to connect, so start the stream first and allow the port through that device's firewall.",
         "lan_title": "LAN Video Receiver",
         "lan_help": "Lets a video switcher or encoder on this church's network (OBS, vMix, etc.) send a live feed to this device over SRT or RIST. Off by default. This setting and the ones below stay in sync with the device's own Settings > Advanced.",
         "lan_allow": "Enable the LAN video receiver",
