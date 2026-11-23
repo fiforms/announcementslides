@@ -43,11 +43,23 @@ extra outputs that run alongside OBS's normal Stream and Record buttons.
 
 ![The OBS multiple-output target window with the SRT/RIST protocol, a RIST URL, and video and audio encoder settings](media:obs-multi-output-settings.png)
 
-The settings in this screenshot are known to work: the x264 encoder with CBR
-rate control at 10000 kbps, 30 FPS, the *veryfast* preset, the *baseline*
-profile, no B-frames, and AAC audio at 128 kbps. The password in the URL is an
-example; use your own passphrase (see below), and match the sender URL the
-device's page shows for the mode you chose.
+This screenshot uses **RIST Unicast Caller** mode: OBS waits for connections
+(`rist://@0.0.0.0:5000`) and each device connects out to it. The **Sender URL**
+on the device's page shows the address the devices should call. The settings
+shown are known to work: the x264 encoder with CBR rate control at 10000 kbps,
+30 FPS, the *veryfast* preset, the *baseline* profile, no B-frames, and AAC
+audio at 128 kbps. The password in the URL is an example; use your own
+passphrase (see below), and use the same one on the sender and every device.
+
+**Why Caller mode is usually the best fit for OBS:**
+
+- One OBS output serves **any number of Slide Announcers** with no change to OBS
+  when you add, replace or reset a device.
+- It doesn't depend on each Slide Announcer keeping the same IP address or
+  being reachable by name on your network.
+- It needs one thing in return: the computer running OBS must keep a **stable
+  address**, either a static (or reserved) IP address or a hostname that always
+  resolves to it. If that address changes, update the Sender URL on the devices.
 
 ## Choose a mode
 
