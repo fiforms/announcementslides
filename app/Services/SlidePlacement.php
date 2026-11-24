@@ -43,13 +43,6 @@ class SlidePlacement
         if ($entityId !== null) {
             $entity = Entity::findOrFail($entityId);
 
-            // Shared with nearby churches at upload: tell their managers.
-            foreach ($slides as $slide) {
-                if ($slide->share_nearby) {
-                    AnnounceSlideAvailability::dispatch($slide->id);
-                }
-            }
-
             $show = match ($addToShow) {
                 'main' => $entity->mainShow(),
                 'separate' => $request->show_id
@@ -70,6 +63,15 @@ class SlidePlacement
                     $show->slides()->syncWithoutDetaching([
                         $slide->id => ['sort_order' => min($nextOrder + $i, $end), 'auto_added' => false],
                     ]);
+                }
+            }
+
+            // Shared with nearby churches at upload: fan it out to their
+            // auto_fill_nearby shows exactly like the "Share nearby" button
+            // does, then tell their managers (the job does both, queued).
+            foreach ($slides as $slide) {
+                if ($slide->share_nearby) {
+                    SyncShowAutoFillForSlide::dispatch($slide->id);
                 }
             }
 

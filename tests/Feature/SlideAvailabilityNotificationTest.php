@@ -11,6 +11,8 @@ use App\Models\Notification;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Models\User;
+use App\Services\SlidePlacement;
+use Illuminate\Http\Request;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -135,6 +137,24 @@ class SlideAvailabilityNotificationTest extends TestCase
         $this->assertSame(0, Notification::forUser($farLeader)->count());
         $this->assertSame(0, Notification::forUser($homeLeader)->count());
         $this->assertSame('admin_slide_shared', $this->only($admin)->type);
+    }
+
+    public function test_slide_shared_nearby_at_upload_is_added_to_nearby_shows(): void
+    {
+        [$home, $homeLeader, $homeMain] = $this->church('Home Church', 'admin', ['latitude' => 35.0, 'longitude' => -80.0]);
+        [, $nearLeader, $nearMain] = $this->church('Near Church', 'admin', ['latitude' => 35.1, 'longitude' => -80.1]);
+
+        $slide = Slide::create(['title' => 'Potluck', 'status' => 'published', 'entity_id' => $home->id,
+            'share_nearby' => true, 'uploaded_by' => $homeLeader->id]);
+        $request = Request::create('/', 'POST', ['add_to_show' => 'main']);
+        $request->setUserResolver(fn () => $homeLeader);
+        app(SlidePlacement::class)->route($request, [$slide], $home->id);
+
+        // Same result as pressing "Share nearby" afterwards: in the neighbour's
+        // auto-fill show, and a manual (not auto-added) link in the home show.
+        $this->assertTrue((bool) $nearMain->slides()->where('slides.id', $slide->id)->first()?->pivot->auto_added);
+        $this->assertFalse((bool) $homeMain->slides()->where('slides.id', $slide->id)->first()?->pivot->auto_added);
+        $this->assertSame(['Main Show'], $this->only($nearLeader)->data['params']['placements'][0]['shows']);
     }
 
     public function test_a_churchs_own_unshared_slide_is_not_announced(): void
