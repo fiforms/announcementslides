@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Notifications\TeamNotifications;
 use App\Models\Entity;
 use App\Models\EntityInvitation;
 use App\Models\User;
@@ -75,6 +76,8 @@ class EntityPeopleController extends Controller
         ]);
         $user->entities()->updateExistingPivot($entity->id, ['role' => 'editor', 'granted_by' => $request->user()->id]);
         $user->forgetEntityRoles();
+
+        TeamNotifications::editorJoined($user, $entity, $request->user()->id, tellEditor: true);
 
         return back()->with('success', "{$user->name} is now an editor.");
     }

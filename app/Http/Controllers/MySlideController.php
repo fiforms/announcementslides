@@ -8,6 +8,7 @@ use App\Models\GlobalShowTemplate;
 use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Notifications\SlideNotifications;
 use App\Models\SlideMedia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
@@ -103,6 +104,10 @@ class MySlideController extends Controller
         // leader's manual keep.
         if ($statusChanged) {
             SyncShowAutoFillForSlide::dispatch($slide->id);
+
+            if ($slide->status === 'pending') {
+                SlideNotifications::submitted([$slide]);
+            }
         }
 
         return redirect()->route('my-slides.index')->with('success', 'Slide updated.');

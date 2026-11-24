@@ -1,5 +1,6 @@
 <script setup>
 import { entityQuery } from '@/Composables/useEntitySelection.js';
+import NotificationBell from '@/Components/NotificationBell.vue';
 import { Link } from '@inertiajs/vue3';
 
 defineProps({
@@ -29,7 +30,7 @@ function getInitials(name) {
             >
                 {{ getInitials(user.name) }}
             </div>
-            <div class="min-w-0">
+            <div class="min-w-0 flex-1">
                 <div class="text-sm font-medium text-white truncate">
                     {{ user.name }}
                 </div>
@@ -37,6 +38,7 @@ function getInitials(name) {
                     {{ user.email }}
                 </div>
             </div>
+            <NotificationBell tone="dark" />
         </div>
 
         <!-- Profile Link -->

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Auth;
 
+use App\Notifications\TeamNotifications;
 use App\Http\Controllers\Controller;
 use App\Models\EntityInvitation;
 use App\Models\User;
@@ -44,6 +45,10 @@ class GoogleController extends Controller
                 ]);
 
                 $invitation?->delete();
+
+                if ($invitation) {
+                    TeamNotifications::userInvitationAccepted($user, $invitation->created_by);
+                }
             }
         }
 

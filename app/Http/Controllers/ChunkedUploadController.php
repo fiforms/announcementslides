@@ -9,6 +9,7 @@ use App\Models\Entity;
 use App\Models\GlobalShowTemplate;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Notifications\SlideNotifications;
 use App\Services\ImageValidationService;
 use App\Services\SlidePlacement;
 use App\Support\ImageResize;
@@ -377,6 +378,10 @@ class ChunkedUploadController extends Controller
         }
 
         app(SlidePlacement::class)->route($request, $slides, $entityId);
+
+        if ($status === 'pending') {
+            SlideNotifications::submitted($slides);
+        }
 
         return response()->json(['success' => true, 'count' => count($slides), 'status' => $status]);
     }

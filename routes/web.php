@@ -21,6 +21,7 @@ use App\Http\Controllers\EntitySlideAnnouncerController;
 use App\Http\Controllers\EntitySlideController;
 use App\Http\Controllers\LocalSlideController;
 use App\Http\Controllers\MySlideController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlayController;
 use App\Http\Controllers\PlayLinkController;
 use App\Http\Controllers\ProfileController;
@@ -90,6 +91,17 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::patch('/profile/settings', [ProfileController::class, 'updateSettings'])->name('profile.settings.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::patch('/profile/notifications', [ProfileController::class, 'updateNotifications'])->name('profile.notifications.update');
+
+    // ── Notifications: inbox, archive, bell ──────────────────────────────────
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('/notifications/archive-all', [NotificationController::class, 'archiveAll'])->name('notifications.archive-all');
+    Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+    Route::post('/notifications/{notification}/archive', [NotificationController::class, 'archive'])->name('notifications.archive');
+    Route::post('/notifications/{notification}/restore', [NotificationController::class, 'restore'])->name('notifications.restore');
 
     Route::get('/entities/search', [EntityController::class, 'search'])->name('entities.search');
     Route::post('/entities/{entity}/subscribe', [EntityController::class, 'subscribe'])->name('entities.subscribe');

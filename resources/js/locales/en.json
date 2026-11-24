@@ -28,7 +28,8 @@
         "team": "Team",
         "shows": "Shows",
         "directory_import": "Directory Import",
-        "help": "Help"
+        "help": "Help",
+        "notifications": "Notifications"
     },
     "auth": {
         "email": "Email",
@@ -1152,6 +1153,94 @@
         "language_name": {
             "en": "English",
             "es": "Español"
+        }
+    },
+    "notifications": {
+        "title": "Notifications",
+        "inbox": "Inbox",
+        "archive": "Archive",
+        "archive_hint": "Cleared notifications are kept here for a while, then deleted automatically.",
+        "preferences": "Notification settings",
+        "preferences_description": "Choose what shows up in your notification inbox and what is also emailed to you. The daily digest collects a day's notifications into one email.",
+        "category": "Category",
+        "in_app": "Inbox",
+        "email": "Email",
+        "email_none": "No email",
+        "email_daily": "Daily digest",
+        "email_immediate": "Right away",
+        "mark_read": "Mark read",
+        "mark_all_read": "Mark all read",
+        "clear": "Clear",
+        "clear_all": "Clear all",
+        "clear_category": "Clear these",
+        "clear_all_confirm": "Move these notifications to the archive?",
+        "restore": "Restore",
+        "view_all": "View all notifications",
+        "all_categories": "All",
+        "empty_inbox": "You're all caught up.",
+        "empty_archive": "Nothing in the archive.",
+        "newer": "Newer",
+        "older": "Older",
+        "just_now": "just now",
+        "minutes_ago": "{n} min ago",
+        "hours_ago": "{n} h ago",
+        "days_ago": "{n} d ago",
+        "added_to": "added to {shows}",
+        "not_added": "not added to any show",
+        "categories": {
+            "slide_review": {
+                "label": "My submissions",
+                "description": "When a slide you submitted is approved or rejected."
+            },
+            "global_slide": {
+                "label": "New global slides",
+                "description": "A new conference-wide slide is available, and whether it was added to your shows."
+            },
+            "nearby_slide": {
+                "label": "Nearby slides",
+                "description": "A nearby church shared a slide, and whether it was added to your shows."
+            },
+            "promo": {
+                "label": "Promo shows",
+                "description": "A new promo show or video is available."
+            },
+            "team": {
+                "label": "Team",
+                "description": "Someone accepted your invitation or joined a team you lead."
+            },
+            "slide_schedule": {
+                "label": "Slide schedule",
+                "description": "A slide you manage started showing or expired."
+            },
+            "admin_review_queue": {
+                "label": "Review queue (admin)",
+                "description": "A slide was submitted for review."
+            },
+            "admin_shared": {
+                "label": "Shared slides (admin)",
+                "description": "A church shared a slide with nearby churches, or a contributor published a global slide."
+            }
+        },
+        "types": {
+            "unknown": "You have a new notification.",
+            "slide_approved": "Your slide “{slide}” was approved and published.",
+            "slide_rejected": "Your slide “{slide}” was not approved.",
+            "slide_pending": "{user} submitted “{slide}” for review.",
+            "slide_pending_many": "{user} submitted {count} slides for review, starting with “{slide}”.",
+            "editor_joined": "{user} is now an editor of {entity}.",
+            "editor_joined_by": "{user} is now an editor of {entity} (invited by {by}).",
+            "editor_joined_by_you": "{user} accepted your invitation and is now an editor of {entity}.",
+            "added_as_editor": "You were added as an editor of {entity}.",
+            "added_as_editor_by": "{by} added you as an editor of {entity}.",
+            "user_joined": "{user} ({email}) accepted your invitation and joined.",
+            "global_slide": "New global slide: “{slide}”.",
+            "nearby_slide": "{entity} shared a slide: “{slide}”.",
+            "promo_available": "New promo show: “{promo}”.",
+            "promo_slide_added": "New in promo show “{promo}”: “{slide}”.",
+            "slide_started": "“{slide}” has started showing.",
+            "slide_expired": "“{slide}” has expired.",
+            "admin_slide_shared": "{entity} shared “{slide}” with nearby churches.",
+            "admin_global_published": "{user} published the global slide “{slide}”."
         }
     }
 }

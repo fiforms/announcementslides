@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\ProfileUpdateRequest;
+use App\Support\NotificationPreferences;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -26,6 +27,7 @@ class ProfileController extends Controller
             'authMethod' => $user->google_id ? 'google' : 'password',
             'nearbyRadiusMiles' => (int) $user->setting('nearby_radius_miles', config('slides.nearby_radius_miles')),
             'slideDelaySeconds' => $user->slideDelaySeconds(),
+            'notificationPreferences' => NotificationPreferences::forUser($user),
             'subscriptions' => $user->entities()
                 ->orderBy('name')
                 ->get(['entities.id', 'entities.name', 'entities.city', 'entities.state', 'entities.entity_type', 'entities.allow_subscription'])
@@ -70,6 +72,27 @@ class ProfileController extends Controller
         foreach ($validated as $tag => $value) {
             $request->user()->putSetting($tag, $value);
         }
+
+        return Redirect::route('profile.edit');
+    }
+
+    /**
+     * Save the user's notification choices (in-app on/off and email mode per category).
+     */
+    public function updateNotifications(Request $request): RedirectResponse
+    {
+        $eligible = array_keys(NotificationPreferences::forUser($request->user()));
+
+        $validated = $request->validate([
+            'preferences'           => ['required', 'array'],
+            'preferences.*.inbox'   => ['required', 'boolean'],
+            'preferences.*.email'   => ['required', 'in:'.implode(',', config('notifications.email_modes'))],
+        ]);
+
+        NotificationPreferences::save(
+            $request->user(),
+            array_intersect_key($validated['preferences'], array_flip($eligible)),
+        );
 
         return Redirect::route('profile.edit');
     }

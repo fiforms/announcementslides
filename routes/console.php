@@ -33,3 +33,7 @@ if (config('backup.schedule') !== 'off' && in_array($backupDriver, ['mysql', 'ma
         ? $backup->weeklyOn(0, config('backup.time'))
         : $backup->dailyAt(config('backup.time'));
 }
+
+// Deletes cleared notifications past the retention period and archives stale
+// inbox items (Admin → Notifications).
+Schedule::command('notifications:prune')->dailyAt('03:30')->withoutOverlapping();

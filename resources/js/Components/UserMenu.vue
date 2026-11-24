@@ -2,6 +2,7 @@
 import { entityQuery } from '@/Composables/useEntitySelection.js';
 import Dropdown from '@/Components/Dropdown.vue';
 import DropdownLink from '@/Components/DropdownLink.vue';
+import NotificationBell from '@/Components/NotificationBell.vue';
 
 defineProps({
     user: {
@@ -21,7 +22,8 @@ function getInitials(name) {
 </script>
 
 <template>
-    <div class="relative ms-3">
+    <div class="relative ms-3 flex items-center gap-2">
+        <NotificationBell />
         <Dropdown align="right" width="48">
             <template #trigger>
                 <button

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Notifications\TeamNotifications;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -37,6 +38,10 @@ class EntityInvitation extends Model
 
         if ($pending->isNotEmpty()) {
             $user->forgetEntityRoles();
+        }
+
+        foreach ($pending as $inv) {
+            TeamNotifications::editorJoined($user, $inv->entity_id, $inv->invited_by);
         }
     }
 }

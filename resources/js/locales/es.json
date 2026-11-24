@@ -28,7 +28,8 @@
         "team": "Equipo",
         "shows": "Presentaciones",
         "directory_import": "Importar directorio",
-        "help": "Ayuda"
+        "help": "Ayuda",
+        "notifications": "Notificaciones"
     },
     "auth": {
         "email": "Correo electrónico",
@@ -1152,6 +1153,94 @@
         "language_name": {
             "en": "English",
             "es": "Español"
+        }
+    },
+    "notifications": {
+        "title": "Notificaciones",
+        "inbox": "Bandeja",
+        "archive": "Archivo",
+        "archive_hint": "Las notificaciones borradas se guardan aquí por un tiempo y luego se eliminan automáticamente.",
+        "preferences": "Configuración de notificaciones",
+        "preferences_description": "Elija qué aparece en su bandeja de notificaciones y qué también se le envía por correo. El resumen diario reúne las notificaciones del día en un solo correo.",
+        "category": "Categoría",
+        "in_app": "Bandeja",
+        "email": "Correo",
+        "email_none": "Sin correo",
+        "email_daily": "Resumen diario",
+        "email_immediate": "De inmediato",
+        "mark_read": "Marcar leída",
+        "mark_all_read": "Marcar todas leídas",
+        "clear": "Borrar",
+        "clear_all": "Borrar todas",
+        "clear_category": "Borrar estas",
+        "clear_all_confirm": "¿Mover estas notificaciones al archivo?",
+        "restore": "Restaurar",
+        "view_all": "Ver todas las notificaciones",
+        "all_categories": "Todas",
+        "empty_inbox": "Está al día.",
+        "empty_archive": "No hay nada en el archivo.",
+        "newer": "Más recientes",
+        "older": "Más antiguas",
+        "just_now": "ahora",
+        "minutes_ago": "hace {n} min",
+        "hours_ago": "hace {n} h",
+        "days_ago": "hace {n} d",
+        "added_to": "agregada a {shows}",
+        "not_added": "no se agregó a ninguna presentación",
+        "categories": {
+            "slide_review": {
+                "label": "Mis envíos",
+                "description": "Cuando una diapositiva que envió es aprobada o rechazada."
+            },
+            "global_slide": {
+                "label": "Nuevas diapositivas globales",
+                "description": "Hay una nueva diapositiva para toda la asociación y si se agregó a sus presentaciones."
+            },
+            "nearby_slide": {
+                "label": "Diapositivas cercanas",
+                "description": "Una iglesia cercana compartió una diapositiva y si se agregó a sus presentaciones."
+            },
+            "promo": {
+                "label": "Presentaciones promocionales",
+                "description": "Hay una nueva presentación o video promocional."
+            },
+            "team": {
+                "label": "Equipo",
+                "description": "Alguien aceptó su invitación o se unió a un equipo que usted dirige."
+            },
+            "slide_schedule": {
+                "label": "Horario de diapositivas",
+                "description": "Una diapositiva que administra comenzó a mostrarse o venció."
+            },
+            "admin_review_queue": {
+                "label": "Cola de revisión (admin)",
+                "description": "Se envió una diapositiva para revisión."
+            },
+            "admin_shared": {
+                "label": "Diapositivas compartidas (admin)",
+                "description": "Una iglesia compartió una diapositiva con iglesias cercanas, o un colaborador publicó una diapositiva global."
+            }
+        },
+        "types": {
+            "unknown": "Tiene una nueva notificación.",
+            "slide_approved": "Su diapositiva «{slide}» fue aprobada y publicada.",
+            "slide_rejected": "Su diapositiva «{slide}» no fue aprobada.",
+            "slide_pending": "{user} envió «{slide}» para revisión.",
+            "slide_pending_many": "{user} envió {count} diapositivas para revisión, empezando por «{slide}».",
+            "editor_joined": "{user} ahora es editor de {entity}.",
+            "editor_joined_by": "{user} ahora es editor de {entity} (invitado por {by}).",
+            "editor_joined_by_you": "{user} aceptó su invitación y ahora es editor de {entity}.",
+            "added_as_editor": "Lo agregaron como editor de {entity}.",
+            "added_as_editor_by": "{by} lo agregó como editor de {entity}.",
+            "user_joined": "{user} ({email}) aceptó su invitación y se unió.",
+            "global_slide": "Nueva diapositiva global: «{slide}».",
+            "nearby_slide": "{entity} compartió una diapositiva: «{slide}».",
+            "promo_available": "Nueva presentación promocional: «{promo}».",
+            "promo_slide_added": "Nuevo en la presentación promocional «{promo}»: «{slide}».",
+            "slide_started": "«{slide}» comenzó a mostrarse.",
+            "slide_expired": "«{slide}» venció.",
+            "admin_slide_shared": "{entity} compartió «{slide}» con iglesias cercanas.",
+            "admin_global_published": "{user} publicó la diapositiva global «{slide}»."
         }
     }
 }

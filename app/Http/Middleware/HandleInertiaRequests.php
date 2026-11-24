@@ -51,6 +51,8 @@ class HandleInertiaRequests extends Middleware
             // Overlay widgets' api.location (see WidgetLocation) — only
             // looked up when any widget is installed.
             'widgetLocation' => fn () => Widget::enabledBySlug() ? WidgetLocation::forRequest($request) : null,
+            // The bell's badge: unread notifications still in the inbox.
+            'unreadNotifications' => fn () => $request->user()?->unreadNotificationCount() ?? 0,
             'slideDelaySeconds' => $request->user()?->slideDelaySeconds() ?? (int) config('slides.slide_delay_seconds'),
             'flash' => [
                 'success' => session('success'),
