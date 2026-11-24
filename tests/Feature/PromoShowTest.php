@@ -85,7 +85,7 @@ class PromoShowTest extends TestCase
 
         $this->actingAs($admin)->get(route('admin.promo-shows.index'))
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/PromoShows')
+                ->component('Admin/PromoShows/Index')
                 ->where('promos.0.sites_count', 2)
                 ->where('promos.0.slides.0.id', $slide->id)
                 ->where('promos.0.slides.0.is_current', true));
@@ -111,5 +111,21 @@ class PromoShowTest extends TestCase
         $this->actingAs(User::factory()->create())->get(route('admin.promo-shows.index'))->assertForbidden();
         $this->actingAs(User::factory()->create())->delete(route('admin.promo-shows.destroy', $template))->assertForbidden();
         $this->assertNotNull($template->fresh());
+    }
+
+    public function test_admin_gets_the_uploader_fixed_to_one_promo(): void
+    {
+        [$template] = $this->promo();
+        $admin = User::factory()->create(['role' => 'admin']);
+
+        $this->actingAs($admin)->get(route('admin.promo-shows.upload', $template))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Admin/PromoShows/Upload')
+                ->where('promo.id', $template->id)
+                ->where('promo.name', 'Camp Meeting')
+                ->has('languages'));
+
+        $this->actingAs(User::factory()->create())->get(route('admin.promo-shows.upload', $template))->assertForbidden();
     }
 }

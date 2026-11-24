@@ -80,8 +80,7 @@ function slideState(slide) {
         </template>
 
         <p class="mb-6 max-w-3xl text-sm text-gray-500">
-            One-off shows distributed to every site (e.g. a special promo video). Create one — or add slides to an
-            existing one — from
+            One-off shows distributed to every site (e.g. a special promo video). Add slides to one with its <em>Upload content</em> button, or create a new one from
             <Link :href="route('admin.slides.index')" class="text-indigo-600 hover:underline">Slides</Link>
             by choosing <em>Distribute as a separate one-off show</em> when uploading. A promo is removed from every
             site automatically once none of its slides are live.
@@ -117,6 +116,10 @@ function slideState(slide) {
                                 <option value="menu">Menu (pick one)</option>
                             </select>
                         </label>
+                        <Link :href="route('admin.promo-shows.upload', promo.id)"
+                            class="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 transition-colors">
+                            Upload content
+                        </Link>
                         <a :href="promo.public_url" target="_blank" rel="noopener"
                             class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                             View

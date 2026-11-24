@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\GlobalShowTemplate;
+use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
@@ -54,7 +55,19 @@ class PromoShowController extends Controller
                 ];
             });
 
-        return Inertia::render('Admin/PromoShows', compact('promos'));
+        return Inertia::render('Admin/PromoShows/Index', compact('promos'));
+    }
+
+    /**
+     * The regular admin slide uploader, fixed to adding to this one promo
+     * (new slides land in it at every site). Saving returns to Promo Shows.
+     */
+    public function upload(GlobalShowTemplate $promo): Response
+    {
+        return Inertia::render('Admin/PromoShows/Upload', [
+            'promo' => $promo->only('id', 'name'),
+            'languages' => Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']),
+        ]);
     }
 
     /**
