@@ -171,7 +171,9 @@ function resetStages() {
 }
 
 // Menu shows: play the picked slide alone; the grid hides underneath.
+let pickedSlideId = null;
 function playFromMenu(index) {
+    pickedSlideId = slidesList.value[index]?.id ?? null;
     inMenu.value = false;
     currentIndex.value = index;
     goToIndex(index);
@@ -180,7 +182,9 @@ function playFromMenu(index) {
 // Back from a picked slide: drop its stage and show the grid again, focused
 // on what was just watched.
 function backToMenu() {
-    const keep = currentIndex.value;
+    // By id: a refresh may have reordered the list while the slide played.
+    const found = slidesList.value.findIndex(s => s.id === pickedSlideId);
+    const keep = found >= 0 ? found : currentIndex.value;
     clearAdvanceTimer();
     leaveTimers.forEach(clearTimeout);
     leaveTimers.clear();
@@ -207,7 +211,8 @@ watch(slidesList, (list) => {
     if (!props.show) return;
     if (list.length && currentIndex.value >= list.length) currentIndex.value = 0;
     if (!activeStage.value) {
-        resetStages();
+        // A picked menu slide still loading isn't a reason to throw the pick away.
+        if (!(props.menu && !inMenu.value)) resetStages();
         return;
     }
     const incoming = incomingStage();

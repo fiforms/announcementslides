@@ -181,6 +181,9 @@ async def _sync_thumbnail(client: httpx.AsyncClient, slide: dict, entry: dict, p
     except httpx.HTTPError:
         if cached:
             entry["thumb_local_filename"] = cached
+            # Keep the URL the cached still came from, so the next cycle sees a
+            # mismatch and retries rather than trusting a stale file.
+            entry["thumbnail_url"] = previous.get("thumbnail_url")
 
 
 async def _sync_frame_file(client: httpx.AsyncClient, url, previous: dict, key: str, filename: str):

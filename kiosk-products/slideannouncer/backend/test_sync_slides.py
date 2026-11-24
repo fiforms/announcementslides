@@ -159,3 +159,36 @@ def test_a_show_without_a_play_mode_plays_as_a_sequence(monkeypatch):
     show = {"id": "3", "name": "Main", "is_main": True, "slides": [], "frame": None}
 
     assert run_show_cycle(monkeypatch, show)["play_mode"] == "sequence"
+
+
+def test_a_failed_still_download_is_retried_not_mistaken_for_cached(monkeypatch, isolated):
+    old = slide(1, title="Week 1", file_url=f"{SERVER}/storage/slides/a.mp4", mime_type="video/mp4", thumbnail_url=f"{SERVER}/storage/thumbs/old.jpg")
+    show = {"id": "8", "name": "Series", "is_main": False, "play_mode": "menu", "slides": [old], "frame": None}
+    run_show_cycle(monkeypatch, show)
+
+    new = {**old, "thumbnail_url": f"{SERVER}/storage/thumbs/new.jpg"}
+
+    def failing(request):
+        if request.url.path.endswith("/shows"):
+            return httpx.Response(200, json={"shows": [{**show, "slides": [new]}], "widgets": [], "location": None, "settings": {}})
+        if "thumbs/" in request.url.path:
+            return httpx.Response(503)
+        return httpx.Response(200, content=b"x")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: REAL_ASYNC_CLIENT(transport=httpx.MockTransport(failing), **kw))
+    asyncio.run(sync.sync_once())
+    asyncio.run(sync.sync_once())  # still failing: must keep trying, not settle on the old still
+
+    attempts = []
+
+    def recovered(request):
+        if request.url.path.endswith("/shows"):
+            return httpx.Response(200, json={"shows": [{**show, "slides": [new]}], "widgets": [], "location": None, "settings": {}})
+        attempts.append(request.url.path)
+        return httpx.Response(200, content=b"new")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: REAL_ASYNC_CLIENT(transport=httpx.MockTransport(recovered), **kw))
+    asyncio.run(sync.sync_once())
+
+    assert any("thumbs/new.jpg" in p for p in attempts)
+    assert (isolated / "media" / "1-thumb.jpg").read_bytes() == b"new"

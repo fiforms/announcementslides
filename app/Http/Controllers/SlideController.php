@@ -139,6 +139,7 @@ class SlideController extends Controller
             'revelationLinkMediaBytes' => (int) config('slides.revelation_link_media_bytes'),
             'promoToken' => $promo?->token,
             'playMode' => $promo?->play_mode ?? $selectedShow?->play_mode ?? 'sequence',
+            'playTitle' => $promo?->name ?? $selectedShow?->name,
             'frame' => $frame,
             'availableShows' => $availableShows,
             'initialSlide' => $initialSlide,

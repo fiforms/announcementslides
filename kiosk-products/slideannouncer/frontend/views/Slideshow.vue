@@ -259,7 +259,9 @@ function resetStages() {
 }
 
 // Menu shows: play the slide picked from the grid, alone.
+let pickedSlideId = null
 function playFromMenu(index) {
+  pickedSlideId = playlist.value[index]?.id ?? null
   picked.value = true
   goToIndex(index)
 }
@@ -267,7 +269,9 @@ function playFromMenu(index) {
 // Back from a picked slide: drop it and show the grid again, highlighting
 // what was just watched.
 function backToMenu() {
-  const keep = currentIndex.value
+  // By id: a sync may have reordered the list while the slide played.
+  const found = playlist.value.findIndex((s) => s.id === pickedSlideId)
+  const keep = found >= 0 ? found : currentIndex.value
   clearPlayThroughFallback()
   leaveTimers.forEach(clearTimeout)
   leaveTimers.clear()
@@ -312,7 +316,8 @@ watch(playlistSignature, () => {
   }
   if (currentIndex.value >= list.length) currentIndex.value = 0
   if (!activeStage.value) {
-    resetStages()
+    // A picked menu slide still loading isn't a reason to throw the pick away.
+    if (!(isMenu.value && picked.value)) resetStages()
     return
   }
   const incoming = incomingStage()
