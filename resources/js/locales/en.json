@@ -27,7 +27,8 @@
         "play_links": "Shared Links",
         "team": "Team",
         "shows": "Shows",
-        "directory_import": "Directory Import"
+        "directory_import": "Directory Import",
+        "help": "Help"
     },
     "auth": {
         "email": "Email",
@@ -1140,5 +1141,17 @@
         "no_audio": "No audio yet.",
         "delete_audio_confirm": "Remove \"{title}\" from the library? Shows using it as background music lose it.",
         "used_by_shows": "Used by {n} show(s)"
+    },
+    "help": {
+        "title": "Help",
+        "empty": "There are no help topics yet.",
+        "all_topics": "All help topics",
+        "link_title": "Help for this page",
+        "not_translated": "This topic has not been translated into your language yet, so it is shown in English.",
+        "not_translated_short": "English only",
+        "language_name": {
+            "en": "English",
+            "es": "Español"
+        }
     }
 }

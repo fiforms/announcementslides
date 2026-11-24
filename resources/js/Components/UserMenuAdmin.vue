@@ -51,6 +51,12 @@ function getInitials(name) {
             {{ $t('nav.qr_code') }}
         </Link>
 
+        <!-- Help Link -->
+        <Link :href="route('help.index')"
+            class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-center">
+            {{ $t('nav.help') }}
+        </Link>
+
         <!-- About Link -->
         <Link :href="route('about', entityQuery())"
             class="block w-full rounded px-3 py-2 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-center">

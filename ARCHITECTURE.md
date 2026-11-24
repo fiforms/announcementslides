@@ -45,6 +45,16 @@ There are two independent permission layers:
 
 While the `users` table is empty the app offers `/setup` ([SetupController](app/Http/Controllers/SetupController.php), page `Pages/Setup/Index.vue`), which creates the first `admin` (email pre-verified, signed in on success) and optionally installs the bundled widgets listed in [config/setup.php](config/setup.php) through `WidgetInstaller`. The gate is [FirstRunSetup::needed()](app/Support/FirstRunSetup.php): [EnsureSetupIsOpen](app/Http/Middleware/EnsureSetupIsOpen.php) 404s both routes as soon as any user exists, and the controller re-checks under a cache lock so two simultaneous submissions cannot create two admins. [RedirectToSetup](app/Http/Middleware/RedirectToSetup.php) sends the home, login and register pages there while the install is empty (`SETUP_REDIRECT=false` disables it; the test suite does). `SETUP_TOKEN`, when set, must be entered on the form; empty means open, which suits a local test but not an exposed one. `auth.password_login` (`PASSWORD_LOGIN`) controls whether the email/password login form is shown at all (default: only in the `local` environment); `POST /login` works regardless. The Docker compose file sets both for a test-friendly default (see [docker/README.md](docker/README.md)).
 
+## In-app help
+
+Help is Markdown in [resources/help/](resources/help/), one folder per language (`resources/help/<locale>/<topic>.md`), rendered by [HelpLibrary](app/Support/Help/HelpLibrary.php) (league/commonmark; raw HTML stripped, unsafe links refused). Config is [config/help.php](config/help.php); authoring rules (front matter, `help:` topic links, `media:` images/videos/captions) are in [resources/help/README.md](resources/help/README.md).
+
+- **Localization:** the language is `?lang=` if given, else the browser's `Accept-Language` among `config('help.locales')`, else English. A topic missing in that language falls back to English per topic and is flagged `fallback` (the page shows a notice), so translations can land one file at a time. The language switcher appears once a second language has content. The server does not know the vue-i18n locale (it is detected in the browser), so help does its own negotiation. UI strings are in `help.*` / `nav.help` in the locale JSON files.
+- **Audience:** a topic's `audience` front matter (`everyone` | `users` | `managers` | `admin`) hides it from the index and 404s it for others. The pages themselves are public like About.
+- **Media:** `![alt](media:name.png)` resolves to the reader's language folder, then English, then shared `resources/help/media/`; `.mp4`/`.webm` render as a `<video>` (with a same-name `.vtt` as captions) and a full `https://` URL to a video does too. Files are served by `HelpController::media` (Range-capable) only for allowed extensions under a `media/` folder (no SVG). Keep large videos out of git and link them by URL.
+- **Linking from pages:** `<HelpLink topic="…" />` ([HelpLink.vue](resources/js/Components/HelpLink.vue)) renders a "?" to a topic.
+- **Adding a topic:** add `resources/help/en/<slug>.md`; the test `HelpTest::test_the_bundled_english_topics_are_well_formed` checks titles, missing media and broken `help:` links.
+
 ## Data model
 
 Models live in [app/Models/](app/Models/); schema in [database/migrations/](database/migrations/).
@@ -104,6 +114,7 @@ Each audience has its own controller and route group, keeping the scoping rules 
 | A church member's local slides | [LocalSlideController](app/Http/Controllers/LocalSlideController.php) | `/local-slides/*` (incl. reorder, archive, share-nearby) |
 | A church leader managing an entity's slides | [EntitySlideController](app/Http/Controllers/EntitySlideController.php) | `/entity/{entity}/slides/*` |
 | Entity leader's shared no-login playback links | [PlayLinkController](app/Http/Controllers/PlayLinkController.php) | `/play-links/*` |
+| In-app help | [HelpController](app/Http/Controllers/HelpController.php) + [HelpLibrary](app/Support/Help/HelpLibrary.php) | `/help`, `/help/{topic}`, `/help-media/{path}` |
 | Public playback via a shared link | [PlayController](app/Http/Controllers/PlayController.php) | `/play/{token}` (+ `/slides`, `/widget-data/…`) |
 | Entity subscriptions / search | [EntityController](app/Http/Controllers/EntityController.php) | `/entities/*` |
 | Admin slide review & publishing | [Admin/SlideController](app/Http/Controllers/Admin/SlideController.php) | `/admin/slides/*` (approve, reject, archive, reorder) |

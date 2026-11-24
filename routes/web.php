@@ -44,6 +44,13 @@ Route::middleware(\App\Http\Middleware\EnsureSetupIsOpen::class)->group(function
 // Public: what this software is, its licence and where the source lives.
 Route::get('/about', [\App\Http\Controllers\AboutController::class, 'show'])->name('about');
 
+// Public in-app help (Markdown in resources/help/<locale>/); topics can restrict their audience.
+Route::get('/help', [\App\Http\Controllers\HelpController::class, 'index'])->name('help.index');
+Route::get('/help/{topic}', [\App\Http\Controllers\HelpController::class, 'show'])
+    ->where('topic', '[a-z0-9-]+')->name('help.show');
+Route::get('/help-media/{path}', [\App\Http\Controllers\HelpController::class, 'media'])
+    ->where('path', '[A-Za-z0-9._/-]+')->name('help.media');
+
 Route::get('/', [SlideController::class, 'index'])->name('slides.index');
 Route::get('/archive', [SlideController::class, 'archive'])->name('slides.archive');
 Route::get('/slides/{slide:token}/download', [SlideController::class, 'download'])->name('slides.download');

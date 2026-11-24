@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { router } from '@inertiajs/vue3';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import HelpLink from '@/Components/HelpLink.vue';
 import DropZone from '@/Components/DropZone.vue';
 import ValidationWarnings from '@/Components/ValidationWarnings.vue';
 import ResizeOption from '@/Components/ResizeOption.vue';
@@ -108,8 +109,9 @@ async function submit() {
             </div>
 
             <div v-else class="space-y-5">
-                <div class="rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
-                    Your slide will be reviewed by an administrator before it becomes publicly visible.
+                <div class="flex items-center justify-between gap-3 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                    <span>Your slide will be reviewed by an administrator before it becomes publicly visible.</span>
+                    <HelpLink topic="submitting-a-slide" />
                 </div>
 
                 <form @submit.prevent="submit" class="rounded-xl border border-gray-200 bg-white p-6 shadow-sm space-y-5">

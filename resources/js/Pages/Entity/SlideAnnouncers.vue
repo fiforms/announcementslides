@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { router, Link } from '@inertiajs/vue3';
 import { useI18n } from 'vue-i18n';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue';
+import HelpLink from '@/Components/HelpLink.vue';
 
 const props = defineProps({
     entity: { type: Object, required: true },
@@ -56,7 +57,10 @@ function formatBytes(bytes) {
                 &larr; {{ $t('slide_announcers.back_to_slides') }}
             </Link>
             <div class="flex items-center justify-between">
-                <h1 class="text-xl font-semibold text-gray-900">{{ $t('slide_announcers.entity_title', { name: entity.name }) }}</h1>
+                <h1 class="flex items-center gap-2 text-xl font-semibold text-gray-900">
+                    {{ $t('slide_announcers.entity_title', { name: entity.name }) }}
+                    <HelpLink topic="pairing-a-device" />
+                </h1>
                 <button @click="generateCode" :disabled="generating"
                     class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50">
                     {{ $t('slide_announcers.generate_code') }}

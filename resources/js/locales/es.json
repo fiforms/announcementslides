@@ -27,7 +27,8 @@
         "play_links": "Enlaces compartidos",
         "team": "Equipo",
         "shows": "Presentaciones",
-        "directory_import": "Importar directorio"
+        "directory_import": "Importar directorio",
+        "help": "Ayuda"
     },
     "auth": {
         "email": "Correo electrónico",
@@ -1140,5 +1141,17 @@
         "no_audio": "Todavía no hay audio.",
         "delete_audio_confirm": "¿Quitar \"{title}\" de la biblioteca? Los programas que lo usan como música de fondo la perderán.",
         "used_by_shows": "Usado por {n} programa(s)"
+    },
+    "help": {
+        "title": "Ayuda",
+        "empty": "Todavía no hay temas de ayuda.",
+        "all_topics": "Todos los temas de ayuda",
+        "link_title": "Ayuda para esta página",
+        "not_translated": "Este tema aún no está traducido a su idioma, por eso se muestra en inglés.",
+        "not_translated_short": "Solo en inglés",
+        "language_name": {
+            "en": "English",
+            "es": "Español"
+        }
     }
 }

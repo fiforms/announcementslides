@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- In-app **Help** (`/help`): Markdown topics per language with English fallback, audience-restricted topics, screenshots and video, and `?` links from pages. See ARCHITECTURE.md → *In-app help*.
+
 ## 0.2.0 — 2026-11-11 (initial release)
 
 The first tagged release of AnnouncementSlides: a web app for distributing

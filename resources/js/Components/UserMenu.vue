@@ -53,6 +53,11 @@ function getInitials(name) {
                     {{ $t('nav.qr_code') }}
                 </DropdownLink>
                 <DropdownLink
+                    :href="route('help.index')"
+                >
+                    {{ $t('nav.help') }}
+                </DropdownLink>
+                <DropdownLink
                     :href="route('about', entityQuery())"
                 >
                     {{ $t('nav.about') }}
