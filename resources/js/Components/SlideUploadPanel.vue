@@ -13,11 +13,11 @@ import { useUploadResize } from '@/Composables/useUploadResize.js';
 
 // The admin slide upload form (files, details, "add to show"), shared by the
 // Slides page and the per-promo upload page. With `promo` set it only ever
-// adds to that one-off show (the show choice is fixed and not offered).
+// adds to that playlist (the show choice is fixed and not offered).
 const props = defineProps({
     languages: { type: Array, default: () => [] },
     globalShowTemplates: { type: Array, default: () => [] },
-    // { id, name } of the promo show to add to, or null for the full choice.
+    // { id, name } of the playlist to add to, or null for the full choice.
     promo: { type: Object, default: null },
 });
 
@@ -117,10 +117,10 @@ async function submitUpload() {
 
     if (!await upload(items, payload)) return;
 
-    // A one-off show was created or added to: its content is managed under
-    // Promo Shows, which is where the new slide actually appears.
+    // A playlist was created or added to: its content is managed under
+    // Playlists, which is where the new slide actually appears.
     const toPromos = payload.add_to_show === 'separate';
-    router.visit(route(toPromos ? 'admin.promo-shows.index' : 'admin.slides.index'), {
+    router.visit(route(toPromos ? 'admin.playlists.index' : 'admin.slides.index'), {
         onSuccess: () => {
             form.reset();
             selectedFiles.value  = [];
@@ -261,7 +261,7 @@ async function submitUpload() {
                 </div>
 
                 <div v-if="promo" class="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-800">
-                    Adding to the one-off show <strong>{{ promo.name }}</strong>. Every site gets a copy.
+                    Adding to the playlist <strong>{{ promo.name }}</strong>. Every site gets a copy.
                 </div>
                 <div v-else class="space-y-2">
                     <label class="block text-sm font-medium text-gray-700">Add to show</label>
@@ -273,7 +273,7 @@ async function submitUpload() {
                     <label class="flex items-center gap-2 text-sm text-gray-700">
                         <input v-model="addToShow" type="radio" value="separate"
                             class="border-gray-300 text-indigo-600 focus:ring-indigo-500" />
-                        Distribute as a separate one-off show (e.g. a special promo video)
+                        Add to a separate playlist
                     </label>
                     <div v-if="addToShow === 'separate'" class="ml-6 flex flex-wrap items-center gap-2">
                         <select v-model="targetShowId"

@@ -23,7 +23,7 @@ function saveRename(promo) {
         renamingId.value = null;
         return;
     }
-    router.patch(route('admin.promo-shows.update', promo.id), { name }, {
+    router.patch(route('admin.playlists.update', promo.id), { name }, {
         preserveScroll: true,
         onSuccess: () => { renamingId.value = null; },
     });
@@ -33,17 +33,17 @@ function saveRename(promo) {
 
 function detachSlide(promo, slide) {
     if (confirm(`Remove "${slide.title}" from "${promo.name}" at every site? The slide itself is kept.`)) {
-        router.delete(route('admin.promo-shows.slides.detach', [promo.id, slide.id]), { preserveScroll: true });
+        router.delete(route('admin.playlists.slides.detach', [promo.id, slide.id]), { preserveScroll: true });
     }
 }
 
 function setPlayMode(promo, play_mode) {
-    router.patch(route('admin.promo-shows.update', promo.id), { play_mode }, { preserveScroll: true });
+    router.patch(route('admin.playlists.update', promo.id), { play_mode }, { preserveScroll: true });
 }
 
 function destroy(promo) {
     if (confirm(`Delete "${promo.name}" from all ${promo.sites_count} site(s)? Its slides are kept.`)) {
-        router.delete(route('admin.promo-shows.destroy', promo.id), { preserveScroll: true });
+        router.delete(route('admin.playlists.destroy', promo.id), { preserveScroll: true });
     }
 }
 
@@ -76,13 +76,14 @@ function slideState(slide) {
 <template>
     <AdminLayout>
         <template #header>
-            <h1 class="text-xl font-semibold text-gray-900">Promo Shows</h1>
+            <h1 class="text-xl font-semibold text-gray-900">Playlists</h1>
         </template>
 
         <p class="mb-6 max-w-3xl text-sm text-gray-500">
-            One-off shows distributed to every site (e.g. a special promo video). Add slides to one with its <em>Upload content</em> button, or create a new one from
+            Playlists are separate shows distributed to every site (e.g. a special promo video, or a weekly series).
+            Add slides to one with its <em>Upload content</em> button, or create a new one from
             <Link :href="route('admin.slides.index')" class="text-indigo-600 hover:underline">Slides</Link>
-            by choosing <em>Distribute as a separate one-off show</em> when uploading. A promo is removed from every
+            by choosing <em>Add to a separate playlist</em> when uploading. A playlist is removed from every
             site automatically once none of its slides are live.
         </p>
 
@@ -116,7 +117,7 @@ function slideState(slide) {
                                 <option value="menu">Menu (pick one)</option>
                             </select>
                         </label>
-                        <Link :href="route('admin.promo-shows.upload', promo.id)"
+                        <Link :href="route('admin.playlists.upload', promo.id)"
                             class="rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-indigo-700 transition-colors">
                             Upload content
                         </Link>
@@ -162,7 +163,7 @@ function slideState(slide) {
                                 class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                 {{ copiedUrl === slide.public_url ? 'Copied!' : 'Copy link' }}
                             </button>
-                            <Link :href="route('admin.slides.edit', { slide: slide.id, from: 'promos' })"
+                            <Link :href="route('admin.slides.edit', { slide: slide.id, from: 'playlists' })"
                                 class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                 Edit
                             </Link>
@@ -178,7 +179,7 @@ function slideState(slide) {
         </div>
 
         <div v-else class="rounded-xl border-2 border-dashed border-gray-200 py-16 text-center">
-            <p class="text-gray-400">No promo shows yet.</p>
+            <p class="text-gray-400">No playlists yet.</p>
         </div>
     </AdminLayout>
 </template>

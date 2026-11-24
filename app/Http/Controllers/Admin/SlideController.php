@@ -178,7 +178,7 @@ class SlideController extends Controller
             SyncShowAutoFillForSlide::dispatch($slide->id);
         }
 
-        return redirect()->route($this->returnTarget($request) === 'promos' ? 'admin.promo-shows.index' : 'admin.slides.index')
+        return redirect()->route($this->returnTarget($request) === 'playlists' ? 'admin.playlists.index' : 'admin.slides.index')
             ->with('success', 'Slide updated.');
     }
 
@@ -189,7 +189,7 @@ class SlideController extends Controller
      */
     private function returnTarget(Request $request): ?string
     {
-        return $request->query('from') === 'promos' ? 'promos' : null;
+        return $request->query('from') === 'playlists' ? 'playlists' : null;
     }
 
     public function storeMedia(Request $request, Slide $slide)

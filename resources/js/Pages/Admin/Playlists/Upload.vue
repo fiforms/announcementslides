@@ -13,7 +13,7 @@ defineProps({
     <AdminLayout>
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('admin.promo-shows.index')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <Link :href="route('admin.playlists.index')" class="text-gray-400 hover:text-gray-600 transition-colors">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
@@ -23,6 +23,6 @@ defineProps({
         </template>
 
         <SlideUploadPanel :promo="promo" :languages="languages"
-            @cancel="router.visit(route('admin.promo-shows.index'))" />
+            @cancel="router.visit(route('admin.playlists.index'))" />
     </AdminLayout>
 </template>

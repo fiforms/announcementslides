@@ -83,23 +83,23 @@ class PromoShowTest extends TestCase
         $copies[1]->update(['name' => 'Our Local Name']);
         $admin = User::factory()->create(['role' => 'admin']);
 
-        $this->actingAs($admin)->get(route('admin.promo-shows.index'))
+        $this->actingAs($admin)->get(route('admin.playlists.index'))
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/PromoShows/Index')
+                ->component('Admin/Playlists/Index')
                 ->where('promos.0.sites_count', 2)
                 ->where('promos.0.slides.0.id', $slide->id)
                 ->where('promos.0.slides.0.is_current', true));
 
-        $this->actingAs($admin)->patch(route('admin.promo-shows.update', $template), ['name' => 'Camp Meeting 2026'])->assertRedirect();
+        $this->actingAs($admin)->patch(route('admin.playlists.update', $template), ['name' => 'Camp Meeting 2026'])->assertRedirect();
         $this->assertSame('Camp Meeting 2026', $template->fresh()->name);
         $this->assertSame('Camp Meeting 2026', $copies[0]->fresh()->name);
         $this->assertSame('Our Local Name', $copies[1]->fresh()->name);
 
-        $this->actingAs($admin)->delete(route('admin.promo-shows.slides.detach', [$template, $slide]))->assertRedirect();
+        $this->actingAs($admin)->delete(route('admin.playlists.slides.detach', [$template, $slide]))->assertRedirect();
         $this->assertSame(0, $copies[0]->slides()->count() + $copies[1]->slides()->count());
         $this->assertNotNull($slide->fresh());
 
-        $this->actingAs($admin)->delete(route('admin.promo-shows.destroy', $template))->assertRedirect();
+        $this->actingAs($admin)->delete(route('admin.playlists.destroy', $template))->assertRedirect();
         $this->assertNull($template->fresh());
         $this->assertSame(0, Show::withTrashed()->whereIn('id', $copies->pluck('id'))->count());
     }
@@ -108,8 +108,8 @@ class PromoShowTest extends TestCase
     {
         [$template] = $this->promo();
 
-        $this->actingAs(User::factory()->create())->get(route('admin.promo-shows.index'))->assertForbidden();
-        $this->actingAs(User::factory()->create())->delete(route('admin.promo-shows.destroy', $template))->assertForbidden();
+        $this->actingAs(User::factory()->create())->get(route('admin.playlists.index'))->assertForbidden();
+        $this->actingAs(User::factory()->create())->delete(route('admin.playlists.destroy', $template))->assertForbidden();
         $this->assertNotNull($template->fresh());
     }
 
@@ -118,14 +118,14 @@ class PromoShowTest extends TestCase
         [$template] = $this->promo();
         $admin = User::factory()->create(['role' => 'admin']);
 
-        $this->actingAs($admin)->get(route('admin.promo-shows.upload', $template))
+        $this->actingAs($admin)->get(route('admin.playlists.upload', $template))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('Admin/PromoShows/Upload')
+                ->component('Admin/Playlists/Upload')
                 ->where('promo.id', $template->id)
                 ->where('promo.name', 'Camp Meeting')
                 ->has('languages'));
 
-        $this->actingAs(User::factory()->create())->get(route('admin.promo-shows.upload', $template))->assertForbidden();
+        $this->actingAs(User::factory()->create())->get(route('admin.playlists.upload', $template))->assertForbidden();
     }
 }

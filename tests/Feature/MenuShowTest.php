@@ -66,17 +66,17 @@ class MenuShowTest extends TestCase
         $copies[1]->update(['play_mode' => 'menu']);
         $admin = User::factory()->create(['role' => 'admin']);
 
-        $this->actingAs($admin)->patch(route('admin.promo-shows.update', $template), ['play_mode' => 'menu'])->assertRedirect();
+        $this->actingAs($admin)->patch(route('admin.playlists.update', $template), ['play_mode' => 'menu'])->assertRedirect();
 
         $this->assertSame('menu', $template->fresh()->play_mode);
         $this->assertSame('menu', $copies[0]->fresh()->play_mode);
 
-        $this->actingAs($admin)->patch(route('admin.promo-shows.update', $template), ['play_mode' => 'sequence'])->assertRedirect();
+        $this->actingAs($admin)->patch(route('admin.playlists.update', $template), ['play_mode' => 'sequence'])->assertRedirect();
         $this->assertSame('sequence', $copies[0]->fresh()->play_mode);
         $this->assertSame('sequence', $copies[1]->fresh()->play_mode);
         $this->assertSame('Weekly Series', $template->fresh()->name, 'changing only the mode keeps the name');
 
-        $this->actingAs($admin)->get(route('admin.promo-shows.index'))
+        $this->actingAs($admin)->get(route('admin.playlists.index'))
             ->assertInertia(fn ($page) => $page->where('promos.0.play_mode', 'sequence'));
     }
 
@@ -104,13 +104,13 @@ class MenuShowTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $slide = Slide::create(['title' => 'Promo', 'status' => 'published', 'uploaded_by' => $admin->id]);
 
-        $this->actingAs($admin)->get(route('admin.slides.edit', ['slide' => $slide->id, 'from' => 'promos']))
-            ->assertInertia(fn ($page) => $page->where('from', 'promos'));
+        $this->actingAs($admin)->get(route('admin.slides.edit', ['slide' => $slide->id, 'from' => 'playlists']))
+            ->assertInertia(fn ($page) => $page->where('from', 'playlists'));
         $this->actingAs($admin)->get(route('admin.slides.edit', ['slide' => $slide->id, 'from' => 'https://evil.example']))
             ->assertInertia(fn ($page) => $page->where('from', null));
 
-        $this->actingAs($admin)->patch(route('admin.slides.update', ['slide' => $slide->id, 'from' => 'promos']), ['title' => 'Promo 2', 'status' => 'published'])
-            ->assertRedirect(route('admin.promo-shows.index'));
+        $this->actingAs($admin)->patch(route('admin.slides.update', ['slide' => $slide->id, 'from' => 'playlists']), ['title' => 'Promo 2', 'status' => 'published'])
+            ->assertRedirect(route('admin.playlists.index'));
         $this->actingAs($admin)->patch(route('admin.slides.update', ['slide' => $slide->id]), ['title' => 'Promo 3', 'status' => 'published'])
             ->assertRedirect(route('admin.slides.index'));
     }

@@ -15,11 +15,11 @@ use Inertia\Inertia;
 use Inertia\Response;
 
 /**
- * Admin oversight of globally-distributed one-off "promo" shows (see
+ * Admin oversight of globally-distributed one-off shows (shown to admins as "Playlists"; "promo" internally and in public ?promo= links) (see
  * GlobalShowTemplate): what each holds, how many sites carry a copy, a
  * public hot-link, and rename/play mode/remove/delete across every site's copy at once.
  * New promos (and new slides in one) are still created from the admin
- * upload form's "Distribute as a separate one-off show" option.
+ * upload form's "Add to a separate playlist" option.
  */
 class PromoShowController extends Controller
 {
@@ -55,16 +55,16 @@ class PromoShowController extends Controller
                 ];
             });
 
-        return Inertia::render('Admin/PromoShows/Index', compact('promos'));
+        return Inertia::render('Admin/Playlists/Index', compact('promos'));
     }
 
     /**
      * The regular admin slide uploader, fixed to adding to this one promo
-     * (new slides land in it at every site). Saving returns to Promo Shows.
+     * (new slides land in it at every site). Saving returns to Playlists.
      */
     public function upload(GlobalShowTemplate $promo): Response
     {
-        return Inertia::render('Admin/PromoShows/Upload', [
+        return Inertia::render('Admin/Playlists/Upload', [
             'promo' => $promo->only('id', 'name'),
             'languages' => Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']),
         ]);
@@ -92,7 +92,7 @@ class PromoShowController extends Controller
             $promo->update($data);
         });
 
-        return back()->with('success', 'Promo show updated.');
+        return back()->with('success', 'Playlist updated.');
     }
 
     /**
@@ -107,7 +107,7 @@ class PromoShowController extends Controller
             ->whereIn('show_id', $promo->shows()->select('id'))
             ->delete();
 
-        return back()->with('success', 'Slide removed from the promo show at every site.');
+        return back()->with('success', 'Slide removed from the playlist at every site.');
     }
 
     /**
@@ -125,6 +125,6 @@ class PromoShowController extends Controller
         // Copies cascade with the template (shows.global_template_id).
         $promo->delete();
 
-        return redirect()->route('admin.promo-shows.index')->with('success', 'Promo show deleted from every site.');
+        return redirect()->route('admin.playlists.index')->with('success', 'Playlist deleted from every site.');
     }
 }

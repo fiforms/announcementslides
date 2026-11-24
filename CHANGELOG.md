@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Promo Shows: an **Upload content** button per promo opens the slide uploader already aimed at that show, and uploading to a one-off show now returns to Promo Shows.
+- **Promo Shows are now called Playlists** (admin sidebar, above Library; `/admin/playlists`). A playlist's **Upload content** button opens the slide uploader already aimed at it, and uploading to a playlist returns to Playlists. The upload form's option now reads "Add to a separate playlist". Public `?promo=` links and internal names are unchanged.
 - **Menu shows:** a show's `play_mode` can be `menu`, a grid to pick from (play once, hold the last frame, Back returns to the grid) for numbered video series and navigable playlists, on the web, shared links and Slide Announcers. Promos set it on Admin → Promo Shows; leaders set it in the Show Editor. Editing a promo's slide now returns to Promo Shows instead of the Slides list. See ARCHITECTURE.md → *Menu shows*.
 - In-app **Help** (`/help`): Markdown topics per language with English fallback, audience-restricted topics, screenshots and video, and `?` links from pages. See ARCHITECTURE.md → *In-app help*.
 
