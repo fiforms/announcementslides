@@ -11,6 +11,7 @@ import { startSrtStream, stopSrtStream, setDebugOverlay } from '../srtStreamPlay
 import SlideStage from '../components/SlideStage.vue'
 import ShowFrameLayer from '../components/ShowFrameLayer.vue'
 import FrameAudio from '../components/FrameAudio.vue'
+import SlideMenu from '../components/SlideMenu.vue'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -83,6 +84,13 @@ const playlist = computed(() => activeShow()?.slides || [])
 // The show's frame (background under, overlay + widgets over every slide),
 // mounted once outside the per-slide fade — see ShowFrameLayer.vue.
 const frame = computed(() => activeShow()?.frame || null)
+// A "menu" show (play_mode 'menu', e.g. a numbered video series) isn't played
+// in sequence: the playlist is a grid to pick from (SlideMenu.vue), a picked
+// slide plays once and holds (a video freezes on its last frame), and Back
+// returns to the grid. `picked` is true while a chosen slide is on screen.
+const isMenu = computed(() => activeShow()?.play_mode === 'menu')
+const picked = ref(false)
+const showGrid = computed(() => isMenu.value && !picked.value && playlist.value.length > 0)
 const status = ref(null)
 const currentIndex = ref(0)
 const paused = ref(false)
@@ -197,11 +205,14 @@ function ensureIncoming(index) {
   const existing = incomingStage()
   if (existing?.index === index) return
   if (existing) dropStage(existing.id)
-  stages.value.push({ id: ++stageSeq, index, slide: playlist.value[index], visible: false, leaving: false })
+  const slide = playlist.value[index]
+  // A menu pick plays once and holds on its last frame, never loops.
+  stages.value.push({ id: ++stageSeq, index, slide: isMenu.value ? { ...slide, video_playback_mode: 'hold_last_frame' } : slide, visible: false, leaving: false })
 }
 
 function prefetchNext() {
   const len = playlist.value.length
+  if (isMenu.value) return
   if (len > 1) ensureIncoming((currentIndex.value + 1) % len)
 }
 
@@ -242,8 +253,33 @@ function resetStages() {
   readyIds.clear()
   activeId.value = null
   currentIndex.value = 0
-  swapRequested = playlist.value.length > 0
+  picked.value = false
+  swapRequested = playlist.value.length > 0 && !isMenu.value
   if (swapRequested) ensureIncoming(0)
+}
+
+// Menu shows: play the slide picked from the grid, alone.
+function playFromMenu(index) {
+  picked.value = true
+  goToIndex(index)
+}
+
+// Back from a picked slide: drop it and show the grid again, highlighting
+// what was just watched.
+function backToMenu() {
+  const keep = currentIndex.value
+  clearPlayThroughFallback()
+  leaveTimers.forEach(clearTimeout)
+  leaveTimers.clear()
+  stages.value = []
+  stageRefs.clear()
+  readyIds.clear()
+  activeId.value = null
+  swapRequested = false
+  currentIndex.value = keep
+  if (seekHideTimer) { clearTimeout(seekHideTimer); seekHideTimer = null }
+  showSeekIndicator.value = false
+  picked.value = false
 }
 
 // What the stages were built from. refreshShows() hands back fresh objects
@@ -258,6 +294,12 @@ const playlistSignature = computed(() => JSON.stringify(playlist.value))
 // leave it). Restarting also clears any stale prefetched stage.
 watch(() => activeShow()?.id, (id, prev) => {
   if (prev === undefined || id === prev) return
+  resetStages()
+  restartAdvanceTimer()
+})
+
+// A sync can flip a show between sequence and menu under a running player.
+watch(isMenu, () => {
   resetStages()
   restartAdvanceTimer()
 })
@@ -316,7 +358,8 @@ function restartAdvanceTimer() {
   // Waiting for the next slide to load: the countdown restarts when it
   // appears (trySwap), not before.
   if (swapRequested) return
-  if (paused.value || externalPlaybackActive.value || playlist.value.length <= 1) return
+  // A menu pick never advances on its own.
+  if (isMenu.value || paused.value || externalPlaybackActive.value || playlist.value.length <= 1) return
   // A 'play_through' video advances from its 'ended' event (onVideoEnded)
   // instead of a fixed delay — skip the interval entirely for it.
   const slide = currentSlide.value
@@ -392,6 +435,8 @@ async function refreshPlaylist() {
 function goToIndex(index) {
   const len = playlist.value.length
   if (len === 0) return
+  // Menu shows move only by picking from the grid: no next/previous/loop.
+  if (isMenu.value && !picked.value) return
   const target = ((index % len) + len) % len
   if (advanceTimer) clearInterval(advanceTimer)
   advanceTimer = null
@@ -419,7 +464,7 @@ function goToIndex(index) {
 function seekOrGoToIndex(direction) {
   const el = activeVideo()
   if (!el) {
-    goToIndex(targetIndex() + direction)
+    if (!isMenu.value) goToIndex(targetIndex() + direction)
     return
   }
   const now = Date.now()
@@ -449,6 +494,11 @@ function showSeekIndicatorFor(el) {
 // reset the video's playback position too (goToIndex's own remount handles
 // the "already elsewhere" case, since a fresh <video> starts at 0 anyway).
 function restartShow() {
+  // Back in a menu show returns to the grid (and does nothing once there).
+  if (isMenu.value) {
+    if (picked.value) backToMenu()
+    return
+  }
   const wasIndex = currentIndex.value
   goToIndex(0)
   if (wasIndex === 0) {
@@ -521,8 +571,8 @@ function onKeydown(event) {
     streamHalted.value = false
     return
   }
-  if (NEXT_SLIDE_KEYS.includes(event.key)) { event.preventDefault(); goToIndex(targetIndex() + 1) }
-  else if (PREV_SLIDE_KEYS.includes(event.key)) { event.preventDefault(); goToIndex(targetIndex() - 1) }
+  if (NEXT_SLIDE_KEYS.includes(event.key)) { event.preventDefault(); if (!isMenu.value) goToIndex(targetIndex() + 1) }
+  else if (PREV_SLIDE_KEYS.includes(event.key)) { event.preventDefault(); if (!isMenu.value) goToIndex(targetIndex() - 1) }
   else if (SEEK_FORWARD_KEYS.includes(event.key)) { event.preventDefault(); seekOrGoToIndex(1) }
   else if (SEEK_BACK_KEYS.includes(event.key)) { event.preventDefault(); seekOrGoToIndex(-1) }
   else if (RESTART_KEYS.includes(event.key)) { event.preventDefault(); restartShow() }
@@ -658,8 +708,16 @@ onUnmounted(() => {
       :frame="frame"
       layer="top"
     />
+    <SlideMenu
+      v-if="showGrid"
+      :slides="playlist"
+      :title="activeShow()?.name"
+      :initial-index="currentIndex"
+      :active="!menuOpen && !externalPlaybackActive && !streamHalted"
+      @select="playFromMenu"
+    />
     <!-- A show with a background and no slides (e.g. just a live channel) shows only that. -->
-    <div v-if="!stages.length && !(status?.paired && (frame?.media_url || frame?.youtube_url || frame?.channel || frame?.audio?.tracks?.length))" class="empty-state">
+    <div v-if="!stages.length && !showGrid && !(status?.paired && (frame?.media_url || frame?.youtube_url || frame?.channel || frame?.audio?.tracks?.length))" class="empty-state">
       <p v-if="status && !status.paired">{{ t('slideshow.notPaired') }}</p>
       <p v-else>{{ t('slideshow.waiting') }}</p>
     </div>

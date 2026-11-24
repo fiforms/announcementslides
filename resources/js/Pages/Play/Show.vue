@@ -9,18 +9,20 @@ const props = defineProps({
     slides: { type: Array, default: () => [] },
     frame: { type: Object, default: null },
     delaySeconds: { type: Number, required: true },
+    playMode: { type: String, default: 'sequence' },
     refreshSeconds: { type: Number, default: 300 },
 });
 
 const slides = ref(props.slides);
 const frame = ref(props.frame);
 const delaySeconds = ref(props.delaySeconds);
+const playMode = ref(props.playMode);
 const revoked = ref(false);
 
 // An unattended screen never reloads, so re-check periodically: new or
 // edited slides, a changed delay, and revocation all reach it. A failed
 // check (offline, server restarting) just keeps playing what it has.
-let snapshot = JSON.stringify(props.slides) + JSON.stringify(props.frame) + props.delaySeconds;
+let snapshot = JSON.stringify(props.slides) + JSON.stringify(props.frame) + props.delaySeconds + props.playMode;
 let timer = null;
 
 async function refresh() {
@@ -35,12 +37,13 @@ async function refresh() {
         }
         if (!res.ok) return;
         const data = await res.json();
-        const next = JSON.stringify(data.slides) + JSON.stringify(data.frame) + data.delaySeconds;
+        const next = JSON.stringify(data.slides) + JSON.stringify(data.frame) + data.delaySeconds + data.playMode;
         if (next !== snapshot) {
             snapshot = next;
             slides.value = data.slides;
             frame.value = data.frame;
             delaySeconds.value = data.delaySeconds;
+            playMode.value = data.playMode ?? 'sequence';
         }
     } catch {
         /* offline: keep playing */
@@ -68,5 +71,7 @@ onUnmounted(() => clearInterval(timer));
         :slides="slides"
         :frame="frame"
         :interval-seconds="delaySeconds"
+        :menu="playMode === 'menu'"
+        :menu-title="title"
     />
 </template>

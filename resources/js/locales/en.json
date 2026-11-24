@@ -570,6 +570,10 @@
         "upload_slide": "Create or Upload",
         "settings": "Settings",
         "auto_fill_options": "Auto Fill Options",
+        "play_mode": "Play mode",
+        "play_mode_sequence": "Sequence — play in order, looping",
+        "play_mode_menu": "Menu — pick one from a grid",
+        "play_mode_hint": "In a menu, viewers choose a slide from a grid; it plays once and holds on its last frame, and Back returns to the grid. Good for a numbered video series. Shows with a background video leave video slides out.",
         "always_on_main": "(always on for Main)",
         "available_slides": "Available slides",
         "unused_slides": "Unused slides",
@@ -920,7 +924,8 @@
     },
     "play": {
         "revoked": "This link is no longer active.",
-        "no_slides": "There are no slides to show right now."
+        "no_slides": "There are no slides to show right now.",
+        "menu_back": "Back to the list"
     },
     "people": {
         "title": "Team — {name}",

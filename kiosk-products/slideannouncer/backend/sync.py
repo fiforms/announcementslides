@@ -161,6 +161,28 @@ def _local_filename(slide: dict, suffix: str = "", url_key: str = "file_url", mi
     return f"{slide['id']}{suffix}{ext}"
 
 
+async def _sync_thumbnail(client: httpx.AsyncClient, slide: dict, entry: dict, previous) -> None:
+    """A video slide's still, cached as <id>-thumb.<ext> for the menu grid
+    (an image slide is its own thumbnail, so it costs nothing). Best-effort:
+    without it the menu just shows a plain tile."""
+    url = slide.get("thumbnail_url")
+    if not url or not (slide.get("mime_type") or "").startswith("video/"):
+        if previous and previous.get("thumb_local_filename"):
+            (MEDIA_DIR / previous["thumb_local_filename"]).unlink(missing_ok=True)
+        return
+    name = _local_filename({"id": slide["id"], "thumbnail_url": url}, suffix="-thumb", url_key="thumbnail_url") or f"{slide['id']}-thumb.jpg"
+    cached = previous.get("thumb_local_filename") if previous else None
+    if cached and previous.get("thumbnail_url") == url and (MEDIA_DIR / cached).exists():
+        entry["thumb_local_filename"] = cached
+        return
+    try:
+        await _download(client, url, MEDIA_DIR / name)
+        entry["thumb_local_filename"] = name
+    except httpx.HTTPError:
+        if cached:
+            entry["thumb_local_filename"] = cached
+
+
 async def _sync_frame_file(client: httpx.AsyncClient, url, previous: dict, key: str, filename: str):
     """One of a frame's two files: returns its local filename (or None if the
     frame no longer has it). `previous` is the last manifest frame, whose
@@ -320,8 +342,12 @@ def _build_active_playlist(manifest: dict) -> list:
             # placeholder on the server).
             if not (base_ok or overlay_ok or placements):
                 continue
+            thumb = entry.get("thumb_local_filename")
             slides.append({
                 "id": entry["id"],
+                "title": entry.get("title"),
+                # A video's still, for the menu grid (an image slide is its own).
+                "thumb_url": f"/media/{thumb}" if thumb and (MEDIA_DIR / thumb).exists() else None,
                 # Language code (None = untagged, shows for everyone). Every
                 # language is synced; main.py's slideshow() filters by the
                 # device's current language at read time.
@@ -339,6 +365,8 @@ def _build_active_playlist(manifest: dict) -> list:
             "name": show.get("name"),
             "is_main": bool(show.get("is_main")),
             "is_channel": bool(show.get("is_channel")),
+            # 'menu' = a grid to pick a slide from, played once (see Slideshow.vue).
+            "play_mode": show.get("play_mode") or "sequence",
             "slides": slides,
             "frame": frame,
         })
@@ -451,6 +479,8 @@ async def sync_once() -> None:
                     # now-orphaned cached file.
                     (MEDIA_DIR / previous["overlay_local_filename"]).unlink(missing_ok=True)
 
+                await _sync_thumbnail(client, slide, entry, previous)
+
                 slides_manifest[slide_id] = entry
                 downloaded_this_cycle[slide_id] = entry
 
@@ -460,6 +490,7 @@ async def sync_once() -> None:
                 # A live channel from the catalog, offered as a slide-less
                 # show (the remote menu groups these under "Live Channels").
                 "is_channel": bool(show.get("is_channel")),
+                "play_mode": show.get("play_mode") or "sequence",
                 "slides": slides_manifest,
                 "frame": await _sync_frame(client, show_id, show.get("frame"), manifest.get(show_id, {}).get("frame")),
             }
@@ -477,6 +508,8 @@ async def sync_once() -> None:
                 (MEDIA_DIR / entry["local_filename"]).unlink(missing_ok=True)
             if entry.get("overlay_local_filename"):
                 (MEDIA_DIR / entry["overlay_local_filename"]).unlink(missing_ok=True)
+            if entry.get("thumb_local_filename"):
+                (MEDIA_DIR / entry["thumb_local_filename"]).unlink(missing_ok=True)
 
     # A show that disappeared entirely takes its frame files with it.
     for show_id, show in manifest.items():

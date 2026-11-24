@@ -20,6 +20,7 @@ const props = defineProps({
     entityId: { type: Number, default: null },
     showToken: { type: String, default: null },
     promoToken: { type: String, default: null },
+    playMode: { type: String, default: 'sequence' },
     frame: { type: Object, default: null },
     availableShows: { type: Array, default: () => [] },
     initialSlide: { type: Object, default: null },
@@ -404,7 +405,7 @@ onUnmounted(() => window.removeEventListener('popstate', onPopState));
             <p class="text-sm text-gray-400">{{ $t('slides.check_back_soon') }}</p>
         </div>
         <!-- Slideshow Modal -->
-        <SlideshowModal :show="showSlideshow" :slides="slideshowSlides" :frame="frame" @close="showSlideshow = false" />
+        <SlideshowModal :show="showSlideshow" :slides="slideshowSlides" :frame="frame" :menu="playMode === 'menu'" @close="showSlideshow = false" />
         <RevelationInfoModal :show="showRevelationInfo" @close="showRevelationInfo = false" />
 
         <SlideLightbox :slide="lightboxSlide" :start-expanded="lightboxStartExpanded" @close="closeLightbox" />

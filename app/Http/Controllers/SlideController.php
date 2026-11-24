@@ -138,6 +138,7 @@ class SlideController extends Controller
             'zipMaxMediaBytes' => (int) config('slides.zip_max_media_bytes'),
             'revelationLinkMediaBytes' => (int) config('slides.revelation_link_media_bytes'),
             'promoToken' => $promo?->token,
+            'playMode' => $promo?->play_mode ?? $selectedShow?->play_mode ?? 'sequence',
             'frame' => $frame,
             'availableShows' => $availableShows,
             'initialSlide' => $initialSlide,

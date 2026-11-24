@@ -570,6 +570,10 @@
         "upload_slide": "Crear o subir",
         "settings": "Configuración",
         "auto_fill_options": "Opciones de relleno automático",
+        "play_mode": "Modo de reproducción",
+        "play_mode_sequence": "Secuencia: en orden, en bucle",
+        "play_mode_menu": "Menú: elegir una de una cuadrícula",
+        "play_mode_hint": "En un menú, se elige una diapositiva de una cuadrícula; se reproduce una vez y se queda en el último cuadro, y «Atrás» vuelve a la cuadrícula. Ideal para una serie de videos numerados. Los programas con video de fondo omiten las diapositivas de video.",
         "always_on_main": "(siempre activado en el principal)",
         "available_slides": "Diapositivas disponibles",
         "unused_slides": "Diapositivas sin usar",
@@ -920,7 +924,8 @@
     },
     "play": {
         "revoked": "Este enlace ya no está activo.",
-        "no_slides": "No hay diapositivas para mostrar por ahora."
+        "no_slides": "No hay diapositivas para mostrar por ahora.",
+        "menu_back": "Volver a la lista"
     },
     "people": {
         "title": "Equipo — {name}",

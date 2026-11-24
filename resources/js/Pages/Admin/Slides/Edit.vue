@@ -16,7 +16,11 @@ const props = defineProps({
     slide: { type: Object, required: true },
     languages: { type: Array, default: () => [] },
     mediaTypes: { type: Array, default: () => [] },
+    // Where the edit was opened from ('promos'), so Save/Cancel/Back return there.
+    from: { type: String, default: null },
 });
+
+const backHref = computed(() => props.from === 'promos' ? route('admin.promo-shows.index') : route('admin.slides.index'));
 
 function toLocalDatetime(iso) {
     if (!iso) return '';
@@ -40,7 +44,7 @@ const form = useForm({
 });
 
 function submit() {
-    form.patch(route('admin.slides.update', props.slide.id));
+    form.patch(route('admin.slides.update', { slide: props.slide.id, ...(props.from ? { from: props.from } : {}) }));
 }
 
 const tab = ref('details');
@@ -79,7 +83,7 @@ onBeforeUnmount(() => {
     <AdminLayout>
         <template #header>
             <div class="flex items-center gap-3">
-                <Link :href="route('admin.slides.index')" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <Link :href="backHref" class="text-gray-400 hover:text-gray-600 transition-colors">
                     <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
                     </svg>
@@ -218,7 +222,7 @@ onBeforeUnmount(() => {
                             class="rounded-lg bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors">
                             {{ form.processing ? $t('admin.saving') : $t('admin.save_changes') }}
                         </button>
-                        <Link :href="route('admin.slides.index')"
+                        <Link :href="backHref"
                             class="rounded-lg border border-gray-300 px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                             Cancel
                         </Link>

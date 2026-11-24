@@ -4,17 +4,19 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\GlobalShowTemplate;
+use App\Models\Show;
 use App\Models\Slide;
 use App\Models\SlideMedia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 /**
  * Admin oversight of globally-distributed one-off "promo" shows (see
  * GlobalShowTemplate): what each holds, how many sites carry a copy, a
- * public hot-link, and rename/remove/delete across every site's copy at once.
+ * public hot-link, and rename/play mode/remove/delete across every site's copy at once.
  * New promos (and new slides in one) are still created from the admin
  * upload form's "Distribute as a separate one-off show" option.
  */
@@ -32,6 +34,7 @@ class PromoShowController extends Controller
                 return [
                     'id'          => $t->id,
                     'name'        => $t->name,
+                    'play_mode'   => $t->play_mode,
                     'sites_count' => $t->shows_count,
                     'creator'     => $t->creator?->only('id', 'name'),
                     'created_at'  => $t->created_at->toIso8601String(),
@@ -60,14 +63,23 @@ class PromoShowController extends Controller
      */
     public function update(Request $request, GlobalShowTemplate $promo)
     {
-        $data = $request->validate(['name' => 'required|string|max:255']);
+        $data = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'play_mode' => ['sometimes', Rule::in(Show::PLAY_MODES)],
+        ]);
 
         DB::transaction(function () use ($promo, $data) {
-            $promo->shows()->where('name', $promo->name)->update(['name' => $data['name']]);
-            $promo->update(['name' => $data['name']]);
+            if (isset($data['name'])) {
+                $promo->shows()->where('name', $promo->name)->update(['name' => $data['name']]);
+            }
+            // Like the name, a copy a leader switched to another mode keeps theirs.
+            if (isset($data['play_mode'])) {
+                $promo->shows()->where('play_mode', $promo->play_mode)->update(['play_mode' => $data['play_mode']]);
+            }
+            $promo->update($data);
         });
 
-        return back()->with('success', 'Promo show renamed.');
+        return back()->with('success', 'Promo show updated.');
     }
 
     /**
