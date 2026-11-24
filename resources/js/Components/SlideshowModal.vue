@@ -4,6 +4,7 @@ import { usePage } from '@inertiajs/vue3';
 import SlideStage from '@/Components/SlideStage.vue';
 import ShowFrameLayer from '@/Components/ShowFrameLayer.vue';
 import FrameAudio from '@/Components/FrameAudio.vue';
+import SlideMenuGrid from '@/Components/SlideMenuGrid.vue';
 
 const props = defineProps({
     show: { type: Boolean, default: false },
@@ -17,6 +18,11 @@ const props = defineProps({
     frame: { type: Object, default: null },
     // Overrides the profile's slide delay when set.
     intervalSeconds: { type: Number, default: null },
+    // A "menu" show (play_mode 'menu'): a grid to pick from instead of a
+    // looping sequence. A picked slide plays once and holds (a video freezes
+    // on its last frame); Back returns to the grid.
+    menu: { type: Boolean, default: false },
+    menuTitle: { type: String, default: '' },
 });
 
 const emit = defineEmits(['close']);
@@ -32,6 +38,9 @@ const slidesList = computed(() => {
     return props.slide ? [props.slide] : [];
 });
 const advanceTimer = ref(null);
+// In a menu show: true while the grid is up, false while a picked slide plays.
+const inMenu = ref(props.menu);
+watch(() => props.menu, (menu) => { inMenu.value = menu; });
 
 // ...and pick up a changed delay without a restart.
 watch(() => props.intervalSeconds, () => {
@@ -110,11 +119,14 @@ function ensureIncoming(index) {
     const existing = incomingStage();
     if (existing?.index === index) return;
     if (existing) dropStage(existing.id);
-    stages.value.push({ id: ++stageSeq, index, slide: slidesList.value[index], visible: false, leaving: false });
+    const slide = slidesList.value[index];
+    // A menu pick plays once and holds on its last frame, never loops.
+    stages.value.push({ id: ++stageSeq, index, slide: props.menu ? { ...slide, video_playback_mode: 'hold_last_frame' } : slide, visible: false, leaving: false });
 }
 
 function prefetchNext() {
     const len = slidesList.value.length;
+    if (props.menu) return;
     if (len > 1) ensureIncoming((currentIndex.value + 1) % len);
 }
 
@@ -154,12 +166,43 @@ function resetStages() {
     readyIds.clear();
     activeId.value = null;
     currentIndex.value = 0;
-    swapRequested = slidesList.value.length > 0;
+    swapRequested = slidesList.value.length > 0 && !props.menu;
     if (swapRequested) ensureIncoming(0);
 }
 
+// Menu shows: play the picked slide alone; the grid hides underneath.
+let pickedSlideId = null;
+function playFromMenu(index) {
+    pickedSlideId = slidesList.value[index]?.id ?? null;
+    inMenu.value = false;
+    currentIndex.value = index;
+    goToIndex(index);
+}
+
+// Back from a picked slide: drop its stage and show the grid again, focused
+// on what was just watched.
+function backToMenu() {
+    // By id: a refresh may have reordered the list while the slide played.
+    const found = slidesList.value.findIndex(s => s.id === pickedSlideId);
+    const keep = found >= 0 ? found : currentIndex.value;
+    clearAdvanceTimer();
+    leaveTimers.forEach(clearTimeout);
+    leaveTimers.clear();
+    stages.value = [];
+    stageRefs.clear();
+    readyIds.clear();
+    activeId.value = null;
+    swapRequested = false;
+    currentIndex.value = keep;
+    showSeekIndicator.value = false;
+    inMenu.value = true;
+}
+
 watch(() => props.show, (show) => {
-    if (show) resetStages();
+    if (show) {
+        inMenu.value = props.menu;
+        resetStages();
+    }
 }, { immediate: true });
 
 // A live list can change under us (kiosk refresh): stay in range and
@@ -168,7 +211,8 @@ watch(slidesList, (list) => {
     if (!props.show) return;
     if (list.length && currentIndex.value >= list.length) currentIndex.value = 0;
     if (!activeStage.value) {
-        resetStages();
+        // A picked menu slide still loading isn't a reason to throw the pick away.
+        if (!(props.menu && !inMenu.value)) resetStages();
         return;
     }
     const incoming = incomingStage();
@@ -212,7 +256,8 @@ const clearAdvanceTimer = () => {
 
 const scheduleAdvance = () => {
     clearAdvanceTimer();
-    if (isPaused.value) return;
+    // A menu pick never advances on its own.
+    if (props.menu || isPaused.value) return;
 
     const slide = currentSlide.value;
     if (isVideoSlide(slide) && slide.video_playback_mode === 'play_through') {
@@ -255,6 +300,8 @@ const stopSlideshow = () => {
 const goToIndex = (index) => {
     const len = slidesList.value.length;
     if (len === 0) return;
+    // Menu shows move only by picking from the grid: no next/previous/loop.
+    if (props.menu && inMenu.value) return;
     const target = ((index % len) + len) % len;
     clearAdvanceTimer();
     if (target === currentIndex.value && activeStage.value) {
@@ -271,9 +318,9 @@ const goToIndex = (index) => {
     showSeekIndicator.value = false;
 };
 
-const nextSlide = () => goToIndex(targetIndex() + 1);
+const nextSlide = () => { if (!props.menu) goToIndex(targetIndex() + 1); };
 
-const prevSlide = () => goToIndex(targetIndex() - 1);
+const prevSlide = () => { if (!props.menu) goToIndex(targetIndex() - 1); };
 
 // Left/Right (and MediaRewind/MediaFastForward) seek a playing video by
 // SEEK_STEP_SECONDS; a second press in the same direction within
@@ -283,7 +330,7 @@ const prevSlide = () => goToIndex(targetIndex() - 1);
 const seekOrGoToIndex = (direction) => {
     const el = activeVideo();
     if (!el) {
-        goToIndex(targetIndex() + direction);
+        if (!props.menu) goToIndex(targetIndex() + direction);
         return;
     }
     const now = Date.now();
@@ -313,6 +360,11 @@ const showSeekIndicatorFor = (el) => {
 // reset the video's playback position too (goToIndex's own remount handles
 // the "already elsewhere" case, since a fresh <video> starts at 0 anyway).
 const restartShow = () => {
+    // Back in a menu show returns to the grid (and from the grid does nothing).
+    if (props.menu) {
+        if (!inMenu.value) backToMenu();
+        return;
+    }
     const wasIndex = currentIndex.value;
     goToIndex(0);
     if (wasIndex === 0) {
@@ -367,6 +419,8 @@ const handleKeydown = (e) => {
     if (!props.show) return;
 
     if (e.key === 'Escape') {
+        // Escape steps back out of a picked slide before it closes the player.
+        if (props.menu && !inMenu.value) { backToMenu(); return; }
         if (props.kiosk) return;
         if (document.fullscreenElement) {
             document.exitFullscreen();
@@ -374,6 +428,9 @@ const handleKeydown = (e) => {
         emit('close');
         return;
     }
+    // The grid handles its own keys (capture phase); Back/Home are the only
+    // ones left for it here and do nothing while it is up.
+    if (props.menu && inMenu.value && !RESTART_KEYS.includes(e.key)) return;
     if (NEXT_SLIDE_KEYS.includes(e.key)) { e.preventDefault(); nextSlide(); }
     else if (PREV_SLIDE_KEYS.includes(e.key)) { e.preventDefault(); prevSlide(); }
     else if (SEEK_FORWARD_KEYS.includes(e.key)) { e.preventDefault(); seekOrGoToIndex(1); }
@@ -456,6 +513,18 @@ const handleShow = () => {
 
                 <ShowFrameLayer v-if="frame && (frame.overlay_url || frame.overlay_widgets?.length)" :frame="frame" layer="top" />
 
+                <SlideMenuGrid v-if="menu && inMenu" :slides="slidesList" :title="menuTitle" :initial-index="currentIndex" @select="playFromMenu" />
+
+                <!-- Menu show, slide playing: the way back to the grid. -->
+                <button
+                    v-if="menu && !inMenu && !kiosk"
+                    @click="backToMenu"
+                    class="absolute top-8 left-8 z-20 flex items-center gap-2 rounded-full bg-black/50 px-4 py-2 text-sm text-white backdrop-blur transition-all duration-300 hover:text-gray-300"
+                    :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'"
+                >
+                    ← {{ $t('play.menu_back') }}
+                </button>
+
                 <!-- Seek indicator -->
                 <div
                     v-if="showSeekIndicator"
@@ -471,7 +540,7 @@ const handleShow = () => {
                 </div>
 
                 <!-- Controls -->
-                <div v-if="!kiosk" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/50 px-6 py-3 rounded-full backdrop-blur transition-opacity duration-300" :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'">
+                <div v-if="!kiosk && !menu" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4 bg-black/50 px-6 py-3 rounded-full backdrop-blur transition-opacity duration-300" :class="showControls ? 'opacity-100' : 'opacity-0 pointer-events-none'">
                     <button
                         @click="prevSlide"
                         class="text-white hover:text-gray-300 transition p-2"

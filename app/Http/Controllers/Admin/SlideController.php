@@ -103,7 +103,7 @@ class SlideController extends Controller
             ->with('success', count($slides) . ' slide(s) uploaded successfully.');
     }
 
-    public function edit(Slide $slide): Response
+    public function edit(Request $request, Slide $slide): Response
     {
         $slide->load('media');
         $languages = Language::orderBy('name')->get(['id', 'abbreviation', 'name', 'native_name']);
@@ -112,6 +112,7 @@ class SlideController extends Controller
             'slide' => $this->slideResource($slide, withMedia: true),
             'languages' => $languages,
             'mediaTypes' => $this->mediaTypesForFrontend(),
+            'from' => $this->returnTarget($request),
         ]);
     }
 
@@ -177,8 +178,18 @@ class SlideController extends Controller
             SyncShowAutoFillForSlide::dispatch($slide->id);
         }
 
-        return redirect()->route('admin.slides.index')
+        return redirect()->route($this->returnTarget($request) === 'promos' ? 'admin.promo-shows.index' : 'admin.slides.index')
             ->with('success', 'Slide updated.');
+    }
+
+    /**
+     * Where an edit was opened from (?from=), so saving or cancelling returns
+     * there: a promo's slides aren't listed under Slides. An allowlist, never
+     * a URL — anything else means the Slides list.
+     */
+    private function returnTarget(Request $request): ?string
+    {
+        return $request->query('from') === 'promos' ? 'promos' : null;
     }
 
     public function storeMedia(Request $request, Slide $slide)

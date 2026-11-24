@@ -141,6 +141,14 @@ An entity admin sets a show's frame on the Show Editor (**Show frame** panel in 
 
 Widget data for frame widgets reuses the three existing endpoints (`widget-data.show`, `play.widget-data`, the device route): each accepts a `show-overlay` media row, authorized by entity membership, the link's own show, or the device's entity.
 
+### Menu shows (`play_mode`)
+
+`shows.play_mode` is `sequence` (default: slides play in order and loop) or `menu` (a pick-one grid, e.g. a weekly video series or a leader's navigable playlist). In a menu show the player lists every slide as a numbered tile (thumbnail + title), a chosen slide plays **once** and holds (a video freezes on its last frame — the player overrides `loop`/`play_through` to hold), nothing auto-advances, and Back (the remote's Back/Home, Escape on the web, or the on-screen button) returns to the grid with the watched tile highlighted. The main show can't be a menu. A show's background video still triggers the *Background video rule* (video slides are omitted), so series shows normally have no video background.
+
+- **Setting it:** leaders choose it per show in the Show Editor (`ShowController::update` `play_mode`); for a promo, an admin sets it on Admin → Promo Shows (`PromoShowController::update`), which writes `global_show_templates.play_mode`, copies it to each site's copy that still has the old value (like a rename, a leader's own choice survives), and new copies start with it (`DistributeGlobalSeparateShow`). A multi-slide series is one promo: upload later weeks with the upload form's existing promo target.
+- **Web:** `SlideshowModal` takes `menu`/`menuTitle` and renders [SlideMenuGrid](resources/js/Components/SlideMenuGrid.vue); `/play/{token}` gets `playMode` (and each slide a `thumbnail_url`), and the Slides page passes the selected show's or promo's mode.
+- **Device:** the shows sync sends `play_mode` per show and `title` per slide; `sync.py` stores them, caches a video slide's `thumbnail_url` as `<id>-thumb.<ext>` (images are their own thumbnail) and writes `play_mode`, `title`, `thumb_url` into the playlist. `Slideshow.vue` renders [SlideMenu.vue](kiosk-products/slideannouncer/frontend/components/SlideMenu.vue) (arrows move, OK plays). Devices get the grid with a new kiosk release; an older kiosk ignores `play_mode` and plays the show as a sequence.
+
 ### Bulk downloads
 
 [SlideController](app/Http/Controllers/SlideController.php) can package the currently-visible slides as a **ZIP** (`downloadZip`) or assemble them into a **PowerPoint** deck (`downloadPowerPoint`) using `phpoffice/phppresentation` — each image is centered, aspect-fit onto a black 16:9 slide.

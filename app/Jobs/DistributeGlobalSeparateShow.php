@@ -41,7 +41,7 @@ class DistributeGlobalSeparateShow implements ShouldQueue
             foreach ($entities as $entity) {
                 $show = Show::firstOrCreate(
                     ['entity_id' => $entity->id, 'global_template_id' => $template->id],
-                    ['name' => $template->name, 'is_main' => false, 'auto_delete_when_empty' => true]
+                    ['name' => $template->name, 'is_main' => false, 'auto_delete_when_empty' => true, 'play_mode' => $template->play_mode]
                 );
 
                 $sortOrder = $slide->assignFanoutSortOrderIfNeeded();

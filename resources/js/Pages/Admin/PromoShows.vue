@@ -37,6 +37,10 @@ function detachSlide(promo, slide) {
     }
 }
 
+function setPlayMode(promo, play_mode) {
+    router.patch(route('admin.promo-shows.update', promo.id), { play_mode }, { preserveScroll: true });
+}
+
 function destroy(promo) {
     if (confirm(`Delete "${promo.name}" from all ${promo.sites_count} site(s)? Its slides are kept.`)) {
         router.delete(route('admin.promo-shows.destroy', promo.id), { preserveScroll: true });
@@ -104,6 +108,15 @@ function slideState(slide) {
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2">
+                        <label class="flex items-center gap-1.5 text-xs text-gray-600"
+                            title="Menu: viewers pick a slide from a grid; it plays once, then Back returns to the grid (e.g. a weekly video series). Sequence: slides play in order and loop.">
+                            Plays as
+                            <select :value="promo.play_mode" @change="setPlayMode(promo, $event.target.value)"
+                                class="rounded-md border-gray-300 py-1 pl-2 pr-7 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                <option value="sequence">Sequence</option>
+                                <option value="menu">Menu (pick one)</option>
+                            </select>
+                        </label>
                         <a :href="promo.public_url" target="_blank" rel="noopener"
                             class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                             View
@@ -146,7 +159,7 @@ function slideState(slide) {
                                 class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                 {{ copiedUrl === slide.public_url ? 'Copied!' : 'Copy link' }}
                             </button>
-                            <Link :href="route('admin.slides.edit', slide.id)"
+                            <Link :href="route('admin.slides.edit', { slide: slide.id, from: 'promos' })"
                                 class="rounded-md border border-gray-300 px-2.5 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors">
                                 Edit
                             </Link>

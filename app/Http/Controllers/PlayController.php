@@ -70,6 +70,7 @@ class PlayController extends Controller
         return [
             'title' => $link->title,
             'delaySeconds' => $link->delay_seconds,
+            'playMode' => $show->play_mode,
             'slides' => $slides,
             'frame' => app(ShowFrame::class)->forPlayer($show, $link->token),
         ];
@@ -92,6 +93,7 @@ class PlayController extends Controller
         return [
             'id' => $slide->id,
             'title' => $slide->title,
+            'thumbnail_url' => $slide->thumbnail_url,
             'mime_type' => $slide->mime_type,
             'video_muted' => $slide->video_muted,
             'video_playback_mode' => $slide->video_playback_mode,

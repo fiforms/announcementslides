@@ -128,3 +128,67 @@ def test_a_muted_library_video_keeps_its_flag_so_the_player_mutes_it(monkeypatch
 
     assert played["1"]["video_muted"] is True
     assert played["2"]["video_muted"] is False
+
+
+def run_show_cycle(monkeypatch, show):
+    def handler(request):
+        if request.url.path.endswith("/shows"):
+            return httpx.Response(200, json={"shows": [show], "widgets": [], "location": None, "settings": {}})
+        return httpx.Response(200, content=b"x")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: REAL_ASYNC_CLIENT(transport=httpx.MockTransport(handler), **kw))
+    asyncio.run(sync.sync_once())
+    return sync.read_shows()[0]
+
+
+def test_a_menu_show_keeps_its_play_mode_and_gives_each_video_a_title_and_cached_still(monkeypatch, isolated):
+    video = slide(1, title="Week 17", file_url=f"{SERVER}/storage/slides/a.mp4", mime_type="video/mp4",
+                  thumbnail_url=f"{SERVER}/storage/thumbs/a.jpg")
+    show = {"id": "8", "name": "Series", "is_main": False, "play_mode": "menu", "slides": [video], "frame": None}
+
+    played = run_show_cycle(monkeypatch, show)
+
+    assert played["play_mode"] == "menu"
+    entry = played["slides"][0]
+    assert entry["title"] == "Week 17"
+    assert entry["thumb_url"] == "/media/1-thumb.jpg"
+    assert (isolated / "media" / "1-thumb.jpg").exists()
+
+
+def test_a_show_without_a_play_mode_plays_as_a_sequence(monkeypatch):
+    show = {"id": "3", "name": "Main", "is_main": True, "slides": [], "frame": None}
+
+    assert run_show_cycle(monkeypatch, show)["play_mode"] == "sequence"
+
+
+def test_a_failed_still_download_is_retried_not_mistaken_for_cached(monkeypatch, isolated):
+    old = slide(1, title="Week 1", file_url=f"{SERVER}/storage/slides/a.mp4", mime_type="video/mp4", thumbnail_url=f"{SERVER}/storage/thumbs/old.jpg")
+    show = {"id": "8", "name": "Series", "is_main": False, "play_mode": "menu", "slides": [old], "frame": None}
+    run_show_cycle(monkeypatch, show)
+
+    new = {**old, "thumbnail_url": f"{SERVER}/storage/thumbs/new.jpg"}
+
+    def failing(request):
+        if request.url.path.endswith("/shows"):
+            return httpx.Response(200, json={"shows": [{**show, "slides": [new]}], "widgets": [], "location": None, "settings": {}})
+        if "thumbs/" in request.url.path:
+            return httpx.Response(503)
+        return httpx.Response(200, content=b"x")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: REAL_ASYNC_CLIENT(transport=httpx.MockTransport(failing), **kw))
+    asyncio.run(sync.sync_once())
+    asyncio.run(sync.sync_once())  # still failing: must keep trying, not settle on the old still
+
+    attempts = []
+
+    def recovered(request):
+        if request.url.path.endswith("/shows"):
+            return httpx.Response(200, json={"shows": [{**show, "slides": [new]}], "widgets": [], "location": None, "settings": {}})
+        attempts.append(request.url.path)
+        return httpx.Response(200, content=b"new")
+
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kw: REAL_ASYNC_CLIENT(transport=httpx.MockTransport(recovered), **kw))
+    asyncio.run(sync.sync_once())
+
+    assert any("thumbs/new.jpg" in p for p in attempts)
+    assert (isolated / "media" / "1-thumb.jpg").read_bytes() == b"new"

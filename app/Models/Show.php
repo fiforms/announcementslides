@@ -36,8 +36,10 @@ class Show extends Model
 
     protected $fillable = [
         'token', 'entity_id', 'global_template_id', 'name', 'is_main', 'language_id',
-        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'frame_channel_id', 'frame_channel_muted', 'frame_audio_volume', 'frame_audio_shuffle', 'created_by',
+        'auto_fill_global', 'auto_fill_nearby', 'auto_delete_when_empty', 'frame_youtube', 'frame_channel_id', 'frame_channel_muted', 'frame_audio_volume', 'frame_audio_shuffle', 'play_mode', 'created_by',
     ];
+
+    public const PLAY_MODES = ['sequence', 'menu'];
 
     protected function casts(): array
     {
@@ -112,6 +114,12 @@ class Show extends Model
     public function overlayMedia(): HasOne
     {
         return $this->hasOne(SlideMedia::class)->where('media_type', 'show-overlay')->latest('id');
+    }
+
+    /** Played as a pick-one grid (play_mode 'menu') rather than a looping sequence. */
+    public function isMenu(): bool
+    {
+        return $this->play_mode === 'menu';
     }
 
     /**

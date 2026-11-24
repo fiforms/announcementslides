@@ -60,7 +60,7 @@ class ShowController extends Controller
             'entity' => ['id' => $entity->id, 'name' => $entity->name],
             'shows' => $shows->map(fn ($s) => [
                 'id' => $s->id, 'name' => $s->name, 'is_main' => $s->is_main,
-                'auto_fill_global' => $s->auto_fill_global, 'auto_fill_nearby' => $s->auto_fill_nearby,
+                'auto_fill_global' => $s->auto_fill_global, 'auto_fill_nearby' => $s->auto_fill_nearby, 'play_mode' => $s->play_mode,
             ]),
             'selectedShowId' => $selectedShow->id,
             'frame' => [
@@ -132,6 +132,7 @@ class ShowController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'auto_fill_global' => 'sometimes|boolean',
             'auto_fill_nearby' => 'sometimes|boolean',
+            'play_mode' => ['sometimes', Rule::in(Show::PLAY_MODES)],
         ]);
 
         // Each field is a true partial patch: only touch it if the request
@@ -156,6 +157,10 @@ class ShowController extends Controller
         ];
         if ($request->filled('name')) {
             $attrs['name'] = $request->input('name');
+        }
+        // The main show is the default rotation, never a pick-one menu.
+        if ($request->filled('play_mode') && !$show->is_main) {
+            $attrs['play_mode'] = $request->input('play_mode');
         }
         $show->update($attrs);
 

@@ -22,7 +22,7 @@ class GlobalShowTemplate extends Model
 {
     use HasPublicToken;
 
-    protected $fillable = ['token', 'name', 'created_by'];
+    protected $fillable = ['token', 'name', 'play_mode', 'created_by'];
 
     protected $casts = ['announced_at' => 'datetime'];
 

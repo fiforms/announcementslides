@@ -58,6 +58,8 @@ class SlideAnnouncerSyncController extends Controller
             'id' => (string) $show->id,
             'name' => $show->name,
             'is_main' => $show->is_main,
+            // 'sequence' loops its slides; 'menu' is a grid to pick one from.
+            'play_mode' => $show->play_mode,
             // The show's frame (background + overlay/widgets over every
             // slide), or null. With a background video, slides containing
             // videos aren't sent at all — never two videos at once.
@@ -133,6 +135,7 @@ class SlideAnnouncerSyncController extends Controller
     {
         return [
             'id' => $slide->id,
+            'title' => $slide->title,
             // Every language is distributed to every device; the device
             // shows only slides matching its own language (or untagged
             // ones, null) — see local-app/backend/main.py's slideshow().

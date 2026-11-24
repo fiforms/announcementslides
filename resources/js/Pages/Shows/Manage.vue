@@ -593,6 +593,16 @@ function persistLeaderOrder() {
                         </label>
                     </div>
                 </div>
+                <div v-if="!selectedShow.is_main" class="rounded-lg border-2 border-gray-300 bg-white px-3 py-2">
+                    <p class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $t('show_manage.play_mode') }}</p>
+                    <select :value="selectedShow.play_mode || 'sequence'"
+                        @change="updateShowSettings({ play_mode: $event.target.value })"
+                        class="rounded-lg border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="sequence">{{ $t('show_manage.play_mode_sequence') }}</option>
+                        <option value="menu">{{ $t('show_manage.play_mode_menu') }}</option>
+                    </select>
+                    <p class="mt-1 text-xs text-gray-500">{{ $t('show_manage.play_mode_hint') }}</p>
+                </div>
                 <div class="rounded-lg border-2 border-gray-300 bg-white px-3 py-2 space-y-3">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">{{ $t('show_manage.frame') }}</p>
