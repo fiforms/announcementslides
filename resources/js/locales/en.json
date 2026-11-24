@@ -1241,6 +1241,33 @@
             "slide_expired": "“{slide}” has expired.",
             "admin_slide_shared": "{entity} shared “{slide}” with nearby churches.",
             "admin_global_published": "{user} published the global slide “{slide}”."
-        }
+        },
+        "unsubscribe_title": "Stop notification emails",
+        "unsubscribe_confirm": "Stop sending “{category}” emails to you?",
+        "unsubscribe_all_confirm": "Stop sending all notification emails to you? Notifications will still appear in your inbox.",
+        "unsubscribe_button": "Turn off these emails",
+        "unsubscribed_title": "Email turned off",
+        "unsubscribed_body": "You will no longer get “{category}” emails. You can turn them back on in your notification settings.",
+        "unsubscribed_all_body": "You will no longer get notification emails. You can turn them back on in your notification settings."
+    },
+    "admin_notifications": {
+        "email": "Email",
+        "email_hint": "Users choose per category whether notifications are also emailed right away or in a daily digest. This switch turns all notification email on or off for the site.",
+        "mailer_log": "The mailer is “{mailer}”, so emails are only written to the log, not delivered. Configure MAIL_* in the environment before turning email on.",
+        "mailer_info": "Mailer: {mailer}, from {from}.",
+        "email_enabled": "Send notification emails",
+        "email_enabled_hint": "While off, notifications still appear in the app and nothing builds up to be emailed later.",
+        "digest_time": "Daily digest time",
+        "digest_time_hint": "When the daily digest goes out (server time zone).",
+        "retention": "Retention",
+        "retention_days": "Delete cleared notifications after (days)",
+        "retention_days_hint": "Cleared notifications stay in each user's archive this long.",
+        "inbox_max_days": "Auto-clear inbox items after (days)",
+        "inbox_max_days_hint": "Notifications nobody cleared move to the archive after this many days. 0 = never.",
+        "send_test": "Send me a test email",
+        "stats": "Current totals",
+        "stat_inbox": "{n} in inboxes",
+        "stat_archived": "{n} archived",
+        "stat_pending": "{n} waiting for the next digest"
     }
 }

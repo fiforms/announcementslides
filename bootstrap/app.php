@@ -15,6 +15,7 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             \App\Http\Middleware\RedirectToSetup::class,
+            \App\Http\Middleware\RememberUserLocale::class,
             \App\Http\Middleware\HandleInertiaRequests::class,
             \Illuminate\Http\Middleware\AddLinkHeadersForPreloadedAssets::class,
         ]);
@@ -23,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
             'not-banned' => \App\Http\Middleware\EnsureNotBanned::class,
             'slide-announcer.auth' => \App\Http\Middleware\EnsureSlideAnnouncer::class,
         ]);
+
+        // Mail clients' one-click unsubscribe POSTs carry no CSRF token; the
+        // route is protected by its URL signature instead.
+        $middleware->validateCsrfTokens(except: ['notifications/unsubscribe/*']);
 
         // Behind an nginx reverse proxy; see TRUSTED_PROXIES in .env.
         $middleware->replace(

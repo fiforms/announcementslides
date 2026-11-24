@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Jobs\SendNotificationEmail;
 use App\Models\Notification;
 use App\Models\User;
 use App\Support\NotificationPreferences;
@@ -119,6 +120,8 @@ class Notifier
     /** @param array<string> $notificationIds */
     protected static function queueImmediateEmails(array $notificationIds): void
     {
-        // Wired up with the email delivery (SendNotificationEmail).
+        foreach ($notificationIds as $id) {
+            SendNotificationEmail::dispatch($id);
+        }
     }
 }

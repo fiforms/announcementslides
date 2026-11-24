@@ -78,6 +78,13 @@ Route::prefix('play/{token}')->name('play.')->middleware('throttle:240,1')->grou
     Route::get('/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'playLink'])->name('widget-data');
 });
 
+// Signed "stop emails like this" links from notification emails (no sign-in needed).
+Route::middleware(['signed', 'throttle:30,1'])->group(function () {
+    Route::get('/notifications/unsubscribe/{user}/{category}', [\App\Http\Controllers\NotificationUnsubscribeController::class, 'show'])
+        ->name('notifications.unsubscribe');
+    Route::post('/notifications/unsubscribe/{user}/{category}', [\App\Http\Controllers\NotificationUnsubscribeController::class, 'store']);
+});
+
 // ── Auth (Breeze) ─────────────────────────────────────────────────────────────
 
 require __DIR__.'/auth.php';
@@ -285,6 +292,12 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     // ── In-browser AI upscaler options ────────────────────────────────────
     Route::get('/upscaler', [AdminUpscalerSettingsController::class, 'index'])->name('upscaler.index');
     Route::patch('/upscaler', [AdminUpscalerSettingsController::class, 'update'])->name('upscaler.update');
+
+    // ── Notifications: email, digest, retention ────────────────────────────
+    Route::get('/notifications', [\App\Http\Controllers\Admin\NotificationSettingsController::class, 'index'])->name('notifications.index');
+    Route::patch('/notifications', [\App\Http\Controllers\Admin\NotificationSettingsController::class, 'update'])->name('notifications.update');
+    Route::post('/notifications/test', [\App\Http\Controllers\Admin\NotificationSettingsController::class, 'test'])
+        ->middleware('throttle:5,1')->name('notifications.test');
 
     // ── Overlay widgets (admin-installed code packages) ───────────────────
     Route::get('/widgets', [AdminWidgetController::class, 'index'])->name('widgets.index');

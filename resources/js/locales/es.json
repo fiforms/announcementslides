@@ -1241,6 +1241,33 @@
             "slide_expired": "«{slide}» venció.",
             "admin_slide_shared": "{entity} compartió «{slide}» con iglesias cercanas.",
             "admin_global_published": "{user} publicó la diapositiva global «{slide}»."
-        }
+        },
+        "unsubscribe_title": "Dejar de recibir correos de notificaciones",
+        "unsubscribe_confirm": "¿Dejar de enviarle correos de «{category}»?",
+        "unsubscribe_all_confirm": "¿Dejar de enviarle todos los correos de notificaciones? Las notificaciones seguirán apareciendo en su bandeja.",
+        "unsubscribe_button": "Desactivar estos correos",
+        "unsubscribed_title": "Correo desactivado",
+        "unsubscribed_body": "Ya no recibirá correos de «{category}». Puede volver a activarlos en su configuración de notificaciones.",
+        "unsubscribed_all_body": "Ya no recibirá correos de notificaciones. Puede volver a activarlos en su configuración de notificaciones."
+    },
+    "admin_notifications": {
+        "email": "Correo",
+        "email_hint": "Cada usuario elige por categoría si las notificaciones también se envían por correo de inmediato o en un resumen diario. Este interruptor activa o desactiva todo el correo de notificaciones del sitio.",
+        "mailer_log": "El servicio de correo es «{mailer}», así que los correos solo se escriben en el registro y no se entregan. Configure MAIL_* en el entorno antes de activar el correo.",
+        "mailer_info": "Servicio de correo: {mailer}, desde {from}.",
+        "email_enabled": "Enviar correos de notificaciones",
+        "email_enabled_hint": "Mientras esté desactivado, las notificaciones siguen apareciendo en la app y no se acumula nada para enviar después.",
+        "digest_time": "Hora del resumen diario",
+        "digest_time_hint": "Cuándo se envía el resumen diario (zona horaria del servidor).",
+        "retention": "Conservación",
+        "retention_days": "Eliminar notificaciones borradas después de (días)",
+        "retention_days_hint": "Las notificaciones borradas quedan en el archivo de cada usuario durante este tiempo.",
+        "inbox_max_days": "Borrar automáticamente de la bandeja después de (días)",
+        "inbox_max_days_hint": "Las notificaciones que nadie borró pasan al archivo después de estos días. 0 = nunca.",
+        "send_test": "Enviarme un correo de prueba",
+        "stats": "Totales actuales",
+        "stat_inbox": "{n} en bandejas",
+        "stat_archived": "{n} archivadas",
+        "stat_pending": "{n} esperando el próximo resumen"
     }
 }
