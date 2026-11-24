@@ -6,7 +6,7 @@
         "my_slides": "Mis diapositivas",
         "submit_slide": "Enviar una diapositiva",
         "slides": "Diapositivas",
-        "promo_shows": "Presentaciones promocionales",
+        "playlists": "Listas de reproducción",
         "users": "Usuarios",
         "entity_slides": "Entidades",
         "slide_announcers": "Dispositivos anunciadores",
@@ -1206,8 +1206,8 @@
                 "description": "Una iglesia cercana compartió una diapositiva y si se agregó a sus presentaciones."
             },
             "promo": {
-                "label": "Presentaciones promocionales",
-                "description": "Hay una nueva presentación o video promocional."
+                "label": "Listas de reproducción",
+                "description": "Hay una nueva lista de reproducción o video."
             },
             "team": {
                 "label": "Equipo",
@@ -1248,8 +1248,8 @@
             "user_joined": "{user} ({email}) aceptó su invitación y se unió.",
             "global_slide": "Nueva diapositiva global: «{slide}».",
             "nearby_slide": "{entity} compartió una diapositiva: «{slide}».",
-            "promo_available": "Nueva presentación promocional: «{promo}».",
-            "promo_slide_added": "Nuevo en la presentación promocional «{promo}»: «{slide}».",
+            "promo_available": "Nueva lista de reproducción: «{promo}».",
+            "promo_slide_added": "Nuevo en la lista de reproducción «{promo}»: «{slide}».",
             "slide_started": "«{slide}» comenzó a mostrarse.",
             "slide_expired": "«{slide}» venció.",
             "admin_slide_shared": "{entity} compartió «{slide}» con iglesias cercanas.",

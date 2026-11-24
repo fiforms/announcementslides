@@ -267,10 +267,11 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     Route::delete('/invitations/{invitation}', [AdminUserController::class, 'destroyInvitation'])->name('invitations.destroy');
 
     // ── Promo shows (globally-distributed one-off shows) ──────────────────
-    Route::get('/promo-shows', [AdminPromoShowController::class, 'index'])->name('promo-shows.index');
-    Route::patch('/promo-shows/{promo}', [AdminPromoShowController::class, 'update'])->name('promo-shows.update');
-    Route::delete('/promo-shows/{promo}/slides/{slide}', [AdminPromoShowController::class, 'detachSlide'])->name('promo-shows.slides.detach');
-    Route::delete('/promo-shows/{promo}', [AdminPromoShowController::class, 'destroy'])->name('promo-shows.destroy');
+    Route::get('/playlists', [AdminPromoShowController::class, 'index'])->name('playlists.index');
+    Route::get('/playlists/{promo}/upload', [AdminPromoShowController::class, 'upload'])->name('playlists.upload');
+    Route::patch('/playlists/{promo}', [AdminPromoShowController::class, 'update'])->name('playlists.update');
+    Route::delete('/playlists/{promo}/slides/{slide}', [AdminPromoShowController::class, 'detachSlide'])->name('playlists.slides.detach');
+    Route::delete('/playlists/{promo}', [AdminPromoShowController::class, 'destroy'])->name('playlists.destroy');
 
     // ── Entity console (admin oversight of entity-scoped slides) ──────────
     Route::get('/entities', [EntityConsoleController::class, 'index'])->name('entities.index');

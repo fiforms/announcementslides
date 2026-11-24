@@ -16,11 +16,11 @@ const props = defineProps({
     slide: { type: Object, required: true },
     languages: { type: Array, default: () => [] },
     mediaTypes: { type: Array, default: () => [] },
-    // Where the edit was opened from ('promos'), so Save/Cancel/Back return there.
+    // Where the edit was opened from ('playlists'), so Save/Cancel/Back return there.
     from: { type: String, default: null },
 });
 
-const backHref = computed(() => props.from === 'promos' ? route('admin.promo-shows.index') : route('admin.slides.index'));
+const backHref = computed(() => props.from === 'playlists' ? route('admin.playlists.index') : route('admin.slides.index'));
 
 function toLocalDatetime(iso) {
     if (!iso) return '';

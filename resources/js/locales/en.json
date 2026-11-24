@@ -6,7 +6,7 @@
         "my_slides": "My Slides",
         "submit_slide": "Submit a Slide",
         "slides": "Slides",
-        "promo_shows": "Promo Shows",
+        "playlists": "Playlists",
         "users": "Users",
         "entity_slides": "Entities",
         "slide_announcers": "Announcer Devices",
@@ -1206,8 +1206,8 @@
                 "description": "A nearby church shared a slide, and whether it was added to your shows."
             },
             "promo": {
-                "label": "Promo shows",
-                "description": "A new promo show or video is available."
+                "label": "Playlists",
+                "description": "A new playlist or video is available."
             },
             "team": {
                 "label": "Team",
@@ -1248,8 +1248,8 @@
             "user_joined": "{user} ({email}) accepted your invitation and joined.",
             "global_slide": "New global slide: “{slide}”.",
             "nearby_slide": "{entity} shared a slide: “{slide}”.",
-            "promo_available": "New promo show: “{promo}”.",
-            "promo_slide_added": "New in promo show “{promo}”: “{slide}”.",
+            "promo_available": "New playlist: “{promo}”.",
+            "promo_slide_added": "New in playlist “{promo}”: “{slide}”.",
             "slide_started": "“{slide}” has started showing.",
             "slide_expired": "“{slide}” has expired.",
             "admin_slide_shared": "{entity} shared “{slide}” with nearby churches.",

@@ -18,7 +18,7 @@ What you receive depends on your role:
 - **Church leaders and editors:**
   - a new global slide is available;
   - a nearby church shared a slide;
-  - a new promo show is available;
+  - a new playlist is available;
   - someone accepted your invitation to the team;
   - one of your church's Slide Announcers is running too hot.
 
