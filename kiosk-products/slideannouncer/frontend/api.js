@@ -13,6 +13,12 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ show_id: showId }),
     }),
+  playbackState: (state) =>
+    request('/api/local/playback-state', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state),
+    }),
   srtSinkStatus: () => request('/api/local/srt-sink'),
   srtSinkPlaying: () => request('/api/local/srt-sink/playing'),
   setSrtSink: (enabled) =>

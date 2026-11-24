@@ -44,6 +44,20 @@ Product docs: [`docs/MULTI_SHOW_IMPLEMENTATION.md`](docs/MULTI_SHOW_IMPLEMENTATI
 (the multi-show kiosk spec), [`docs/AIRSHOW.md`](docs/AIRSHOW.md) (screen
 mirroring: AirShow mode and background mode).
 
+## Update hold
+
+The platform's updaters won't restart the kiosk or reboot while
+`/run/slide-announcer/update-hold` exists (platform `docs/DEVICE_CONTRACT.md`,
+"Update hold"). `backend/update_hold.py` keeps it current, holding for: a LAN
+video stream (`video_stream`), a Revelation presentation (`revelation`), an
+AirShow cast (`airshow_casting`), an unfinished video picked from a menu show
+(`play_once_video`), and a live channel someone chose with the remote
+(`live_channel`; one that is up only because it was pinned at shutdown doesn't
+count). Ordinary announcement slides never hold. The last two exist only in the
+kiosk page, which reports them to `POST /api/local/playback-state` every 5
+seconds (`Slideshow.vue`); a page that goes quiet for 30 seconds is treated as
+playing nothing. The hold lingers 60 seconds after its last reason ends.
+
 ## LAN video receiver (SRT/RIST)
 
 Not a separate systemd unit — `backend/srt_stream_bridge.py` is an in-process

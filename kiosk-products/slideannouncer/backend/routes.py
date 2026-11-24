@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 import pairing
 
-from . import airshow, pinning, revelation, srt_sink, srt_stream_bridge, sync, widgets
+from . import airshow, pinning, revelation, srt_sink, srt_stream_bridge, sync, update_hold, widgets
 
 router = APIRouter()
 
@@ -78,6 +78,22 @@ def pin_show(body: PinShowRequest):
     # MULTI_SHOW_IMPLEMENTATION.md.
     pinning.write_pinned_show_id(body.show_id)
     return {"ok": True, "pinned_show_id": body.show_id}
+
+
+class PlaybackStateRequest(BaseModel):
+    play_once_video: bool = False
+    live_channel: bool = False
+    # True once the page has seen a key press (a person is using the remote).
+    interacted: bool = False
+
+
+@router.post("/api/local/playback-state")
+def playback_state(body: PlaybackStateRequest):
+    # The kiosk page's report of what the backend can't see (update_hold.py):
+    # while it says a menu video is unfinished, or a live channel someone chose
+    # is up, the platform's updaters hold off restarting the kiosk.
+    update_hold.record_report(**body.model_dump())
+    return {"ok": True}
 
 
 def _srt_sink_response(config: dict) -> dict:
