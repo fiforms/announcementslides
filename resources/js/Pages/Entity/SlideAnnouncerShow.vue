@@ -151,11 +151,29 @@ function generatePassphrase() {
 
 // Mirrors kiosk-products/slideannouncer/backend/srt_sink.py's sender_url(): the
 // URL to configure a sender (OBS, vMix, an encoder) with. Built from the
-// form's current values so it previews an unsaved change; latency/buffer
-// are device-side tuning, taken from the device's last report.
+// form's current values so it previews an unsaved change.
+// Same stops as the device's Settings > SRT Sink slider (fine steps where
+// tuning matters, coarse at the high end), so the slider moves over a stop
+// index and maps back to ms.
+const SRT_LATENCY_STOPS_MS = [60, 120, 180, 240, 300, 450, 600];
+const RIST_BUFFER_STOPS_MS = [100, 200, 300, 500, 750, 1000, 1500, 2000];
+const bufferStops = computed(() => (isRist.value ? RIST_BUFFER_STOPS_MS : SRT_LATENCY_STOPS_MS));
+const bufferField = computed(() => (isRist.value ? 'rx_rist_buffer_ms' : 'rx_srt_latency_ms'));
+const bufferIndex = computed(() => {
+    const ms = Number(form[bufferField.value]);
+    let best = 0;
+    bufferStops.value.forEach((stop, i) => {
+        if (Math.abs(stop - ms) < Math.abs(bufferStops.value[best] - ms)) best = i;
+    });
+    return best;
+});
+function setBuffer(index) {
+    form[bufferField.value] = bufferStops.value[index];
+}
+
 const connectUrl = computed(() => {
-    const latencyMs = receiver.srt_latency_ms ?? 120;
-    const bufferMs = receiver.rist_buffer_ms ?? 500;
+    const latencyMs = Number(form.rx_srt_latency_ms) || 120;
+    const bufferMs = Number(form.rx_rist_buffer_ms) || 500;
     // Caller mode: this device dials out, so the sender listens ("@" = listen)
     // on the port saved here, with the secret/encryption saved here.
     if (isCaller.value) {
@@ -418,14 +436,12 @@ function copyConnectUrl() {
                         </p>
                     </div>
 
-                    <div class="max-w-xs">
+                    <div class="max-w-md">
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ isRist ? $t('slide_announcers.rist_buffer') : $t('slide_announcers.srt_latency') }}</label>
-                        <div class="flex items-center gap-2">
-                            <input v-if="isRist" v-model="form.rx_rist_buffer_ms" type="number" min="50" max="3000" step="50"
-                                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            <input v-else v-model="form.rx_srt_latency_ms" type="number" min="20" max="2000" step="10"
-                                class="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            <span class="text-sm text-gray-500">ms</span>
+                        <div class="flex items-center gap-3">
+                            <input type="range" min="0" :max="bufferStops.length - 1" step="1" :value="bufferIndex"
+                                class="flex-1 accent-indigo-600" @input="setBuffer(Number($event.target.value))" />
+                            <span class="w-16 text-right text-sm text-gray-700">{{ form[bufferField] }} ms</span>
                         </div>
                         <p class="mt-1 text-xs text-gray-500">{{ $t('slide_announcers.buffer_help') }}</p>
                         <p v-if="form.errors['srt_sink_config.srt_latency_ms']" class="mt-1 text-xs text-red-600">{{ form.errors['srt_sink_config.srt_latency_ms'] }}</p>
