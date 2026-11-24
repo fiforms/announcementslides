@@ -35,6 +35,8 @@ class Slide extends Model
             'share_nearby' => 'boolean',
             'immutable' => 'boolean',
             'announced_at' => 'datetime',
+            'start_notified_at' => 'datetime',
+            'expiry_notified_at' => 'datetime',
         ];
     }
 

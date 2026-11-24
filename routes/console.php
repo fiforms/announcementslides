@@ -45,3 +45,6 @@ $digestTime = rescue(fn () => NotificationSettings::get('digest_time'), config('
 Schedule::command('notifications:send-digest')
     ->dailyAt(preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string) $digestTime) ? $digestTime : '07:00')
     ->withoutOverlapping();
+
+// "Started showing" / "expired" notices (publishing and expiry are query-time).
+Schedule::command('notifications:slide-schedule')->everyFifteenMinutes()->withoutOverlapping();
