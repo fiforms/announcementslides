@@ -125,6 +125,13 @@ class SlideAnnouncerHeartbeatController extends Controller
             // dance) without guessing from the URL/filename.
             'os_release_type' => $osUpdateAvailable ? $activeOsRelease->release_type : null,
             'os_auto_update_enabled' => $device->auto_update_enabled,
+            // How long the offered update has been available, so a device that
+            // is rarely powered on can tell it is overdue and skip its
+            // overnight window (it never skips what's on screen). Null when
+            // nothing is offered.
+            'app_update_age_hours' => $appUpdateAvailable ? $activeAppRelease->hoursOfferedOn($device->update_channel) : null,
+            'os_update_age_hours' => $osUpdateAvailable ? $activeOsRelease->hoursOfferedOn($device->update_channel) : null,
+            'update_overdue_after_hours' => (int) config('slide_announcer.update_overdue_after_hours'),
         ] + HeartbeatExtensions::respond($device));
     }
 

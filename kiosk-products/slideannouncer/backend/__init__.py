@@ -5,7 +5,7 @@ from pathlib import Path
 
 from product import Product
 
-from . import airshow, channel_assist, pinning, srt_sink, srt_stream_bridge, sync
+from . import airshow, channel_assist, pinning, srt_sink, srt_stream_bridge, sync, update_hold
 from .routes import router
 
 
@@ -37,7 +37,7 @@ product = Product(
     name="slideannouncer",
     api_base="/api/slide-announcers",
     routers=[router],
-    background_tasks=[sync.run_forever, srt_stream_bridge.run_forever, airshow.run_hold_monitor, channel_assist.run_forever],
+    background_tasks=[sync.run_forever, srt_stream_bridge.run_forever, airshow.run_hold_monitor, update_hold.run_hold_monitor, channel_assist.run_forever],
     status_fields=lambda: {"sync": sync.read_status()},
     heartbeat_payload=_heartbeat_payload,
     on_heartbeat_response=_on_heartbeat_response,

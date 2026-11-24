@@ -33,4 +33,18 @@ return [
     |--------------------------------------------------------------------------
     */
     'pairing_code_ttl_minutes' => env('SLIDE_ANNOUNCER_PAIRING_CODE_TTL_MINUTES', 10),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Overdue updates
+    |--------------------------------------------------------------------------
+    |
+    | Devices normally apply updates only in their overnight idle window. A
+    | device that is only powered on for a weekly service never sees that
+    | window, so once an offered update is this many hours old the device
+    | skips the window and applies it on its next check (it still defers to
+    | whatever is on screen — see DEVICE_CONTRACT.md, "Overdue updates").
+    |
+    */
+    'update_overdue_after_hours' => env('SLIDE_ANNOUNCER_UPDATE_OVERDUE_AFTER_HOURS', 72),
 ];

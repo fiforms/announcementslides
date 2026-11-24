@@ -157,6 +157,19 @@ class SlideAnnouncerRelease extends Model
         ];
     }
 
+    /**
+     * Whole hours since this release was tagged onto $channel, i.e. since a
+     * device on that channel could first have been offered it; null if it
+     * isn't tagged there. Sent to devices as an age rather than a timestamp
+     * so a Pi with no RTC and a not-yet-synced clock can't misjudge it.
+     */
+    public function hoursOfferedOn(string $channel): ?int
+    {
+        $taggedAt = $this->channels->firstWhere('channel', $channel)?->created_at;
+
+        return $taggedAt ? max(0, (int) $taggedAt->diffInHours(now(), true)) : null;
+    }
+
     public function currentChannelNames(): array
     {
         return $this->channels->pluck('channel')->all();

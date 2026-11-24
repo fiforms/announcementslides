@@ -133,6 +133,37 @@ watch(() => activeShow()?.id, () => {
   noteActivity()
   streamHalted.value = false
 })
+
+// What the platform's updaters must not interrupt (backend/update_hold.py):
+// report, every few seconds, the two things only this page can see — a video
+// picked from a menu show that hasn't finished, and a live channel on screen.
+// A live channel only counts once someone has pressed a key (`interacted`,
+// from real key presses only — not the show change at startup), so one that is
+// up merely because it was pinned at the last shutdown never blocks an update.
+const PLAYBACK_REPORT_MS = 5 * 1000
+let interactedSinceLoad = false
+let playbackReportTimer = null
+function noteKeyPress() {
+  const first = !interactedSinceLoad
+  interactedSinceLoad = true
+  noteActivity()
+  if (first) reportPlayback()
+}
+function playbackState() {
+  return {
+    play_once_video: isMenu.value && picked.value && isVideoSlide(currentSlide.value) && !activeVideo()?.ended,
+    live_channel: streamsLive.value && !streamHalted.value,
+    interacted: interactedSinceLoad,
+  }
+}
+async function reportPlayback() {
+  try {
+    await api.playbackState(playbackState())
+  } catch {
+    // The backend treats a silent page as one that isn't playing anything, which
+    // errs toward letting an update through — retry on the next tick.
+  }
+}
 const volume = ref(100)
 const muted = ref(false)
 const showVolumeIndicator = ref(false)
@@ -657,9 +688,11 @@ onMounted(async () => {
   statusTimer = setInterval(refreshStatus, STATUS_INTERVAL_MS)
   externalPlaybackTimer = setInterval(refreshExternalPlayback, EXTERNAL_PLAYBACK_POLL_MS)
   streamCheckTimer = setInterval(checkStreamTimeout, STREAM_CHECK_MS)
+  playbackReportTimer = setInterval(reportPlayback, PLAYBACK_REPORT_MS)
+  reportPlayback()
   // Capture phase: every key counts as activity, including ones the Menu
   // overlay or remoteNav.js handle and never pass on.
-  window.addEventListener('keydown', noteActivity, true)
+  window.addEventListener('keydown', noteKeyPress, true)
   window.addEventListener('keydown', onKeydown)
 })
 
@@ -669,7 +702,8 @@ onUnmounted(() => {
   if (statusTimer) clearInterval(statusTimer)
   if (externalPlaybackTimer) clearInterval(externalPlaybackTimer)
   if (streamCheckTimer) clearInterval(streamCheckTimer)
-  window.removeEventListener('keydown', noteActivity, true)
+  if (playbackReportTimer) clearInterval(playbackReportTimer)
+  window.removeEventListener('keydown', noteKeyPress, true)
   if (volumeSettleTimer) clearTimeout(volumeSettleTimer)
   if (volumeHideTimer) clearTimeout(volumeHideTimer)
   if (seekHideTimer) clearTimeout(seekHideTimer)
