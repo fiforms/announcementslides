@@ -31,6 +31,10 @@ return [
         'slide_schedule' => ['audience' => 'everyone', 'inbox' => true, 'email' => 'none'],
         'admin_review_queue' => ['audience' => 'admin', 'inbox' => true, 'email' => 'daily'],
         'admin_shared' => ['audience' => 'admin', 'inbox' => true, 'email' => 'none'],
+        // A church's Slide Announcer reported a temperature over the limit.
+        'device_temperature' => ['audience' => 'managers', 'inbox' => true, 'email' => 'immediate'],
+        // "Status notifications": a device went offline / came back. Opt-in.
+        'device_status' => ['audience' => 'managers', 'inbox' => false, 'email' => 'none'],
     ],
 
     'email_modes' => ['none', 'immediate', 'daily'],
@@ -46,6 +50,10 @@ return [
 
     // Off until the deployment has a real mailer configured.
     'email_enabled' => (bool) env('NOTIFICATION_EMAIL_ENABLED', false),
+
+    // A Slide Announcer heartbeat at or above this CPU temperature (°C)
+    // raises a device_temperature notice.
+    'device_temp_threshold_c' => (int) env('NOTIFICATION_DEVICE_TEMP_THRESHOLD_C', 70),
 
     // How many notifications the bell's dropdown shows.
     'recent_limit' => 8,

@@ -23,6 +23,9 @@ return [
         'slide_expired'        => '«:slide» venció.',
         'admin_slide_shared'   => ':entity compartió «:slide» con iglesias cercanas.',
         'admin_global_published' => ':user publicó la diapositiva global «:slide».',
+        'device_hot' => '«:device» en :entity está muy caliente: :temp °C (límite :limit °C).',
+        'device_offline' => '«:device» en :entity no se ha reportado :missed veces y parece estar desconectado.',
+        'device_online' => '«:device» en :entity está en línea de nuevo.',
     ],
     'categories' => [
         'slide_review'       => 'Mis envíos',
@@ -33,6 +36,8 @@ return [
         'slide_schedule'     => 'Horario de diapositivas',
         'admin_review_queue' => 'Cola de revisión (admin)',
         'admin_shared'       => 'Diapositivas compartidas (admin)',
+        'device_temperature' => 'Temperatura de dispositivos',
+        'device_status' => 'Estado de dispositivos',
     ],
     'added_to'        => 'agregada a :shows',
     'more_churches'   => 'y :n iglesias más',

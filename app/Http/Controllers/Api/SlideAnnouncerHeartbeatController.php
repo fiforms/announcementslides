@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Language;
 use App\Models\SlideAnnouncerHeartbeat;
 use App\Models\SlideAnnouncerRelease;
+use App\Notifications\DeviceNotifications;
 use App\Support\SlideAnnouncer\HeartbeatExtensions;
 use Illuminate\Http\Request;
 
@@ -67,6 +68,9 @@ class SlideAnnouncerHeartbeatController extends Controller
 
         HeartbeatExtensions::absorb($device, $data);
         $device->save();
+
+        // Over-temperature and "back online" notices for the church's managers.
+        DeviceNotifications::heartbeat($device, isset($data['cpu_temp_c']) ? (float) $data['cpu_temp_c'] : null);
 
         SlideAnnouncerHeartbeat::create([
             'slide_announcer_id' => $device->id,

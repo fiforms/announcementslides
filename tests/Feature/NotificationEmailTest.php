@@ -143,10 +143,12 @@ class NotificationEmailTest extends TestCase
         $this->actingAs($admin)->get(route('admin.notifications.index'))->assertOk();
         $this->actingAs($admin)->patch(route('admin.notifications.update'), [
             'email_enabled' => false, 'digest_time' => '06:30', 'retention_days' => 30, 'inbox_max_days' => 0,
+            'device_temp_threshold_c' => 75,
         ])->assertRedirect();
 
         $this->assertSame('06:30', NotificationSettings::get('digest_time'));
         $this->assertSame(30, NotificationSettings::get('retention_days'));
+        $this->assertSame(75, NotificationSettings::get('device_temp_threshold_c'));
         $this->assertFalse(NotificationSettings::emailEnabled());
 
         $this->actingAs($admin)->post(route('admin.notifications.test'))->assertRedirect();

@@ -19,7 +19,8 @@ What you receive depends on your role:
   - a new global slide is available;
   - a nearby church shared a slide;
   - a new promo show is available;
-  - someone accepted your invitation to the team.
+  - someone accepted your invitation to the team;
+  - one of your church's Slide Announcers is running too hot.
 
   Slide notices list each church you manage and the shows the slide was
   added to automatically, or say it wasn't added, so you know whether to add
@@ -30,6 +31,10 @@ What you receive depends on your role:
   - global slides a contributor published.
 - **Optional:** when a scheduled slide starts showing or a slide expires.
   These are off by email by default.
+- **Device status (off unless you turn it on):** a Slide Announcer at your
+  church stopped checking in (about 15 minutes without contact) or came
+  back online. Turn it on under **Device status** in your notification
+  settings.
 
 ## Inbox and archive
 

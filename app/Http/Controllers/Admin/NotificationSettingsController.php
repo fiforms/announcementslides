@@ -13,7 +13,7 @@ use Inertia\Inertia;
 use Inertia\Response;
 use Throwable;
 
-/** Site-wide notification settings: email on/off, digest time, retention. */
+/** Site-wide notification settings: email on/off, digest time, retention, device temperature limit. */
 class NotificationSettingsController extends Controller
 {
     public function index(): Response
@@ -37,6 +37,7 @@ class NotificationSettingsController extends Controller
             'digest_time'    => ['required', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
             'retention_days' => 'required|integer|min:1|max:3650',
             'inbox_max_days' => 'required|integer|min:0|max:3650',
+            'device_temp_threshold_c' => 'required|integer|min:40|max:110',
         ]);
 
         NotificationSettings::save($data);

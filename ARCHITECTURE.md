@@ -247,6 +247,9 @@ The model is [Notification](app/Models/Notification.php). `type` is a short key 
     - `Show::syncAutoFillForSlide()` and `restoreImmutableSlide()` return the show ids they attached, so each notice can say which of a manager's shows the slide landed in.
     - `slides.announced_at` and `global_show_templates.announced_at` are claimed atomically, so a slide is announced only once.
   - Started and expired slides: `notifications:slide-schedule`, every 15 minutes, using `slides.start_notified_at` / `expiry_notified_at`.
+  - Slide Announcer devices: [DeviceNotifications](app/Notifications/DeviceNotifications.php), sent to the managers of the device's church.
+    - `device_temperature`: the heartbeat controller calls it with each reported `cpu_temp_c`. At or over the admin-set limit (default 70 °C) it sends one notice and stamps `slide_announcers.temp_alert_at`. The alert re-arms only once the device is 5 °C below the limit and an hour has passed.
+    - `device_status` (opt-in, off by default): `notifications:device-status` runs every 5 minutes and reports devices that missed `slide_announcer.offline_after_missed_heartbeats` (3) heartbeats, stamping `offline_notified_at`. The device's next heartbeat clears the stamp and sends "back online". Devices silent for more than 24 hours are stamped without a notice.
 - **UI:**
   - The bell is [NotificationBell.vue](resources/js/Components/NotificationBell.vue), in `UserMenu` and `UserMenuAdmin`. Its badge comes from the shared prop `unreadNotifications`, and its dropdown from `GET /notifications/recent`.
   - The inbox and archive are at `/notifications` ([NotificationController](app/Http/Controllers/NotificationController.php)). Every query there is scoped to the signed-in user. `/notifications/{id}/open` marks a notification read and redirects, to same-site paths only.
@@ -259,6 +262,7 @@ The model is [Notification](app/Models/Notification.php). `type` is a short key 
   - digest time
   - how long cleared notifications are kept (`notifications:prune`, daily)
   - how long before un-cleared inbox items are archived automatically
+  - the device over-temperature limit
   - a "send me a test email" button
 
 Everything above relies on the queue worker and the scheduler. The Docker image runs both (`docker/supervisord.conf`).

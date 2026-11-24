@@ -81,6 +81,17 @@ const mailerIsLog = ['log', 'array'].includes(props.mailer);
                     <span v-if="form.errors.inbox_max_days" class="block text-xs text-red-600">{{ form.errors.inbox_max_days }}</span>
                 </label>
 
+                <div>
+                    <h2 class="text-lg font-semibold text-gray-900">{{ t('admin_notifications.devices') }}</h2>
+                </div>
+
+                <label class="block">
+                    <span class="block text-sm font-medium text-gray-900">{{ t('admin_notifications.device_temp_threshold_c') }}</span>
+                    <input v-model.number="form.device_temp_threshold_c" type="number" min="40" max="110" class="mt-1 w-32 rounded-md border-gray-300 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                    <span class="block text-xs text-gray-500">{{ t('admin_notifications.device_temp_threshold_c_hint') }}</span>
+                    <span v-if="form.errors.device_temp_threshold_c" class="block text-xs text-red-600">{{ form.errors.device_temp_threshold_c }}</span>
+                </label>
+
                 <div class="flex items-center gap-4">
                     <button type="submit" :disabled="form.processing"
                         class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-50">

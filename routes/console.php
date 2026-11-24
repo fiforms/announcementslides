@@ -48,3 +48,6 @@ Schedule::command('notifications:send-digest')
 
 // "Started showing" / "expired" notices (publishing and expiry are query-time).
 Schedule::command('notifications:slide-schedule')->everyFifteenMinutes()->withoutOverlapping();
+
+// Slide Announcers that stopped heartbeating ("status notifications").
+Schedule::command('notifications:device-status')->everyFiveMinutes()->withoutOverlapping();

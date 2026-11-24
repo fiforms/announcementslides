@@ -23,6 +23,9 @@ return [
         'slide_expired'        => '“:slide” has expired.',
         'admin_slide_shared'   => ':entity shared “:slide” with nearby churches.',
         'admin_global_published' => ':user published the global slide “:slide”.',
+        'device_hot' => '“:device” at :entity is running hot: :temp °C (limit :limit °C).',
+        'device_offline' => '“:device” at :entity has missed :missed check-ins and appears to be offline.',
+        'device_online' => '“:device” at :entity is back online.',
     ],
     'categories' => [
         'slide_review'       => 'My submissions',
@@ -33,6 +36,8 @@ return [
         'slide_schedule'     => 'Slide schedule',
         'admin_review_queue' => 'Review queue (admin)',
         'admin_shared'       => 'Shared slides (admin)',
+        'device_temperature' => 'Device temperature',
+        'device_status' => 'Device status',
     ],
     'added_to'        => 'added to :shows',
     'more_churches'   => 'and :n more churches',

@@ -1219,6 +1219,14 @@
             "admin_shared": {
                 "label": "Diapositivas compartidas (admin)",
                 "description": "Una iglesia compartió una diapositiva con iglesias cercanas, o un colaborador publicó una diapositiva global."
+            },
+            "device_temperature": {
+                "label": "Temperatura de dispositivos",
+                "description": "Un Slide Announcer de su iglesia está más caliente de lo normal."
+            },
+            "device_status": {
+                "label": "Estado de dispositivos",
+                "description": "Un Slide Announcer de su iglesia se desconectó o volvió a estar en línea."
             }
         },
         "types": {
@@ -1240,7 +1248,10 @@
             "slide_started": "«{slide}» comenzó a mostrarse.",
             "slide_expired": "«{slide}» venció.",
             "admin_slide_shared": "{entity} compartió «{slide}» con iglesias cercanas.",
-            "admin_global_published": "{user} publicó la diapositiva global «{slide}»."
+            "admin_global_published": "{user} publicó la diapositiva global «{slide}».",
+            "device_hot": "«{device}» en {entity} está muy caliente: {temp} °C (límite {limit} °C).",
+            "device_offline": "«{device}» en {entity} no se ha reportado {missed} veces y parece estar desconectado.",
+            "device_online": "«{device}» en {entity} está en línea de nuevo."
         },
         "unsubscribe_title": "Dejar de recibir correos de notificaciones",
         "unsubscribe_confirm": "¿Dejar de enviarle correos de «{category}»?",
@@ -1270,6 +1281,9 @@
         "stats": "Totales actuales",
         "stat_inbox": "{n} en bandejas",
         "stat_archived": "{n} archivadas",
-        "stat_pending": "{n} esperando el próximo resumen"
+        "stat_pending": "{n} esperando el próximo resumen",
+        "devices": "Slide Announcers",
+        "device_temp_threshold_c": "Aviso de temperatura alta a partir de (°C)",
+        "device_temp_threshold_c_hint": "Se avisa a los encargados de la iglesia cuando un dispositivo reporta una temperatura de CPU igual o superior. Solo se vuelve a avisar cuando se haya enfriado."
     }
 }

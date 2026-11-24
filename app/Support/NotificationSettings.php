@@ -11,7 +11,7 @@ use App\Models\AppSetting;
  */
 class NotificationSettings
 {
-    public const KEYS = ['retention_days', 'inbox_max_days', 'digest_time', 'email_enabled'];
+    public const KEYS = ['retention_days', 'inbox_max_days', 'digest_time', 'email_enabled', 'device_temp_threshold_c'];
 
     public static function get(string $key): mixed
     {
@@ -19,7 +19,7 @@ class NotificationSettings
 
         return match ($key) {
             'email_enabled' => (bool) $value,
-            'retention_days', 'inbox_max_days' => (int) $value,
+            'retention_days', 'inbox_max_days', 'device_temp_threshold_c' => (int) $value,
             default => $value,
         };
     }

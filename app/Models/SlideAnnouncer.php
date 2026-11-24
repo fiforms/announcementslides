@@ -47,6 +47,8 @@ class SlideAnnouncer extends Model
         'last_seen_at' => 'datetime',
         'paired_at' => 'datetime',
         'revoked_at' => 'datetime',
+        'temp_alert_at' => 'datetime',
+        'offline_notified_at' => 'datetime',
     ];
 
     public function entity(): BelongsTo
