@@ -78,7 +78,7 @@ class SlideController extends Controller
             // addressed by template instead (a stable, hot-linkable ?promo=).
             // A link to a promo that has since expired and been swept just
             // falls back to the Global Board.
-            $promo = $this->requestedPromo($request);
+            $promo = $this->requestedPromo($request) ?? $this->promoHoldingOnly($request, $slide);
             $selectedShow = $promo ? null : ($this->requestedShow($request, null) ?? $globalBoard);
             $showId = $selectedShow?->id;
 
@@ -634,6 +634,24 @@ class SlideController extends Controller
     }
 
     /** The promo named by ?promo=<token>, or null (a swept/unknown promo falls back to the Global Board). */
+    /**
+     * A link straight to a slide (/slides/{token}) names no show. When that
+     * slide belongs to a playlist and isn't on the Global Board, open the
+     * playlist behind it, so closing the slide lands on its playlist rather
+     * than on Announcements. An explicit ?show= or ?promo= always wins.
+     */
+    private function promoHoldingOnly(Request $request, ?Slide $slide): ?GlobalShowTemplate
+    {
+        if (!$slide || $slide->entity_id !== null || $request->query('show')) {
+            return null;
+        }
+        if (Show::globalBoard()->slides()->whereKey($slide->id)->exists()) {
+            return null;
+        }
+
+        return GlobalShowTemplate::whereHas('shows.slides', fn ($q) => $q->whereKey($slide->id))->orderBy('id')->first();
+    }
+
     private function requestedPromo(Request $request): ?GlobalShowTemplate
     {
         $token = $request->query('promo');

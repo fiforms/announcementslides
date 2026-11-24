@@ -128,4 +128,20 @@ class PromoShowTest extends TestCase
 
         $this->actingAs(User::factory()->create())->get(route('admin.playlists.upload', $template))->assertForbidden();
     }
+
+    public function test_a_direct_slide_link_opens_the_playlist_that_holds_it(): void
+    {
+        [$template, $slide] = $this->promo();
+
+        $this->get(route('slides.show', $slide->token))
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('promoToken', $template->token)
+                ->where('initialSlide.id', $slide->id)
+                ->has('slides', 1));
+
+        // On the Global Board too: it stays with Announcements.
+        Show::globalBoard()->slides()->attach($slide->id, ['sort_order' => 1]);
+        $this->get(route('slides.show', $slide->token))
+            ->assertInertia(fn (Assert $page) => $page->where('promoToken', null));
+    }
 }
