@@ -2,6 +2,7 @@
 
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
+use App\Support\NotificationSettings;
 use Illuminate\Support\Facades\Schedule;
 
 Artisan::command('inspire', function () {
@@ -33,3 +34,20 @@ if (config('backup.schedule') !== 'off' && in_array($backupDriver, ['mysql', 'ma
         ? $backup->weeklyOn(0, config('backup.time'))
         : $backup->dailyAt(config('backup.time'));
 }
+
+// Deletes cleared notifications past the retention period and archives stale
+// inbox items (Admin → Notifications).
+Schedule::command('notifications:prune')->dailyAt('03:30')->withoutOverlapping();
+
+// The daily notification digest, at the time set on Admin → Notifications.
+// rescue(): the settings table may not exist yet (fresh install, pending migrations).
+$digestTime = rescue(fn () => NotificationSettings::get('digest_time'), config('notifications.digest_time'), false);
+Schedule::command('notifications:send-digest')
+    ->dailyAt(preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', (string) $digestTime) ? $digestTime : '07:00')
+    ->withoutOverlapping();
+
+// "Started showing" / "expired" notices (publishing and expiry are query-time).
+Schedule::command('notifications:slide-schedule')->everyFifteenMinutes()->withoutOverlapping();
+
+// Slide Announcers that stopped heartbeating ("status notifications").
+Schedule::command('notifications:device-status')->everyFiveMinutes()->withoutOverlapping();

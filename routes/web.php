@@ -21,6 +21,7 @@ use App\Http\Controllers\EntitySlideAnnouncerController;
 use App\Http\Controllers\EntitySlideController;
 use App\Http\Controllers\LocalSlideController;
 use App\Http\Controllers\MySlideController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\PlayController;
 use App\Http\Controllers\PlayLinkController;
 use App\Http\Controllers\ProfileController;
@@ -77,6 +78,13 @@ Route::prefix('play/{token}')->name('play.')->middleware('throttle:240,1')->grou
     Route::get('/widget-data/{slideMedia}/{element}/{endpoint}', [WidgetDataController::class, 'playLink'])->name('widget-data');
 });
 
+// Signed "stop emails like this" links from notification emails (no sign-in needed).
+Route::middleware(['signed', 'throttle:30,1'])->group(function () {
+    Route::get('/notifications/unsubscribe/{user}/{category}', [\App\Http\Controllers\NotificationUnsubscribeController::class, 'show'])
+        ->name('notifications.unsubscribe');
+    Route::post('/notifications/unsubscribe/{user}/{category}', [\App\Http\Controllers\NotificationUnsubscribeController::class, 'store']);
+});
+
 // ── Auth (Breeze) ─────────────────────────────────────────────────────────────
 
 require __DIR__.'/auth.php';
@@ -90,6 +98,17 @@ Route::middleware(['auth', 'not-banned'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::patch('/profile/settings', [ProfileController::class, 'updateSettings'])->name('profile.settings.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::patch('/profile/notifications', [ProfileController::class, 'updateNotifications'])->name('profile.notifications.update');
+
+    // ── Notifications: inbox, archive, bell ──────────────────────────────────
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::get('/notifications/recent', [NotificationController::class, 'recent'])->name('notifications.recent');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('/notifications/archive-all', [NotificationController::class, 'archiveAll'])->name('notifications.archive-all');
+    Route::get('/notifications/{notification}/open', [NotificationController::class, 'open'])->name('notifications.open');
+    Route::post('/notifications/{notification}/read', [NotificationController::class, 'read'])->name('notifications.read');
+    Route::post('/notifications/{notification}/archive', [NotificationController::class, 'archive'])->name('notifications.archive');
+    Route::post('/notifications/{notification}/restore', [NotificationController::class, 'restore'])->name('notifications.restore');
 
     Route::get('/entities/search', [EntityController::class, 'search'])->name('entities.search');
     Route::post('/entities/{entity}/subscribe', [EntityController::class, 'subscribe'])->name('entities.subscribe');
@@ -273,6 +292,12 @@ Route::middleware(['auth', EnsureAdmin::class])->prefix('admin')->name('admin.')
     // ── In-browser AI upscaler options ────────────────────────────────────
     Route::get('/upscaler', [AdminUpscalerSettingsController::class, 'index'])->name('upscaler.index');
     Route::patch('/upscaler', [AdminUpscalerSettingsController::class, 'update'])->name('upscaler.update');
+
+    // ── Notifications: email, digest, retention ────────────────────────────
+    Route::get('/notifications', [\App\Http\Controllers\Admin\NotificationSettingsController::class, 'index'])->name('notifications.index');
+    Route::patch('/notifications', [\App\Http\Controllers\Admin\NotificationSettingsController::class, 'update'])->name('notifications.update');
+    Route::post('/notifications/test', [\App\Http\Controllers\Admin\NotificationSettingsController::class, 'test'])
+        ->middleware('throttle:5,1')->name('notifications.test');
 
     // ── Overlay widgets (admin-installed code packages) ───────────────────
     Route::get('/widgets', [AdminWidgetController::class, 'index'])->name('widgets.index');

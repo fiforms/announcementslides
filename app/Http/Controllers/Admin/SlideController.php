@@ -10,6 +10,7 @@ use App\Models\GlobalShowTemplate;
 use App\Models\Language;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Notifications\SlideNotifications;
 use App\Models\SlideMedia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -134,6 +135,7 @@ class SlideController extends Controller
         $newLanguageId = $request->filled('language_id') ? (int) $request->input('language_id') : null;
         $languageChanged = $slide->language_id !== $newLanguageId;
         $statusChanged = $slide->status !== $request->input('status');
+        $wasPending = $slide->status === 'pending';
 
         $data = $request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at', 'status', 'entity_id', 'share_nearby', 'immutable');
 
@@ -153,7 +155,17 @@ class SlideController extends Controller
             $immutableChanged = $data['immutable'] !== $slide->immutable;
         }
 
+        // Publishing or rejecting from the edit form is a review decision too.
+        if ($statusChanged && in_array($data['status'], ['published', 'rejected'], true)) {
+            $data['reviewed_by'] = auth()->id();
+            $data['reviewed_at'] = now();
+        }
+
         $slide->update($data);
+
+        if ($statusChanged && $wasPending) {
+            SlideNotifications::reviewed($slide, $request->user());
+        }
 
         // Re-run auto-fill fan-out so language-gated shows pick up/drop this
         // slide to match its new tag, and so it fans into (once published) or
@@ -230,6 +242,8 @@ class SlideController extends Controller
             SyncShowAutoFillForSlide::dispatch($slide->id);
         }
 
+        SlideNotifications::reviewed($slide, auth()->user());
+
         return back()->with('success', 'Slide approved and published.');
     }
 
@@ -246,6 +260,8 @@ class SlideController extends Controller
         if ($slide->entity_id === null) {
             SyncShowAutoFillForSlide::dispatch($slide->id);
         }
+
+        SlideNotifications::reviewed($slide, auth()->user());
 
         return back()->with('success', 'Slide rejected.');
     }

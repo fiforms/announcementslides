@@ -10,6 +10,12 @@ return [
     // interval would flip "online" false on any single dropped beat.
     'online_threshold_minutes' => env('SLIDE_ANNOUNCER_ONLINE_THRESHOLD_MINUTES', 12),
 
+    // How often devices heartbeat (local-app/backend/heartbeat.py's
+    // INTERVAL_SECONDS), and how many in a row a device must miss before
+    // its managers get a "went offline" status notification.
+    'heartbeat_interval_minutes' => 5,
+    'offline_after_missed_heartbeats' => env('SLIDE_ANNOUNCER_OFFLINE_AFTER_MISSED_HEARTBEATS', 3),
+
     /*
     |--------------------------------------------------------------------------
     | Heartbeat log retention

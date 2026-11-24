@@ -6,6 +6,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Collection;
@@ -148,6 +149,17 @@ class User extends Authenticatable
     public function viewableEntityIds(): array
     {
         return $this->viewableEntities()->pluck('entities.id')->toArray();
+    }
+
+    /** This user's in-app notifications (inbox and archive); see App\Services\Notifier. */
+    public function appNotifications(): MorphMany
+    {
+        return $this->morphMany(Notification::class, 'notifiable');
+    }
+
+    public function unreadNotificationCount(): int
+    {
+        return $this->appNotifications()->whereNull('archived_at')->whereNull('read_at')->count();
     }
 
     public function settings(): HasMany

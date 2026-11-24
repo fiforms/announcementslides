@@ -227,6 +227,46 @@ A device's version is the pair `<platform>_<product>` (e.g. `0.4.1_0.1.0`), with
 
 One service, [BackupService](app/Services/Backup/BackupService.php), builds every backup: `backup:create` (CLI), the scheduler ([routes/console.php](routes/console.php), database-only), the Docker entrypoint (`--if-migrations-pending --tag=pre-migrate` before `migrate`) and the admin page ([BackupController](app/Http/Controllers/Admin/BackupController.php) → queued [RunBackup](app/Jobs/RunBackup.php)). An archive is a ZIP: `manifest.json`, `database.sql` (from `mysqldump` via [MysqlDumper](app/Services/Backup/MysqlDumper.php), swappable through `DatabaseDumper`), and in full mode `files/public/` + `files/private/` (never the backups dir itself). The `APP_KEY` is never included, only a fingerprint. Archives live on `config('backup.disk')` under `backups/`; the `backups` table is only metadata and is rebuilt from the manifests by `syncFromDisk()` (a restore replaces the table with an older copy). Only scheduled and pre-migrate/pre-restore archives are pruned ([config/backup.php](config/backup.php)). Restore is CLI-only (`backup:restore`: manifest checks, safety backup, maintenance mode, load, migrate, files). `Widget.settings` uses a tolerant cast so a different `APP_KEY` reads as "not configured". See [docker/README.md](docker/README.md#backups).
 
+## Notifications
+
+Per-user in-app notifications with optional email. Each event creates **one row per recipient** in `notifications`. This is Laravel's database-notifications table, plus four columns:
+
+- `category`
+- `archived_at`: "cleared", which is separate from `read_at`
+- `email_mode`: the recipient's email choice when the row was created
+- `emailed_at`
+
+The model is [Notification](app/Models/Notification.php). `type` is a short key that the frontend renders through `notifications.types.*` in the locale files. Emails render it through `lang/<locale>/notifications.php`, so keep the two in step. `data` holds `params`, an optional `url`, and a `slide_id` whose thumbnail is looked up at display time.
+
+- **Creating:** always go through [Notifier::send()](app/Services/Notifier.php). It takes a category, a type, recipients, and a payload (or a per-user closure). It applies preferences, skips banned users and non-admins in admin-only categories, writes rows with a chunked bulk insert, and queues one `SendNotificationEmail` per "Right away" recipient. Notifier never sends mail itself. Fan-outs that can reach many people run in queued jobs.
+- **Categories** are defined in [config/notifications.php](config/notifications.php), each with an audience (`everyone` / `managers` / `admin`) and default inbox and email settings. Per-user choices are UserSettings (`notify.<category>.inbox|email`), read and written only by [NotificationPreferences](app/Support/NotificationPreferences.php). The choices are edited on the Profile page.
+- **Events:**
+  - Review decisions and new submissions: [SlideNotifications](app/Notifications/SlideNotifications.php), called from the admin and upload controllers.
+  - Team joins: [TeamNotifications](app/Notifications/TeamNotifications.php), from `EntityInvitation::redeemFor`, `EntityPeopleController::store` and `GoogleController`.
+  - New global, nearby and promo slides: [SlideAvailabilityNotifications](app/Notifications/SlideAvailabilityNotifications.php). It runs from `SyncShowAutoFillForSlide`, `AnnounceSlideAvailability` and `DistributeGlobalSeparateShow`.
+    - `Show::syncAutoFillForSlide()` and `restoreImmutableSlide()` return the show ids they attached, so each notice can say which of a manager's shows the slide landed in.
+    - `slides.announced_at` and `global_show_templates.announced_at` are claimed atomically, so a slide is announced only once.
+  - Started and expired slides: `notifications:slide-schedule`, every 15 minutes, using `slides.start_notified_at` / `expiry_notified_at`.
+  - Slide Announcer devices: [DeviceNotifications](app/Notifications/DeviceNotifications.php), sent to the managers of the device's church.
+    - `device_temperature`: the heartbeat controller calls it with each reported `cpu_temp_c`. At or over the admin-set limit (default 70 °C) it sends one notice and stamps `slide_announcers.temp_alert_at`. The alert re-arms only once the device is 5 °C below the limit and an hour has passed.
+    - `device_status` (opt-in, off by default): `notifications:device-status` runs every 5 minutes and reports devices that missed `slide_announcer.offline_after_missed_heartbeats` (3) heartbeats, stamping `offline_notified_at`. The device's next heartbeat clears the stamp and sends "back online". Devices silent for more than 24 hours are stamped without a notice.
+- **UI:**
+  - The bell is [NotificationBell.vue](resources/js/Components/NotificationBell.vue), in `UserMenu` and `UserMenuAdmin`. Its badge comes from the shared prop `unreadNotifications`, and its dropdown from `GET /notifications/recent`.
+  - The inbox and archive are at `/notifications` ([NotificationController](app/Http/Controllers/NotificationController.php)). Every query there is scoped to the signed-in user. `/notifications/{id}/open` marks a notification read and redirects, to same-site paths only.
+- **Email:**
+  - The digest: `notifications:send-digest` runs daily at the admin-set time and queues one `SendNotificationDigest` per user. A digest leaves out items already read in the app.
+  - Every email carries a signed per-category unsubscribe link plus RFC 8058 `List-Unsubscribe` headers (the POST route is CSRF-exempt). GET only shows a confirm button.
+  - Emails are written in the user's `locale` setting, which [RememberUserLocale](app/Http/Middleware/RememberUserLocale.php) records from `Accept-Language` once per session.
+- **Admin → Notifications** ([NotificationSettings](app/Support/NotificationSettings.php), stored in `app_settings`) controls:
+  - email on/off (off by default, so nothing builds up before a mailer is configured)
+  - digest time
+  - how long cleared notifications are kept (`notifications:prune`, daily)
+  - how long before un-cleared inbox items are archived automatically
+  - the device over-temperature limit
+  - a "send me a test email" button
+
+Everything above relies on the queue worker and the scheduler. The Docker image runs both (`docker/supervisord.conf`).
+
 ## Frontend layout
 
 Under [resources/js/](resources/js/):

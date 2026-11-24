@@ -4,6 +4,7 @@ import AccountAuthMethod from './Partials/AccountAuthMethod.vue';
 import DeleteUserForm from './Partials/DeleteUserForm.vue';
 import ManageEntitySubscriptions from './Partials/ManageEntitySubscriptions.vue';
 import NearbyRadiusForm from './Partials/NearbyRadiusForm.vue';
+import NotificationPreferencesForm from './Partials/NotificationPreferencesForm.vue';
 import SlideDelayForm from './Partials/SlideDelayForm.vue';
 import UpdatePasswordForm from './Partials/UpdatePasswordForm.vue';
 import UpdateProfileInformationForm from './Partials/UpdateProfileInformationForm.vue';
@@ -35,6 +36,10 @@ defineProps({
         type: Number,
         default: 12,
     },
+    notificationPreferences: {
+        type: Object,
+        default: () => ({}),
+    },
 });
 </script>
 
@@ -60,6 +65,13 @@ defineProps({
                     <ManageEntitySubscriptions
                         :subscriptions="subscriptions"
                         class="max-w-xl"
+                    />
+                </div>
+
+                <div class="bg-white p-4 shadow sm:rounded-lg sm:p-8">
+                    <NotificationPreferencesForm
+                        :preferences="notificationPreferences"
+                        class="max-w-3xl"
                     />
                 </div>
 

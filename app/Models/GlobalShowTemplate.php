@@ -24,6 +24,8 @@ class GlobalShowTemplate extends Model
 
     protected $fillable = ['token', 'name', 'created_by'];
 
+    protected $casts = ['announced_at' => 'datetime'];
+
     public function shows(): HasMany
     {
         return $this->hasMany(Show::class, 'global_template_id');

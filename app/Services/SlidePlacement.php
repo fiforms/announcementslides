@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\ShowController;
+use App\Jobs\AnnounceSlideAvailability;
 use App\Jobs\DistributeGlobalSeparateShow;
 use App\Jobs\SyncShowAutoFillForSlide;
 use App\Models\Entity;
@@ -65,6 +66,15 @@ class SlidePlacement
                 }
             }
 
+            // Shared with nearby churches at upload: fan it out to their
+            // auto_fill_nearby shows exactly like the "Share nearby" button
+            // does, then tell their managers (the job does both, queued).
+            foreach ($slides as $slide) {
+                if ($slide->share_nearby) {
+                    SyncShowAutoFillForSlide::dispatch($slide->id);
+                }
+            }
+
             return;
         }
 
@@ -98,6 +108,9 @@ class SlidePlacement
 
             if ($addToShow !== 'none') {
                 SyncShowAutoFillForSlide::dispatch($slide->id);
+            } else {
+                // Not added anywhere, but churches still hear it's available.
+                AnnounceSlideAvailability::dispatch($slide->id);
             }
         }
     }
