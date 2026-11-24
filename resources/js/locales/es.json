@@ -1248,7 +1248,9 @@
         "unsubscribe_button": "Desactivar estos correos",
         "unsubscribed_title": "Correo desactivado",
         "unsubscribed_body": "Ya no recibirá correos de «{category}». Puede volver a activarlos en su configuración de notificaciones.",
-        "unsubscribed_all_body": "Ya no recibirá correos de notificaciones. Puede volver a activarlos en su configuración de notificaciones."
+        "unsubscribed_all_body": "Ya no recibirá correos de notificaciones. Puede volver a activarlos en su configuración de notificaciones.",
+        "more_churches": "y {n} iglesias más",
+        "starts": "Comienza a mostrarse el {date}"
     },
     "admin_notifications": {
         "email": "Correo",

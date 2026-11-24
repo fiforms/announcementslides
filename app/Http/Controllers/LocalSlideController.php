@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\AnnounceSlideAvailability;
 use App\Http\Controllers\Concerns\AuthorizesEntityAccess;
 use App\Http\Controllers\Concerns\ManagesSlideMedia;
 use App\Models\Entity;
@@ -89,7 +90,7 @@ class LocalSlideController extends Controller
         $slide->update($request->only('title', 'notes', 'text_description', 'link', 'video_playback_mode', 'language_id', 'publish_at', 'expires_at'));
 
         if ($languageChanged && $slide->share_nearby) {
-            Show::syncAutoFillForSlide($slide);
+            AnnounceSlideAvailability::dispatch($slide->id, Show::syncAutoFillForSlide($slide));
         }
 
         // back() rather than a fixed redirect so this endpoint also works when
@@ -187,7 +188,8 @@ class LocalSlideController extends Controller
         }
 
         $slide->update(['share_nearby' => true]);
-        Show::syncAutoFillForSlide($slide);
+        // Nearby churches' managers hear about it (queued: possibly many people).
+        AnnounceSlideAvailability::dispatch($slide->id, Show::syncAutoFillForSlide($slide));
 
         return back()->with('success', 'Slide is now shared with nearby churches.');
     }

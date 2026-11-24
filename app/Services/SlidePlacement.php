@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Http\Controllers\ShowController;
+use App\Jobs\AnnounceSlideAvailability;
 use App\Jobs\DistributeGlobalSeparateShow;
 use App\Jobs\SyncShowAutoFillForSlide;
 use App\Models\Entity;
@@ -41,6 +42,13 @@ class SlidePlacement
 
         if ($entityId !== null) {
             $entity = Entity::findOrFail($entityId);
+
+            // Shared with nearby churches at upload: tell their managers.
+            foreach ($slides as $slide) {
+                if ($slide->share_nearby) {
+                    AnnounceSlideAvailability::dispatch($slide->id);
+                }
+            }
 
             $show = match ($addToShow) {
                 'main' => $entity->mainShow(),
@@ -98,6 +106,9 @@ class SlidePlacement
 
             if ($addToShow !== 'none') {
                 SyncShowAutoFillForSlide::dispatch($slide->id);
+            } else {
+                // Not added anywhere, but churches still hear it's available.
+                AnnounceSlideAvailability::dispatch($slide->id);
             }
         }
     }

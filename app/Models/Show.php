@@ -172,38 +172,49 @@ class Show extends Model
      * nearby) and language match. Never touches a link a leader created
      * manually (auto_added = false on the pivot) — automatic reconciliation
      * only retracts what automation itself added.
+     *
+     * @return array<int> ids of the shows the slide was newly added to (for
+     *                    the "new slide available" notifications)
      */
-    public static function syncAutoFillForSlide(Slide $slide): void
+    public static function syncAutoFillForSlide(Slide $slide): array
     {
         $isGlobal = $slide->entity_id === null;
         $flag = $isGlobal ? 'auto_fill_global' : 'auto_fill_nearby';
         $entityIds = static::candidateEntityIdsForSlide($slide);
 
-        static::where($flag, true)
+        return static::where($flag, true)
             ->whereIn('entity_id', $entityIds)
             ->get()
-            ->each(fn (self $show) => static::reconcilePair($show, $slide));
+            ->filter(fn (self $show) => static::reconcilePair($show, $slide) === 'attached')
+            ->modelKeys();
     }
 
     /**
      * Put an immutable global slide back into every entity's Main Show —
      * including ones where a leader removed it before it became immutable.
      * Other (extra) shows are left alone: the lock applies to Main only.
+     *
+     * @return array<int> ids of the shows it was put back into
      */
-    public static function restoreImmutableSlide(Slide $slide): void
+    public static function restoreImmutableSlide(Slide $slide): array
     {
         if (!$slide->isLockedInShows()) {
-            return;
+            return [];
         }
 
-        static::where('is_main', true)->whereNotNull('entity_id')->get()->each(function (self $show) use ($slide) {
+        $attached = [];
+
+        static::where('is_main', true)->whereNotNull('entity_id')->get()->each(function (self $show) use ($slide, &$attached) {
             if (!$show->slides()->where('slides.id', $slide->id)->exists()) {
                 $show->slides()->attach($slide->id, [
                     'sort_order' => $slide->assignFanoutSortOrderIfNeeded(),
                     'auto_added' => true,
                 ]);
+                $attached[] = $show->id;
             }
         });
+
+        return $attached;
     }
 
     /**
@@ -268,8 +279,10 @@ class Show extends Model
      * pane). That keeps a slide's sort position stable across its own
      * schedule, while still reacting immediately to an admin's
      * approve/reject or draft/publish toggle.
+     *
+     * @return 'attached'|'detached'|null what changed
      */
-    private static function reconcilePair(self $show, Slide $slide): void
+    private static function reconcilePair(self $show, Slide $slide): ?string
     {
         $eligible = $slide->status === 'published';
         $pivot = $show->slides()->where('slides.id', $slide->id)->first()?->pivot;
@@ -277,8 +290,16 @@ class Show extends Model
         if ($eligible && !$pivot) {
             $sortOrder = $slide->assignFanoutSortOrderIfNeeded();
             $show->slides()->attach($slide->id, ['sort_order' => $sortOrder, 'auto_added' => true]);
-        } elseif (!$eligible && $pivot && $pivot->auto_added) {
-            $show->slides()->detach($slide->id);
+
+            return 'attached';
         }
+
+        if (!$eligible && $pivot && $pivot->auto_added) {
+            $show->slides()->detach($slide->id);
+
+            return 'detached';
+        }
+
+        return null;
     }
 }

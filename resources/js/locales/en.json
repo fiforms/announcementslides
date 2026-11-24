@@ -1248,7 +1248,9 @@
         "unsubscribe_button": "Turn off these emails",
         "unsubscribed_title": "Email turned off",
         "unsubscribed_body": "You will no longer get “{category}” emails. You can turn them back on in your notification settings.",
-        "unsubscribed_all_body": "You will no longer get notification emails. You can turn them back on in your notification settings."
+        "unsubscribed_all_body": "You will no longer get notification emails. You can turn them back on in your notification settings.",
+        "more_churches": "and {n} more churches",
+        "starts": "Starts showing {date}"
     },
     "admin_notifications": {
         "email": "Email",

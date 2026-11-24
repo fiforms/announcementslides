@@ -6,6 +6,7 @@ use App\Models\Entity;
 use App\Models\GlobalShowTemplate;
 use App\Models\Show;
 use App\Models\Slide;
+use App\Notifications\SlideAvailabilityNotifications;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -47,5 +48,8 @@ class DistributeGlobalSeparateShow implements ShouldQueue
                 $show->slides()->syncWithoutDetaching([$slide->id => ['sort_order' => $sortOrder, 'auto_added' => true]]);
             }
         });
+
+        // Every church now has its copy: tell their show managers.
+        SlideAvailabilityNotifications::announcePromo($template, $slide);
     }
 }

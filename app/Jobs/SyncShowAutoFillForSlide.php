@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Show;
 use App\Models\Slide;
+use App\Notifications\SlideAvailabilityNotifications;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -27,8 +28,14 @@ class SyncShowAutoFillForSlide implements ShouldQueue
     {
         $slide = Slide::find($this->slideId);
         if ($slide) {
-            Show::syncAutoFillForSlide($slide);
-            Show::restoreImmutableSlide($slide);
+            $attached = array_merge(
+                Show::syncAutoFillForSlide($slide),
+                Show::restoreImmutableSlide($slide),
+            );
+
+            // First time it's published: tell the churches' show managers
+            // (no-op if it was announced before; see announced_at).
+            SlideAvailabilityNotifications::announce($slide, array_unique($attached));
         }
     }
 }

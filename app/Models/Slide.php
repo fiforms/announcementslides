@@ -34,6 +34,7 @@ class Slide extends Model
             'reviewed_at' => 'datetime',
             'share_nearby' => 'boolean',
             'immutable' => 'boolean',
+            'announced_at' => 'datetime',
         ];
     }
 

@@ -14,6 +14,9 @@ const { message, categoryLabel, when } = useNotificationText();
 
 const n = computed(() => props.notification);
 const placements = computed(() => n.value.params?.placements ?? []);
+const startsAt = computed(() => n.value.params?.starts_at
+    ? new Date(n.value.params.starts_at + 'T00:00:00').toLocaleDateString()
+    : null);
 
 function post(name) {
     router.post(route(name, n.value.id), {}, {
@@ -56,7 +59,11 @@ function post(name) {
                     </template>
                     <template v-else>{{ $t('notifications.not_added') }}</template>
                 </li>
+                <li v-if="n.params?.more">{{ $t('notifications.more_churches', { n: n.params.more }) }}</li>
             </ul>
+            <p v-if="startsAt && !compact" class="mt-1 text-xs text-gray-600">
+                {{ $t('notifications.starts', { date: startsAt }) }}
+            </p>
 
             <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-500">
                 <span>{{ when(n.created_at) }}</span>

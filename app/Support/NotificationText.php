@@ -39,14 +39,26 @@ class NotificationText
         return __($key, $replace, $locale);
     }
 
-    /** @return array<string> one line per church for slide-placement notices */
+    /** @return array<string> detail lines: one per church for slide-placement notices, plus the start date */
     public static function placementLines(Notification $n, ?string $locale = null): array
     {
-        return collect($n->data['params']['placements'] ?? [])
+        $params = $n->data['params'] ?? [];
+
+        $lines = collect($params['placements'] ?? [])
             ->map(fn ($p) => $p['entity'].': '.(! empty($p['shows'])
                 ? __('notifications.added_to', ['shows' => implode(', ', $p['shows'])], $locale)
-                : __('notifications.not_added', [], $locale)))
-            ->all();
+                : __('notifications.not_added', [], $locale)));
+
+        if (! empty($params['more'])) {
+            $lines->push(__('notifications.more_churches', ['n' => $params['more']], $locale));
+        }
+
+        if (! empty($params['starts_at'])) {
+            $date = \Illuminate\Support\Carbon::parse($params['starts_at'])->locale($locale ?? app()->getLocale())->isoFormat('LL');
+            $lines->push(__('notifications.starts', ['date' => $date], $locale));
+        }
+
+        return $lines->all();
     }
 
     public static function category(string $category, ?string $locale = null): string

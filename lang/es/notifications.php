@@ -35,6 +35,8 @@ return [
         'admin_shared'       => 'Diapositivas compartidas (admin)',
     ],
     'added_to'        => 'agregada a :shows',
+    'more_churches'   => 'y :n iglesias más',
+    'starts'          => 'Comienza a mostrarse el :date',
     'not_added'       => 'no se agregó a ninguna presentación',
     'view'            => 'Ver',
     'open_inbox'      => 'Abrir sus notificaciones',

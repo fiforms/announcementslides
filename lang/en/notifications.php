@@ -35,6 +35,8 @@ return [
         'admin_shared'       => 'Shared slides (admin)',
     ],
     'added_to'        => 'added to :shows',
+    'more_churches'   => 'and :n more churches',
+    'starts'          => 'Starts showing :date',
     'not_added'       => 'not added to any show',
     'view'            => 'View',
     'open_inbox'      => 'Open your notifications',
